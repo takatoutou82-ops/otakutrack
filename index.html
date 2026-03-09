@@ -1,0 +1,3628 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OtakuTrack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+:root {
+  --bg:      #09090d;
+  --bg2:     #0e0e14;
+  --bg3:     #13131a;
+  --bg4:     #18181f;
+  --surface: #1e1e28;
+  --s2:      #252530;
+  --border:  #2a2a38;
+  --border2: #343448;
+  --acc:     #8b7cf8;
+  --acc2:    #a99cff;
+  --acc3:    #6b5be6;
+  --acc-glow:rgba(139,124,248,0.25);
+  --manga:   #f472b6;
+  --anime:   #38bdf8;
+  --green:   #4ade80;
+  --orange:  #fb923c;
+  --red:     #f87171;
+  --yellow:  #fbbf24;
+  --text:    #ebebf5;
+  --t2:      #9898b8;
+  --t3:      #4a4a68;
+  --t4:      #2e2e45;
+  --r: 10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',sans-serif;font-size:14px;line-height:1.6;overflow-x:hidden;min-height:100vh}
+h1,h2,h3,h4,h5,h6{font-family:'Syne',sans-serif;font-weight:700;line-height:1.1}
+a{color:inherit;text-decoration:none}
+button{cursor:pointer;border:none;font-family:inherit;background:none}
+input,textarea,select{font-family:inherit}
+img{display:block}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── GRAIN OVERLAY ── */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;opacity:.025;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* ── NAV ── */
+#nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  height:52px;
+  background:rgba(9,9,13,.92);
+  backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+  padding:0 20px;gap:0;
+}
+.nav-logo{
+  font-family:'Syne',sans-serif;font-weight:800;font-size:16px;
+  display:flex;align-items:center;gap:7px;
+  margin-right:28px;cursor:pointer;flex-shrink:0;
+  letter-spacing:-0.3px;
+}
+.nav-logo-mark{
+  width:22px;height:22px;border-radius:6px;
+  background:linear-gradient(135deg,var(--acc3),var(--acc));
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:white;font-weight:800;
+  box-shadow:0 0 12px var(--acc-glow);
+}
+.nav-links{display:flex;gap:2px;align-items:center;flex:1}
+.nl{
+  padding:5px 13px;border-radius:7px;
+  font-size:13px;font-weight:500;color:var(--t2);
+  transition:all .15s;cursor:pointer;white-space:nowrap;
+}
+.nl:hover{color:var(--text);background:var(--surface)}
+.nl.on{color:var(--text);background:var(--surface)}
+.nl.manga-nl.on{color:var(--manga)}
+.nl.anime-nl.on{color:var(--anime)}
+.nav-r{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
+.nav-searchbox{
+  display:flex;align-items:center;gap:7px;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:8px;padding:5px 12px;width:200px;
+  transition:all .2s;
+}
+.nav-searchbox:focus-within{border-color:var(--acc);width:240px;box-shadow:0 0 0 3px rgba(139,124,248,.1)}
+.nav-searchbox input{background:none;border:none;outline:none;color:var(--text);font-size:13px;width:100%}
+.nav-searchbox input::placeholder{color:var(--t3)}
+
+/* ── PAGES ── */
+.pg{display:none;padding-top:52px;min-height:100vh;animation:fadeIn .25s ease}
+.pg.on{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.wrap{max-width:1200px;margin:0 auto;padding:0 20px}
+.pt32{padding-top:32px}.pb40{padding-bottom:40px}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:8px;font-weight:600;font-size:13px;transition:all .15s;font-family:'Syne',sans-serif;cursor:pointer;white-space:nowrap}
+.btn-primary{background:var(--acc);color:#fff;border:1px solid var(--acc)}
+.btn-primary:hover{background:var(--acc2);transform:translateY(-1px);box-shadow:0 6px 20px rgba(139,124,248,.3)}
+.btn-secondary{background:var(--surface);color:var(--text);border:1px solid var(--border2)}
+.btn-secondary:hover{background:var(--s2)}
+.btn-ghost{background:transparent;color:var(--t2);border:1px solid var(--border);padding:7px 14px;font-size:12.5px}
+.btn-ghost:hover{color:var(--text);background:var(--surface)}
+.btn-danger{background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.2);padding:6px 12px;font-size:12px}
+.btn-danger:hover{background:rgba(248,113,113,.2)}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-icon{width:32px;height:32px;padding:0;justify-content:center;border-radius:7px}
+
+/* ── SECTION HEADER ── */
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-bottom:13px;border-bottom:1px solid var(--border)}
+.sh-title{font-size:17px;font-weight:700;display:flex;align-items:center;gap:9px}
+.badge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:100px;font-family:'Syne',sans-serif;letter-spacing:.4px}
+.b-manga{background:rgba(244,114,182,.12);color:var(--manga);border:1px solid rgba(244,114,182,.2)}
+.b-anime{background:rgba(56,189,248,.12);color:var(--anime);border:1px solid rgba(56,189,248,.2)}
+.b-new{background:rgba(74,222,128,.12);color:var(--green);border:1px solid rgba(74,222,128,.2)}
+.b-cbz{background:rgba(251,146,60,.12);color:var(--orange);border:1px solid rgba(251,146,60,.2)}
+.sec{padding:32px 0}
+
+/* ── COVERS GRID ── */
+.cg{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px}
+.cg-lg{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
+
+.cc{cursor:pointer}
+.cc-wrap{
+  position:relative;border-radius:8px;overflow:hidden;aspect-ratio:2/3;
+  background:var(--bg3);margin-bottom:7px;
+  transition:transform .22s,box-shadow .22s;
+}
+.cc:hover .cc-wrap{transform:translateY(-4px);box-shadow:0 14px 36px rgba(0,0,0,.55)}
+.cc-img{width:100%;height:100%;object-fit:cover;transition:transform .3s}
+.cc:hover .cc-img{transform:scale(1.04)}
+.cc-overlay{
+  position:absolute;inset:0;
+  background:linear-gradient(to top,rgba(0,0,0,.88) 0%,transparent 55%);
+  opacity:0;transition:opacity .2s;
+  display:flex;flex-direction:column;justify-content:flex-end;padding:9px;gap:5px;
+}
+.cc:hover .cc-overlay{opacity:1}
+.cc-ov-btns{display:flex;gap:5px}
+.cc-ov-btn{
+  width:28px;height:28px;border-radius:6px;
+  background:rgba(255,255,255,.13);backdrop-filter:blur(4px);
+  border:1px solid rgba(255,255,255,.18);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;color:#fff;transition:background .15s;cursor:pointer;
+}
+.cc-ov-btn:hover{background:var(--acc)}
+.cc-rating{display:inline-flex;align-items:center;gap:3px;background:rgba(0,0,0,.65);border-radius:4px;padding:2px 6px;font-size:11px;font-weight:700;color:var(--yellow);width:fit-content}
+.type-pill{
+  position:absolute;top:7px;right:7px;
+  font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;
+  font-family:'Syne',sans-serif;letter-spacing:.4px;
+}
+.tp-manga{background:rgba(244,114,182,.88);color:#fff}
+.tp-anime{background:rgba(56,189,248,.88);color:#0e0e14}
+.tp-cbz{background:rgba(251,146,60,.88);color:#fff}
+.status-dot{
+  position:absolute;top:7px;left:7px;
+  width:7px;height:7px;border-radius:50%;
+}
+.sd-ongoing{background:var(--green);box-shadow:0 0 6px var(--green)}
+.sd-done{background:var(--acc2)}
+.sd-dropped{background:var(--red)}
+.sd-planned{background:var(--t3)}
+
+.cc-title{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Syne',sans-serif}
+.cc-meta{font-size:11px;color:var(--t3)}
+
+/* ── EMPTY STATE ── */
+.empty{
+  text-align:center;padding:80px 20px;
+  display:flex;flex-direction:column;align-items:center;gap:14px;
+}
+.empty-icon{font-size:48px;opacity:.3}
+.empty-title{font-size:20px;font-weight:700;color:var(--t2)}
+.empty-sub{font-size:14px;color:var(--t3);max-width:320px}
+
+/* ── HOME ── */
+.hero{
+  padding:48px 20px 40px;max-width:1200px;margin:0 auto;
+  position:relative;overflow:hidden;
+}
+.hero-glow{
+  position:absolute;top:-60px;right:-80px;
+  width:500px;height:400px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(139,124,248,.08) 0%,transparent 70%);
+  pointer-events:none;
+}
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:7px;
+  background:rgba(139,124,248,.1);border:1px solid rgba(139,124,248,.2);
+  border-radius:100px;padding:4px 13px;
+  font-size:11.5px;font-weight:600;color:var(--acc2);
+  margin-bottom:18px;font-family:'Syne',sans-serif;letter-spacing:.3px;
+}
+.hero h1{font-size:clamp(28px,4.5vw,46px);letter-spacing:-1.5px;margin-bottom:12px;font-weight:800}
+.hero h1 em{font-style:normal;color:var(--acc2)}
+.hero-sub{color:var(--t2);font-size:15px;max-width:420px;margin-bottom:26px}
+
+/* ── SEARCH FULL ── */
+.sf-wrap{display:flex;gap:10px;margin-bottom:18px;position:relative}
+.sf-input{
+  flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  padding:10px 16px;color:var(--text);font-size:14px;outline:none;transition:border-color .2s;
+}
+.sf-input:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(139,124,248,.08)}
+.sf-input::placeholder{color:var(--t3)}
+.sf-results{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:50;
+  background:var(--bg4);border:1px solid var(--border2);border-radius:10px;
+  max-height:360px;overflow-y:auto;
+  box-shadow:0 16px 48px rgba(0,0,0,.5);
+}
+.sfr-item{
+  display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;
+  transition:background .12s;border-bottom:1px solid var(--border);
+}
+.sfr-item:last-child{border-bottom:none}
+.sfr-item:hover{background:var(--surface)}
+.sfr-thumb{width:36px;height:52px;border-radius:5px;object-fit:cover;background:var(--bg3);flex-shrink:0}
+.sfr-info{flex:1;min-width:0}
+.sfr-title{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Syne',sans-serif}
+.sfr-meta{font-size:11px;color:var(--t3)}
+.sfr-type{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;flex-shrink:0;font-family:'Syne',sans-serif}
+
+/* ── FILTERS ── */
+.filters{padding:14px 0;border-bottom:1px solid var(--border);margin-bottom:20px}
+.filter-section{margin-bottom:10px}
+.filter-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--t4);margin-bottom:7px;font-family:'Syne',sans-serif}
+.filter-pills{display:flex;gap:6px;flex-wrap:wrap}
+.fb{
+  padding:5px 13px;border-radius:7px;
+  background:var(--bg3);border:1px solid var(--border);
+  color:var(--t2);font-size:12.5px;font-weight:500;
+  transition:all .13s;cursor:pointer;
+}
+.fb:hover{background:var(--surface);color:var(--text)}
+.fb.on{background:var(--surface);color:var(--acc2);border-color:var(--acc)}
+
+/* ── WORK PAGE ── */
+.work-hero{
+  position:relative;padding:36px 20px 28px;
+  max-width:1200px;margin:0 auto;
+}
+.work-bg{
+  position:absolute;inset:0;background-size:cover;background-position:center;
+  opacity:.04;filter:blur(50px);pointer-events:none;z-index:0;
+}
+.work-layout{display:grid;grid-template-columns:180px 1fr;gap:28px;position:relative;z-index:1}
+@media(max-width:580px){.work-layout{grid-template-columns:1fr}}
+.work-cover-box{
+  width:180px;aspect-ratio:2/3;border-radius:10px;overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.6);flex-shrink:0;background:var(--bg3);
+  position:relative;
+}
+.work-cover-box img{width:100%;height:100%;object-fit:cover;display:block}
+.cover-change-btn{
+  position:absolute;bottom:0;left:0;right:0;
+  background:rgba(0,0,0,.75);backdrop-filter:blur(4px);
+  color:#fff;font-size:11px;font-weight:700;font-family:'Syne',sans-serif;
+  padding:8px;text-align:center;cursor:pointer;border:none;width:100%;
+  opacity:0;transition:opacity .2s;
+}
+.work-cover-box:hover .cover-change-btn{opacity:1}
+.work-type-pill{
+  display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;
+  padding:4px 12px;border-radius:100px;margin-bottom:11px;font-family:'Syne',sans-serif;
+}
+.wtp-manga{background:rgba(244,114,182,.12);color:var(--manga);border:1px solid rgba(244,114,182,.25)}
+.wtp-anime{background:rgba(56,189,248,.12);color:var(--anime);border:1px solid rgba(56,189,248,.25)}
+.work-title{font-size:clamp(20px,3.5vw,32px);font-weight:800;letter-spacing:-.6px;margin-bottom:4px}
+.work-title-alt{font-size:13px;color:var(--t3);margin-bottom:14px}
+.wm-row{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:14px}
+.wm-item{display:flex;flex-direction:column;gap:2px}
+.wm-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.7px;font-weight:600}
+.wm-value{font-size:13.5px;font-weight:500}
+.genres-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px}
+.gtag{padding:4px 10px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);font-size:12px;color:var(--t2);cursor:pointer;transition:all .13s}
+.gtag:hover{border-color:var(--acc);color:var(--acc2)}
+.synopsis{color:var(--t2);line-height:1.75;font-size:13.5px;max-width:580px;margin-bottom:22px}
+.work-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+
+/* ── RATING /10 ── */
+.rating-box{display:flex;align-items:center;gap:10px}
+.rating-select{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);font-size:14px;font-weight:700;font-family:'Syne',sans-serif;outline:none;cursor:pointer;transition:border-color .15s;min-width:90px}
+.rating-select:focus{border-color:var(--acc)}
+.rating-display{color:var(--yellow);font-size:15px;font-weight:800;font-family:'Syne',sans-serif}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:22px}
+.tab{
+  padding:9px 18px;background:none;color:var(--t3);
+  font-size:13.5px;font-weight:600;font-family:'Syne',sans-serif;
+  border-bottom:2px solid transparent;transition:all .14s;margin-bottom:-1px;
+}
+.tab:hover{color:var(--t2)}
+.tab.on{color:var(--text);border-bottom-color:var(--acc)}
+.tp{display:none}.tp.on{display:block}
+
+/* ── PROGRESS ── */
+.prog-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px}
+.prog-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-bottom:12px}
+.prog-row{display:flex;align-items:center;gap:8px;margin-top:10px}
+.prog-num-input{
+  background:var(--bg);border:1px solid var(--border);border-radius:7px;
+  padding:5px 9px;color:var(--text);font-size:13px;outline:none;
+  width:65px;text-align:center;transition:border-color .15s;
+}
+.prog-num-input:focus{border-color:var(--acc)}
+.prog-bar-bg{background:var(--bg4);border-radius:100px;height:5px;overflow:hidden;margin:7px 0}
+.prog-bar-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--acc3),var(--acc));transition:width .5s ease}
+.prog-info{display:flex;justify-content:space-between;font-size:11px;color:var(--t3)}
+.status-sel{
+  background:var(--bg);border:1px solid var(--border);border-radius:7px;
+  padding:7px 11px;color:var(--text);font-size:13px;outline:none;width:100%;margin-top:10px;cursor:pointer;
+  transition:border-color .15s;
+}
+.status-sel:focus{border-color:var(--acc)}
+
+/* ── WORK PAGE GRID ── */
+.work-body{display:grid;grid-template-columns:1fr 280px;gap:28px;max-width:1200px;margin:0 auto;padding:0 20px 40px}
+@media(max-width:860px){.work-body{grid-template-columns:1fr}}
+.sidebar-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px}
+.sb-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-bottom:12px}
+
+/* ── REVIEW ── */
+.review-card{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:14px;margin-bottom:10px}
+.rv-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.rv-user{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600}
+.rv-avatar{width:26px;height:26px;border-radius:50%;background:var(--acc3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}
+.rv-stars{color:var(--yellow);font-size:12px}
+.rv-text{font-size:13px;color:var(--t2);line-height:1.65}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:28px}
+.stat-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:18px 14px;text-align:center}
+.stat-n{font-size:30px;font-weight:800;font-family:'Syne',sans-serif;line-height:1;margin-bottom:5px}
+.stat-l{font-size:11px;color:var(--t3);font-weight:500}
+.genre-bar-row{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+.gbl{font-size:12.5px;color:var(--t2);width:90px;flex-shrink:0}
+.gbt{flex:1;background:var(--bg4);border-radius:100px;height:7px;overflow:hidden}
+.gbf{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--acc3),var(--acc))}
+.gbc{font-size:11px;color:var(--t3);width:24px;text-align:right;flex-shrink:0}
+
+/* ── PROFILE ── */
+.profile-banner{
+  position:relative;height:420px;
+  background:var(--bg2);overflow:hidden;
+}
+.profile-banner-img{
+  width:100%;height:100%;object-fit:cover;display:block;
+}
+.profile-banner-bg{
+  position:absolute;inset:0;
+  background-repeat:no-repeat;
+  background-position:center center;
+  background-size:cover;
+}
+.profile-banner-empty{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;color:var(--t4);pointer-events:none;
+}
+.profile-banner-upload{
+  position:absolute;bottom:16px;right:16px;z-index:3;
+  background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.2);
+  color:#ddd;border-radius:8px;padding:8px 16px;font-size:12px;
+  cursor:pointer;backdrop-filter:blur(8px);
+  font-family:'Syne',sans-serif;font-weight:600;transition:all .15s;
+}
+.profile-banner-upload:hover{background:rgba(0,0,0,.9);color:#fff;border-color:rgba(255,255,255,.4)}
+.top5-row{display:flex;gap:9px;overflow-x:auto;padding-bottom:3px}
+.t5c{flex-shrink:0;width:88px;cursor:pointer}
+.t5-cover{width:88px;height:130px;border-radius:7px;overflow:hidden;background:var(--bg3);margin-bottom:5px;transition:transform .18s}
+.t5c:hover .t5-cover{transform:translateY(-3px)}
+.t5-cover img{width:100%;height:100%;object-fit:cover}
+.t5-rank{font-size:10px;color:var(--t3);font-weight:600}
+.t5-title{font-size:11.5px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── LISTS ── */
+.lists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.list-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s,transform .15s}
+.list-card:hover{border-color:var(--acc);transform:translateY(-2px)}
+.lc-covers{display:flex;gap:5px;margin-bottom:12px}
+.lc-cov{width:42px;height:60px;border-radius:5px;overflow:hidden;background:var(--bg4)}
+.lc-cov img{width:100%;height:100%;object-fit:cover}
+.lc-title{font-size:14px;font-weight:700;font-family:'Syne',sans-serif;margin-bottom:3px}
+.lc-meta{font-size:11.5px;color:var(--t3)}
+
+/* ── COLLECTION ── */
+.coll-item{
+  display:flex;align-items:center;gap:13px;padding:11px 0;
+  border-bottom:1px solid var(--border);
+}
+.coll-item:last-child{border-bottom:none}
+.coll-cov{width:38px;height:55px;border-radius:5px;overflow:hidden;background:var(--bg3);flex-shrink:0}
+.coll-cov img{width:100%;height:100%;object-fit:cover}
+.coll-info{flex:1;min-width:0}
+.coll-title{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Syne',sans-serif}
+.coll-meta{font-size:11px;color:var(--t3)}
+.vol-ctrl{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.vc-btn{width:24px;height:24px;border-radius:6px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .13s}
+.vc-btn:hover{background:var(--acc);border-color:var(--acc)}
+.vc-n{font-size:13px;min-width:18px;text-align:center;font-weight:600}
+
+/* ── CBZ ── */
+.cbz-upload-area{
+  border:2px dashed var(--border2);border-radius:12px;padding:48px 24px;
+  text-align:center;cursor:pointer;transition:all .2s;background:var(--bg3);
+  margin-bottom:24px;
+}
+.cbz-upload-area:hover,.cbz-upload-area.drag{border-color:var(--acc);background:rgba(139,124,248,.04)}
+.cbz-icon{font-size:40px;margin-bottom:12px;opacity:.5}
+.cbz-title{font-size:16px;font-weight:700;margin-bottom:5px;font-family:'Syne',sans-serif}
+.cbz-sub{font-size:13px;color:var(--t3)}
+.cbz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.cbz-card{background:var(--bg3);border:1px solid var(--border);border-radius:9px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s}
+.cbz-card:hover{border-color:var(--orange);transform:translateY(-3px)}
+.cbz-thumb{width:100%;aspect-ratio:2/3;background:linear-gradient(135deg,var(--bg4),var(--surface));display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--t4)}
+.cbz-info{padding:10px 12px}
+.cbz-name{font-size:13px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.cbz-size{font-size:11px;color:var(--t3)}
+
+/* ── READER ── */
+#pg-reader{background:#000;display:none;flex-direction:column}
+#pg-reader.on{display:flex}
+.reader-top{background:rgba(0,0,0,.9);border-bottom:1px solid #1a1a1a;padding:10px 18px;display:flex;align-items:center;gap:14px}
+.reader-ch-sel{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:7px;padding:5px 11px;color:#eee;font-size:13px;outline:none}
+.reader-body{flex:1;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:12px}
+.reader-page-img{max-width:820px;width:100%;display:block;margin-bottom:1px;transform-origin:top center;transition:transform .1s}
+.reader-ctrl{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background:rgba(0,0,0,.88);backdrop-filter:blur(12px);border:1px solid #2a2a2a;border-radius:100px;padding:7px 15px;z-index:10}
+.rc-btn{background:none;border:none;color:#777;font-size:20px;padding:3px 7px;transition:color .13s;cursor:pointer;line-height:1}
+.rc-btn:hover{color:#fff}
+.rc-info{color:#555;font-size:12.5px;display:flex;align-items:center;padding:0 4px}
+.rc-sep{width:1px;background:#2a2a2a;margin:0 4px;align-self:stretch}
+
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .18s}
+.modal-bg.on{opacity:1;pointer-events:auto}
+.modal{background:var(--bg4);border:1px solid var(--border2);border-radius:14px;padding:24px;width:100%;max-width:420px;transform:translateY(8px);transition:transform .18s}
+.modal-bg.on .modal{transform:translateY(0)}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center}
+.modal-close{color:var(--t3);font-size:18px;cursor:pointer;line-height:1}
+.modal-close:hover{color:var(--text)}
+.fg{margin-bottom:14px}
+.fl{display:block;font-size:11px;font-weight:700;color:var(--t2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.fi{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:9px 11px;color:var(--text);font-size:13.5px;outline:none;transition:border-color .15s}
+.fi:focus{border-color:var(--acc)}
+textarea.fi{resize:vertical;min-height:72px}
+
+/* ── TOAST ── */
+.toast-zone{position:fixed;bottom:18px;right:18px;z-index:400;display:flex;flex-direction:column;gap:7px}
+.toast{background:var(--s2);border:1px solid var(--border2);border-left:3px solid var(--acc);border-radius:9px;padding:11px 15px;font-size:13px;display:flex;align-items:center;gap:8px;min-width:220px;animation:tIn .25s ease,tOut .25s ease 2.5s forwards}
+.toast.ok{border-left-color:var(--green)}
+.toast.err{border-left-color:var(--red)}
+@keyframes tIn{from{transform:translateX(14px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes tOut{to{opacity:0;transform:translateX(8px)}}
+
+/* ── LOADING ── */
+.loading{display:flex;align-items:center;justify-content:center;padding:60px;gap:10px;color:var(--t3);font-size:14px}
+.spin{width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── PAGINATION ── */
+.pager{display:flex;align-items:center;gap:7px;justify-content:center;margin-top:28px;flex-wrap:wrap}
+.page-btn{width:34px;height:34px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);color:var(--t2);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;transition:all .13s;cursor:pointer}
+.page-btn:hover{background:var(--surface);color:var(--text)}
+.page-btn.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.page-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── SCORE DISPLAY ── */
+.score-display{display:inline-flex;align-items:center;gap:5px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);border-radius:6px;padding:3px 9px}
+.score-val{font-size:13px;font-weight:700;color:var(--yellow);font-family:'Syne',sans-serif}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+
+  /* Fix overflow horizontal GLOBAL */
+  *{box-sizing:border-box}
+  body,html{overflow-x:hidden;width:100%;max-width:100vw}
+  .pg,.wrap,.sec,section,main{max-width:100%;overflow-x:hidden}
+
+  /* Nav */
+  .nav{padding:0 10px;height:48px;gap:6px}
+  .nav-logo{font-size:13px;gap:5px}
+  .nav-links{gap:0;flex:1;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;min-width:0}
+  .nav-links::-webkit-scrollbar{display:none}
+  .nl{padding:4px 7px;font-size:11px;white-space:nowrap;border-radius:6px}
+  .nav-searchbox{display:none}
+  .nav-r{gap:4px;flex-shrink:0}
+
+  /* Wrap */
+  .wrap{padding:0 10px;width:100%}
+  .pt32{padding-top:16px}
+
+  /* Hero home */
+  .hero{padding:20px 10px}
+  .hero h1{font-size:20px;line-height:1.2}
+  .hero p{font-size:13px}
+  .hero-btns{flex-wrap:wrap;gap:8px}
+
+  /* Grilles — 3 colonnes égales partout */
+  .cg,.cg-lg{
+    display:grid !important;
+    grid-template-columns:repeat(3,1fr) !important;
+    gap:8px !important;
+    width:100% !important;
+  }
+  .cc{width:100% !important;min-width:0 !important;max-width:100% !important}
+  .cc-wrap{aspect-ratio:2/3 !important;height:auto !important;width:100% !important}
+  .cc-img{width:100% !important;height:100% !important;object-fit:cover !important}
+  .cc-title{font-size:10px !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cc-meta{font-size:9px !important}
+
+  /* Sections */
+  .sh{margin-bottom:12px;padding-bottom:10px;flex-wrap:wrap;gap:6px}
+  .sh-title{font-size:14px}
+  .sec{margin-top:20px}
+
+  /* Work page */
+  .work-header{flex-direction:column;align-items:center;gap:14px;padding:14px 10px;width:100%}
+  .work-cover-box{width:110px !important;height:163px !important;margin:0 auto;flex-shrink:0 !important}
+  .work-title{font-size:18px;text-align:center}
+  .work-title-alt{text-align:center;font-size:11px}
+  .wm-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  .wm-item{font-size:11px}
+  .genres-row{justify-content:center;flex-wrap:wrap}
+  .synopsis{font-size:13px;line-height:1.6}
+  .work-actions{flex-wrap:wrap;gap:6px;justify-content:center}
+  .work-actions .btn,.work-actions button{font-size:11px !important;padding:6px 10px !important}
+  .read-dropdown-menu{min-width:140px;left:auto;right:0}
+  .work-body{grid-template-columns:1fr !important;gap:14px;padding:0 10px 32px;width:100%}
+  #work-sidebar{display:none !important}
+
+  /* Tabs */
+  .tabs{overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;gap:2px;width:100%}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{white-space:nowrap;font-size:11px;padding:6px 10px}
+
+  /* Bannière profil */
+  .profile-banner{height:180px}
+  .profile-banner-upload{font-size:10px;padding:5px 10px;bottom:10px;right:10px}
+
+  /* Top 5 profil */
+  #pg-profile .wrap > div:first-child{grid-template-columns:1fr !important;gap:20px}
+
+  /* Stats */
+  #stats-grid{grid-template-columns:repeat(2,1fr) !important}
+
+  /* Suivi — empiler manga + animé verticalement */
+  #suivi-grid{grid-template-columns:1fr !important}
+
+  /* Suivi */
+  .tracking-tabs{overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;gap:4px}
+  .tracking-tabs::-webkit-scrollbar{display:none}
+  .tracking-tab{white-space:nowrap;font-size:11px;padding:5px 10px}
+
+  /* Collection */
+  .book-spine{width:20px !important;font-size:7px}
+
+  /* Modals */
+  .modal-box{width:96vw !important;max-height:88vh;padding:16px 12px;border-radius:12px}
+
+  /* Search results */
+  .sfr-item{gap:8px}
+  .sfr-cover{width:38px;height:55px}
+  .sfr-title{font-size:13px}
+
+  /* Crop banner */
+  #banner-crop-preview{height:180px}
+  #banner-crop-box{border-radius:10px;width:96vw}
+}
+
+@media(max-width:400px){
+  .cg,.cg-lg{grid-template-columns:repeat(2,1fr) !important;gap:7px !important}
+  .nl{font-size:10px;padding:3px 6px}
+}
+
+/* ── ANNUAL ── */
+.annual-bars{display:flex;align-items:flex-end;gap:7px;height:70px}
+.ab{flex:1;border-radius:3px 3px 0 0;background:var(--acc);opacity:.35;transition:opacity .15s;cursor:pointer;min-width:16px}
+.ab:hover,.ab.cur{opacity:1}
+.annual-lbls{display:flex;gap:7px;margin-top:4px}
+.al{flex:1;font-size:10px;color:var(--t4);text-align:center}
+
+/* ── INLINE INFO ── */
+.info-note{background:rgba(139,124,248,.07);border-left:2px solid var(--acc);padding:9px 13px;border-radius:0 7px 7px 0;font-size:13px;color:var(--t2);margin:14px 0;font-style:italic}
+
+.back-btn{display:inline-flex;align-items:center;gap:6px;color:var(--t3);font-size:13px;background:none;border:none;padding:0;margin-bottom:18px;transition:color .13s;cursor:pointer}
+.back-btn:hover{color:var(--text)}
+
+/* ── SCORE INPUT DISPLAY ── */
+.your-rating-box{display:flex;flex-direction:column;gap:4px}
+.yr-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+
+/* ── COVER LIGHTBOX ── */
+.cover-lightbox{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.93);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px}
+.cover-lightbox.on{display:flex}
+.cover-lightbox-img{max-height:78vh;max-width:86vw;border-radius:10px;box-shadow:0 30px 80px rgba(0,0,0,.8);object-fit:contain;display:block}
+.cover-lightbox-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.clb-close{position:fixed;top:18px;right:22px;color:#aaa;font-size:26px;cursor:pointer;line-height:1;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.15);border-radius:8px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;z-index:10}
+.clb-close:hover{color:#fff;background:rgba(255,255,255,.1)}
+.work-cover-box{cursor:zoom-in;position:relative;border-radius:10px;overflow:hidden}
+.work-cover-box img{width:100%;height:100%;object-fit:cover;transition:filter .2s;display:block}
+.work-cover-box:hover img{filter:brightness(.7)}
+.work-cover-box::after{content:'🔍';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;opacity:0;transition:opacity .2s;pointer-events:none}
+.work-cover-box:hover::after{opacity:1}
+
+/* ── VOLUME PICKER ── */
+.vol-picker{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.vp-num{
+  width:32px;height:32px;border-radius:6px;border:1.5px solid var(--border);
+  background:var(--bg3);color:var(--t2);font-size:12px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .12s;font-family:'Syne',sans-serif;
+}
+.vp-num:hover{border-color:var(--acc);color:var(--acc)}
+.vp-num.owned{background:var(--manga);border-color:var(--manga);color:#fff}
+
+/* ── COLLECTION TABS ── */
+.coll-tabs{display:flex;gap:8px;margin-bottom:20px}
+.coll-tab{padding:8px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg3);
+  color:var(--t2);font-size:13px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;transition:all .15s}
+.coll-tab.on{background:var(--acc);border-color:var(--acc);color:#fff}
+
+/* ── CBZ / ONLINE ENTRIES ── */
+.media-entry{
+  display:flex;align-items:center;gap:12px;padding:10px 0;
+  border-bottom:1px solid var(--border);
+}
+.media-entry:last-child{border-bottom:none}
+.media-entry-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.media-cbz .media-entry-icon{background:rgba(251,191,36,.12)}
+.media-online .media-entry-icon{background:rgba(56,189,248,.12)}
+.media-entry-info{flex:1;min-width:0}
+.media-entry-title{font-size:13.5px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.media-entry-sub{font-size:11px;color:var(--t3);margin-top:2px}
+.media-entry-del{background:none;border:none;color:var(--t4);cursor:pointer;font-size:16px;padding:4px;border-radius:5px;transition:color .1s}
+.media-entry-del:hover{color:var(--red)}
+.add-media-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.add-media-row input{flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-size:13px;font-family:'Syne',sans-serif;outline:none}
+.add-media-row input:focus{border-color:var(--acc)}
+
+/* ── RELATIONS SECTION ── */
+.relation-group{margin-bottom:18px}
+.relation-group-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:8px;font-family:'Syne',sans-serif}
+.relation-card{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);margin-bottom:8px;transition:border-color .15s}
+.relation-card.rel-clickable{cursor:pointer}
+.relation-card.rel-clickable:hover{border-color:var(--acc)}
+.relation-card img{width:46px;height:66px;border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg4)}
+.relation-card-info{flex:1;min-width:0}
+.relation-card-title{font-size:13px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.relation-card-meta{font-size:11px;color:var(--t3);margin-top:2px}
+
+/* ── TRACKING PAGE ── */
+.tracking-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px}
+.tracking-tab{padding:10px 22px;font-size:13px;font-weight:700;font-family:'Syne',sans-serif;color:var(--t2);border:none;background:none;cursor:pointer;position:relative;transition:color .15s}
+.tracking-tab.on{color:var(--text)}
+.tracking-tab.on::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;background:var(--acc);border-radius:2px}
+.tracking-section{display:none}
+.tracking-section.on{display:block}
+
+.track-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;padding:4px 0}
+
+/* progress bar mini */
+.mini-prog{height:3px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden}
+.mini-prog-fill{height:100%;border-radius:2px;background:var(--acc);transition:width .3s}
+
+/* ── LIBRARY / BOOKSHELF ── */
+.library-header{display:flex;align-items:center;gap:14px;margin-bottom:28px;flex-wrap:wrap}
+.library-add-btn{display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--surface);border:1.5px dashed var(--border2);border-radius:10px;color:var(--t2);font-size:13px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer;transition:all .15s}
+.library-add-btn:hover{border-color:var(--acc);color:var(--acc);background:rgba(139,124,248,.06)}
+
+.bookshelf{
+  background:linear-gradient(180deg,var(--bg3) 0%,#1a1014 100%);
+  border:1px solid var(--border);border-radius:14px;padding:20px 20px 0;
+  margin-bottom:28px;position:relative;overflow:hidden;
+}
+.bookshelf::before{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:18px;
+  background:linear-gradient(180deg,#2a1a12 0%,#3d2318 60%,#4a2b1e 100%);
+  border-radius:0 0 14px 14px;
+}
+.bookshelf-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:14px;font-family:'Syne',sans-serif}
+.bookshelf-row{display:flex;gap:6px;padding-bottom:22px;overflow-x:auto;min-height:160px;align-items:flex-end;scrollbar-width:thin;scrollbar-color:var(--border2) var(--bg4)}
+.book-spine{
+  width:34px;flex-shrink:0;border-radius:3px 6px 6px 3px;
+  cursor:pointer;position:relative;transition:transform .2s,filter .2s;
+  box-shadow:3px 0 8px rgba(0,0,0,.6);
+}
+.book-spine:hover{transform:translateY(-8px) scaleY(1.02);filter:brightness(1.15);z-index:2}
+.book-spine img{width:34px;height:110px;object-fit:cover;border-radius:3px 6px 6px 3px;display:block}
+.book-spine.not-owned{opacity:.25;filter:grayscale(1)}
+.book-num{
+  position:absolute;bottom:4px;left:0;right:0;text-align:center;
+  font-size:9px;font-weight:800;color:rgba(255,255,255,.8);
+  font-family:'Syne',sans-serif;text-shadow:0 1px 3px rgba(0,0,0,.9);
+}
+.book-add-slot{
+  width:34px;flex-shrink:0;height:110px;border:1.5px dashed var(--border2);
+  border-radius:3px 6px 6px 3px;display:flex;align-items:center;justify-content:center;
+  color:var(--t4);font-size:18px;cursor:pointer;transition:all .15s;
+}
+.book-add-slot:hover{border-color:var(--acc);color:var(--acc)}
+
+.bookshelf-manga-title{
+  font-size:14px;font-weight:800;font-family:'Syne',sans-serif;
+  margin-bottom:10px;display:flex;align-items:center;gap:10px;
+}
+.shelf-owned-count{font-size:11px;color:var(--t3);font-weight:600}
+
+/* ── TOP 5 MANUEL ── */
+.top5-manual{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
+.top5-slot{
+  width:88px;cursor:pointer;position:relative;
+}
+.top5-slot-cover{
+  width:88px;height:130px;border-radius:8px;overflow:hidden;background:var(--surface);
+  border:1.5px dashed var(--border2);display:flex;align-items:center;justify-content:center;
+  font-size:22px;color:var(--t4);transition:all .15s;margin-bottom:5px;
+}
+.top5-slot-cover img{width:100%;height:100%;object-fit:cover}
+.top5-slot-cover:hover{border-color:var(--acc);color:var(--acc)}
+.top5-slot.filled .top5-slot-cover{border-style:solid;border-color:transparent}
+.top5-rank{font-size:10px;color:var(--t3);font-weight:700;font-family:'Syne',sans-serif}
+.top5-title{font-size:11.5px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top5-slot-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.7);border-radius:4px;color:#fff;font-size:11px;padding:2px 5px;opacity:0;transition:opacity .15s;border:none;cursor:pointer}
+.top5-slot:hover .top5-slot-del{opacity:1}
+
+/* ── ADD TO LIBRARY MODAL ── */
+.lib-search-results{max-height:300px;overflow-y:auto;margin-top:8px}
+.lib-search-item{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer;transition:background .1s}
+.lib-search-item:hover{background:var(--surface)}
+.lib-search-item img{width:36px;height:52px;object-fit:cover;border-radius:5px;flex-shrink:0}
+/* ── READ DROPDOWN ── */
+.read-dropdown{position:relative;display:inline-block}
+.read-dropdown-menu{
+  display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:100;
+  background:var(--bg4);border:1px solid var(--border2);border-radius:9px;
+  min-width:180px;overflow:hidden;
+  box-shadow:0 12px 32px rgba(0,0,0,.5);
+}
+.read-dropdown-menu.on{display:block}
+.read-dropdown-menu a{
+  display:block;padding:10px 14px;font-size:13px;font-weight:600;
+  color:var(--t2);font-family:'Syne',sans-serif;
+  transition:background .12s,color .12s;cursor:pointer;
+  border-bottom:1px solid var(--border);text-decoration:none;
+}
+.read-dropdown-menu a:last-child{border-bottom:none}
+.read-dropdown-menu a:hover{background:var(--surface);color:#e879f9}
+/* ── BANNER CROP ── */
+#banner-crop-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#banner-crop-box{position:relative;width:800px;max-width:95vw;background:var(--bg2);border-radius:16px;overflow:hidden;border:1px solid var(--border2)}
+#banner-crop-preview{width:100%;height:300px;overflow:hidden;position:relative;background:#000;cursor:grab;user-select:none}
+#banner-crop-preview.dragging{cursor:grabbing}
+#banner-crop-img{position:absolute;transform-origin:0 0;will-change:transform}
+#banner-crop-controls{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.crop-zoom-row{display:flex;align-items:center;gap:12px}
+.crop-zoom-row label{font-size:12px;color:var(--t3);font-family:'Syne',sans-serif;font-weight:600;width:50px}
+.crop-zoom-row input[type=range]{flex:1;accent-color:var(--acc)}
+.crop-btns{display:flex;gap:10px;justify-content:flex-end}
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<div id="nav">
+  <div class="nav-logo" onclick="nav('home')">
+    <div class="nav-logo-mark">OT</div>
+    OtakuTrack
+  </div>
+  <div class="nav-links">
+    <div class="nl on" data-page="home" onclick="nav('home');activate(this)">Accueil</div>
+    <div class="nl manga-nl" data-page="manga" onclick="nav('manga');activate(this)">Manga</div>
+    <div class="nl anime-nl" data-page="anime" onclick="nav('anime');activate(this)">Animé</div>
+    <div class="nl" data-page="profile" onclick="nav('profile');activate(this)">Profil</div>
+    <div class="nl" data-page="lists" onclick="nav('lists');activate(this)">Listes</div>
+    <div class="nl" data-page="suivi" onclick="nav('suivi');activate(this)">Suivi</div>
+    <div class="nl" data-page="stats" onclick="nav('stats');activate(this)">Stats</div>
+    <div class="nl" data-page="collection" onclick="nav('collection');activate(this)">Collection</div>
+  </div>
+  <div class="nav-r">
+    <div class="nav-searchbox">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--t3);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="navSearchInput" type="text" placeholder="Rechercher…" oninput="navSearch(this.value)">
+    </div>
+    <button id="fb-auth-btn" onclick="handleAuthClick()" style="display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:5px 10px;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+      <span id="fb-auth-label">Connexion</span>
+    </button>
+  </div>
+</div>
+
+<!-- ═══ TOAST ZONE ═══ -->
+<div class="toast-zone" id="toastZone"></div>
+
+<!-- ═══ MODALS ═══ -->
+<!-- Sync import modal -->
+<div class="modal-bg" id="m-sync">
+  <div class="modal-box" style="max-width:480px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px">📥 Importer un code</h3>
+      <button onclick="closeM('m-sync')" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--t3);margin-bottom:14px">Colle le code exporté depuis l'autre appareil. Tes données existantes seront fusionnées, rien ne sera perdu.</p>
+    <textarea id="sync-code-input" placeholder="Colle ton code ici…" style="width:100%;height:120px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px;color:var(--text);font-size:12px;font-family:monospace;resize:none;outline:none;box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeM('m-sync')">Annuler</button>
+      <button class="btn btn-primary" onclick="importSyncCode()">Fusionner</button>
+    </div>
+  </div>
+</div>
+<!-- Add to list modal -->
+<div class="modal-bg" id="m-list">
+  <div class="modal">
+    <div class="modal-title">Ajouter à une liste <span class="modal-close" onclick="closeM('m-list')">✕</span></div>
+    <div id="m-list-body"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-list')">Annuler</button>
+      <button class="btn btn-primary" style="flex:1" onclick="confirmList()">Confirmer</button>
+    </div>
+  </div>
+</div>
+<!-- Create list -->
+<div class="modal-bg" id="m-createlist">
+  <div class="modal">
+    <div class="modal-title">Nouvelle liste <span class="modal-close" onclick="closeM('m-createlist')">✕</span></div>
+    <div class="fg"><label class="fl">Titre</label><input class="fi" id="cl-title" placeholder="Ex: Top mangas 2024"></div>
+    <div class="fg"><label class="fl">Description</label><textarea class="fi" id="cl-desc" placeholder="Décrivez votre liste…"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-createlist')">Annuler</button>
+      <button class="btn btn-primary" style="flex:1" onclick="doCreateList()">Créer</button>
+    </div>
+  </div>
+</div>
+<!-- Write review -->
+<div class="modal-bg" id="m-review">
+  <div class="modal">
+    <div class="modal-title">Écrire une critique <span class="modal-close" onclick="closeM('m-review')">✕</span></div>
+    <div class="fg">
+      <label class="fl">Note</label>
+      <div class="stars" id="m-review-stars">
+        <span class="star" onclick="setRvRating(1)">★</span><span class="star" onclick="setRvRating(2)">★</span>
+        <span class="star" onclick="setRvRating(3)">★</span><span class="star" onclick="setRvRating(4)">★</span>
+        <span class="star" onclick="setRvRating(5)">★</span>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Critique</label><textarea class="fi" id="rv-text" placeholder="Vos impressions…" style="min-height:110px"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-review')">Annuler</button>
+      <button class="btn btn-primary" style="flex:1" onclick="submitReview()">Publier</button>
+    </div>
+  </div>
+</div>
+<!-- Edit profile -->
+<div class="modal-bg" id="m-profile">
+  <div class="modal">
+    <div class="modal-title">Modifier le profil <span class="modal-close" onclick="closeM('m-profile')">✕</span></div>
+    <div class="fg"><label class="fl">Pseudo</label><input class="fi" id="ep-name" placeholder="Votre pseudo"></div>
+    <div class="fg"><label class="fl">Bio</label><textarea class="fi" id="ep-bio" placeholder="Décrivez-vous…"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-profile')">Annuler</button>
+      <button class="btn btn-primary" style="flex:1" onclick="saveProfile()">Sauvegarder</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ADD TO PHYSICAL LIBRARY -->
+<div class="modal-bg" id="m-add-phys">
+  <div class="modal" style="max-width:500px;width:100%">
+    <div class="modal-title">Ajouter à la bibliothèque physique <span class="modal-close" onclick="closeM('m-add-phys')">✕</span></div>
+    <div class="fg"><label class="fl">Rechercher un manga</label>
+      <input class="fi" id="phys-search-input" placeholder="Titre du manga…" oninput="searchForCollection(this.value,'phys')">
+    </div>
+    <div class="lib-search-results" id="phys-search-results"></div>
+    <div id="phys-picker-area" style="display:none">
+      <div style="font-size:13px;font-weight:700;margin:14px 0 8px;font-family:'Syne',sans-serif" id="phys-picker-title"></div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:10px">Clique sur les tomes que tu possèdes</div>
+      <div class="vol-picker" id="phys-vol-picker"></div>
+      <button class="btn btn-primary" style="width:100%;margin-top:14px" onclick="confirmPhysAdd()">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ADD CBZ -->
+<div class="modal-bg" id="m-add-cbz">
+  <div class="modal" style="max-width:500px;width:100%">
+    <div class="modal-title">Ajouter une série CBZ <span class="modal-close" onclick="closeM('m-add-cbz')">✕</span></div>
+    <div class="fg"><label class="fl">Rechercher un manga</label>
+      <input class="fi" id="cbz-search-input" placeholder="Titre du manga…" oninput="searchForCollection(this.value,'cbz')">
+    </div>
+    <div class="lib-search-results" id="cbz-search-results"></div>
+    <div id="cbz-form-area" style="display:none">
+      <div style="font-size:13px;font-weight:700;margin:14px 0 8px;font-family:'Syne',sans-serif" id="cbz-form-title"></div>
+      <div class="fg"><label class="fl">Support (tablette, clé USB…)</label><input class="fi" id="cbz-device-input" placeholder="ex: tablette"></div>
+      <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="confirmCbzAdd()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ADD ONLINE -->
+<div class="modal-bg" id="m-add-online">
+  <div class="modal" style="max-width:500px;width:100%">
+    <div class="modal-title">Ajouter une lecture en ligne <span class="modal-close" onclick="closeM('m-add-online')">✕</span></div>
+    <div class="fg"><label class="fl">Rechercher un manga / animé</label>
+      <input class="fi" id="online-search-input" placeholder="Titre…" oninput="searchForCollection(this.value,'online')">
+    </div>
+    <div class="lib-search-results" id="online-search-results"></div>
+    <div id="online-form-area" style="display:none">
+      <div style="font-size:13px;font-weight:700;margin:14px 0 8px;font-family:'Syne',sans-serif" id="online-form-title"></div>
+      <div class="fg"><label class="fl">Nom du site</label><input class="fi" id="online-name-input" placeholder="ex: Anime-Sama"></div>
+      <div class="fg"><label class="fl">URL (optionnel)</label><input class="fi" id="online-url-input" placeholder="https://…"></div>
+      <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="confirmOnlineAdd()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: TOP5 PICKER -->
+<div class="modal-bg" id="m-top5-pick">
+  <div class="modal" style="max-width:480px;width:100%">
+    <div class="modal-title">Choisir une œuvre <span class="modal-close" onclick="closeM('m-top5-pick')">✕</span></div>
+    <div class="lib-search-results" id="top5-pick-list" style="max-height:380px"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PAGE: HOME -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="pg on" id="pg-home">
+  <div class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-eyebrow">✦ Votre bibliothèque manga &amp; animé</div>
+    <h1>Suivez chaque <em>œuvre</em><br>que vous aimez</h1>
+    <p class="hero-sub">Cataloguez vos lectures, suivez vos animés, gérez votre collection — tout au même endroit.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="nav('manga');activate(document.querySelector('[data-page=manga]'))">Parcourir les mangas</button>
+      <button class="btn btn-secondary" onclick="nav('anime');activate(document.querySelector('[data-page=anime]'))">Parcourir les animés</button>
+    </div>
+  </div>
+
+  <div class="wrap pb40">
+    <!-- Recommandations -->
+    <div id="home-reco-sec" style="display:none">
+      <div class="sh">
+        <h2 class="sh-title">✦ Pour toi <span class="badge b-new">RECO</span></h2>
+        <button class="btn btn-ghost" onclick="loadRecommendations(true)">Actualiser →</button>
+      </div>
+      <div id="home-reco-wrap"><div class="loading"><div class="spin"></div></div></div>
+      <div style="margin-top:28px"></div>
+    </div>
+
+    <!-- In progress -->
+    <div id="home-inprogress-sec" style="display:none">
+      <div class="sh"><h2 class="sh-title">Continuer à lire / voir</h2></div>
+      <div class="cg" id="home-inprogress"></div>
+      <div style="margin-top:28px"></div>
+    </div>
+
+    <!-- Popular from API -->
+    <div class="sec">
+      <div class="sh">
+        <h2 class="sh-title">Populaires en ce moment <span class="badge b-new">TENDANCE</span></h2>
+        <button class="btn btn-ghost" onclick="nav('manga');activate(document.querySelector('[data-page=manga]'))">Voir tout →</button>
+      </div>
+      <div id="home-popular-wrap"><div class="loading"><div class="spin"></div> Chargement…</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px" id="home-twocol">
+      <div class="sec">
+        <div class="sh">
+          <h2 class="sh-title">Manga <span class="badge b-manga">MANGA</span></h2>
+          <button class="btn btn-ghost" onclick="nav('manga');activate(document.querySelector('[data-page=manga]'))">Tout →</button>
+        </div>
+        <div id="home-manga-wrap"><div class="loading"><div class="spin"></div></div></div>
+      </div>
+      <div class="sec">
+        <div class="sh">
+          <h2 class="sh-title">Animé <span class="badge b-anime">ANIMÉ</span></h2>
+          <button class="btn btn-ghost" onclick="nav('anime');activate(document.querySelector('[data-page=anime]'))">Tout →</button>
+        </div>
+        <div id="home-anime-wrap"><div class="loading"><div class="spin"></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PAGE: MANGA -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="pg" id="pg-manga">
+  <div class="wrap pt32 pb40">
+    <div class="sh"><h1 class="sh-title" style="font-size:22px">Catalogue Manga <span class="badge b-manga">MANGA</span></h1></div>
+    <div class="sf-wrap" style="position:relative">
+      <input class="sf-input" id="manga-search" type="text" placeholder="🔍 Rechercher un manga par titre, auteur…" oninput="onCatalogSearch('manga',this.value)">
+      <div class="sf-results" id="manga-search-results" style="display:none"></div>
+    </div>
+    <div class="filters" id="manga-filters">
+      <div class="filter-section">
+        <div class="filter-section-label">Genres</div>
+        <div class="filter-pills" id="manga-genre-pills"><span style="color:var(--t4);font-size:12px">Chargement…</span></div>
+      </div>
+    </div>
+    <div id="manga-catalog-wrap"><div class="loading"><div class="spin"></div> Chargement…</div></div>
+    <div class="pager" id="manga-pager"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PAGE: ANIME -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="pg" id="pg-anime">
+  <div class="wrap pt32 pb40">
+    <div class="sh"><h1 class="sh-title" style="font-size:22px">Catalogue Animé <span class="badge b-anime">ANIMÉ</span></h1></div>
+    <div class="sf-wrap">
+      <input class="sf-input" id="anime-search" type="text" placeholder="🔍 Rechercher un animé par titre, studio…" oninput="onCatalogSearch('anime',this.value)">
+      <div class="sf-results" id="anime-search-results" style="display:none"></div>
+    </div>
+    <div class="filters" id="anime-filters">
+      <div class="filter-section">
+        <div class="filter-section-label">Genres</div>
+        <div class="filter-pills" id="anime-genre-pills"><span style="color:var(--t4);font-size:12px">Chargement…</span></div>
+      </div>
+    </div>
+    <div id="anime-catalog-wrap"><div class="loading"><div class="spin"></div> Chargement…</div></div>
+    <div class="pager" id="anime-pager"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PAGE: WORK DETAIL -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="pg" id="pg-work">
+  <div class="work-hero">
+    <div class="work-bg" id="work-bg"></div>
+    <div class="wrap"><button class="back-btn" onclick="goBack()">← Retour</button></div>
+    <div class="wrap">
+      <div class="work-layout" id="work-layout"></div>
+    </div>
+  </div>
+  <div class="work-body">
+    <div>
+      <div class="tabs" id="work-tabs">
+        <button class="tab on" onclick="switchTab(this,'tp-progress')">Progression</button>
+        <button class="tab" onclick="switchTab(this,'tp-reviews')">Critiques</button>
+        <button class="tab" onclick="switchTab(this,'tp-similar')">Similaires</button>
+        <button class="tab" onclick="switchTab(this,'tp-relations')">Relations</button>
+        <button class="tab" id="tab-tomes" style="display:none" onclick="switchTab(this,'tp-tomes');loadTomes()">Tomes</button>
+      </div>
+      <div class="tp on" id="tp-progress"><div id="progress-section"></div></div>
+      <div class="tp" id="tp-reviews">
+        <div id="reviews-section"></div>
+        <button class="btn btn-ghost" onclick="openM('m-review')" style="margin-top:10px">+ Écrire une critique</button>
+      </div>
+      <div class="tp" id="tp-similar"><div class="cg" id="similar-section"></div></div>
+      <div class="tp" id="tp-relations"><div id="relations-section"></div></div>
+      <div class="tp" id="tp-tomes"><div id="tomes-section"></div></div>
+    </div>
+    <div id="work-sidebar"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PAGE: SUIVI -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="pg" id="pg-suivi">
+  <div class="wrap pt32 pb40">
+    <div class="sh" style="margin-bottom:16px">
+      <h1 class="sh-title" style="font-size:22px">Mon Suivi</h1>
+    </div>
+
+    <!-- Search + Sort bar -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:center">
+      <div style="flex:1;min-width:200px;display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 14px">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--t3);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="suivi-search" type="text" placeholder="Rechercher dans mon suivi…"
+          style="background:none;border:none;outline:none;color:var(--text);font-size:13px;width:100%"
+          oninput="renderSuivi()">
+      </div>
+      <select id="suivi-sort" onchange="renderSuivi()"
+        style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;cursor:pointer">
+        <option value="title">A → Z</option>
+        <option value="title-desc">Z → A</option>
+        <option value="rating" selected>Mieux notés</option>
+        <option value="rating-asc">Moins bien notés</option>
+        <option value="progress">Progression ↓</option>
+        <option value="date-desc">Ajouté récemment</option>
+        <option value="date-asc">Ajouté anciennement</option>
+      </select>
+    </div>
+
+    <!-- TABS: Manga / Animé -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px" id="suivi-grid">
+      <!-- MANGA -->
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <span class="badge b-manga">MANGA</span>
+          <span style="font-size:15px;font-weight:800;font-family:'Syne',sans-serif">Manga</span>
+        </div>
+        <div class="tracking-tabs" id="manga-track-tabs">
+          <button class="tracking-tab on" onclick="switchTrackTab('manga','watchlist',this)">📋 À lire</button>
+          <button class="tracking-tab" onclick="switchTrackTab('manga','ongoing',this)">▶ En cours</button>
+          <button class="tracking-tab" onclick="switchTrackTab('manga','done',this)">✓ Terminé</button>
+          <button class="tracking-tab" onclick="switchTrackTab('manga','dropped',this)">✕ Abandonné</button>
+        </div>
+        <div class="tracking-section on" id="ts-manga-watchlist"><div class="track-grid" id="tg-manga-watchlist"></div></div>
+        <div class="tracking-section" id="ts-manga-ongoing"><div class="track-grid" id="tg-manga-ongoing"></div></div>
+        <div class="tracking-section" id="ts-manga-done"><div class="track-grid" id="tg-manga-done"></div></div>
+        <div class="tracking-section" id="ts-manga-dropped"><div class="track-grid" id="tg-manga-dropped"></div></div>
+      </div>
+
+      <!-- ANIMÉ -->
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <span class="badge b-anime">ANIMÉ</span>
+          <span style="font-size:15px;font-weight:800;font-family:'Syne',sans-serif">Animé</span>
+        </div>
+        <div class="tracking-tabs" id="anime-track-tabs">
+          <button class="tracking-tab on" onclick="switchTrackTab('anime','watchlist',this)">📋 À voir</button>
+          <button class="tracking-tab" onclick="switchTrackTab('anime','ongoing',this)">▶ En cours</button>
+          <button class="tracking-tab" onclick="switchTrackTab('anime','done',this)">✓ Terminé</button>
+          <button class="tracking-tab" onclick="switchTrackTab('anime','dropped',this)">✕ Abandonné</button>
+        </div>
+        <div class="tracking-section on" id="ts-anime-watchlist"><div class="track-grid" id="tg-anime-watchlist"></div></div>
+        <div class="tracking-section" id="ts-anime-ongoing"><div class="track-grid" id="tg-anime-ongoing"></div></div>
+        <div class="tracking-section" id="ts-anime-done"><div class="track-grid" id="tg-anime-done"></div></div>
+        <div class="tracking-section" id="ts-anime-dropped"><div class="track-grid" id="tg-anime-dropped"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PAGE: PROFILE -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="pg" id="pg-profile">
+  <!-- BANNIÈRE -->
+  <div class="profile-banner" id="profile-banner">
+    <div class="profile-banner-bg" id="profile-banner-bg"></div>
+    <img id="profile-banner-img" class="profile-banner-img" src="" alt="" style="display:none">
+    <div class="profile-banner-empty" id="profile-banner-empty">
+      <span style="font-size:40px">🖼</span>
+      <span style="font-size:13px;font-family:'Syne',sans-serif;font-weight:600;color:var(--t3)">Ajoute une bannière</span>
+    </div>
+    <input type="file" id="banner-file-input" accept="image/*" style="display:none" onchange="handleBannerUpload(this.files[0])">
+    <button class="profile-banner-upload" onclick="document.getElementById('banner-file-input').click()">🖼 Changer la bannière</button>
+  </div>
+
+  <div class="wrap pt32 pb40">
+    <!-- TOP 5 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px">
+      <div>
+        <div class="sh" style="margin-bottom:14px">
+          <h2 class="sh-title">Top 5 Mangas <span class="badge b-manga">MANGA</span></h2>
+        </div>
+        <div class="top5-manual" id="top5-manga"></div>
+      </div>
+      <div>
+        <div class="sh" style="margin-bottom:14px">
+          <h2 class="sh-title">Top 5 Animés <span class="badge b-anime">ANIMÉ</span></h2>
+        </div>
+        <div class="top5-manual" id="top5-anime"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<!-- ═══════════════════════════════════════════ -->
+<div class="pg" id="pg-lists">
+  <div class="wrap pt32 pb40">
+    <div class="sh">
+      <h1 class="sh-title" style="font-size:22px">Mes Listes</h1>
+      <button class="btn btn-primary" onclick="openM('m-createlist')">+ Nouvelle liste</button>
+    </div>
+    <div id="lists-grid"></div>
+  </div>
+</div>
+
+<!-- PAGE: LIST DETAIL -->
+<div class="pg" id="pg-listdetail">
+  <div class="wrap pt32 pb40">
+    <button class="back-btn" onclick="goBack()">← Mes listes</button>
+    <div id="listdetail-body"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PAGE: STATS -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="pg" id="pg-stats">
+  <div class="wrap pt32 pb40">
+    <div class="sh"><h1 class="sh-title" style="font-size:22px">Mes Statistiques</h1></div>
+    <div class="stats-grid" id="stats-grid"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:8px">
+      <div>
+        <div class="sh"><h2 class="sh-title">Genres préférés</h2></div>
+        <div id="genre-bars"></div>
+      </div>
+      <div>
+        <div class="sh"><h2 class="sh-title">Activité par mois</h2></div>
+        <div id="annual-chart"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PAGE: COLLECTION -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="pg" id="pg-collection">
+  <div class="wrap pt32 pb40">
+    <div class="sh" style="margin-bottom:20px">
+      <h1 class="sh-title" style="font-size:22px">Ma Collection</h1>
+    </div>
+    <div class="coll-tabs">
+      <button class="coll-tab on" onclick="switchCollTab(this,'ct-phys')">📚 Physique</button>
+      <button class="coll-tab" onclick="switchCollTab(this,'ct-cbz')">📂 CBZ</button>
+      <button class="coll-tab" onclick="switchCollTab(this,'ct-online')">🌐 En ligne</button>
+    </div>
+
+    <!-- PHYSICAL LIBRARY -->
+    <div id="ct-phys">
+      <div class="library-header">
+        <button class="library-add-btn" onclick="openM('m-add-phys')">＋ Ajouter une série</button>
+      </div>
+      <div id="phys-library"></div>
+      <div id="phys-empty" style="display:none">
+        <div class="empty"><div class="empty-icon">📚</div><div class="empty-title">Bibliothèque vide</div><div class="empty-sub">Cliquez sur "Ajouter une série" pour commencer votre bibliothèque.</div></div>
+      </div>
+    </div>
+
+    <!-- CBZ -->
+    <div id="ct-cbz" style="display:none">
+      <div class="library-header">
+        <button class="library-add-btn" onclick="openM('m-add-cbz')">＋ Ajouter une série CBZ</button>
+      </div>
+      <div id="cbz-list"></div>
+      <div id="cbz-empty" style="display:none">
+        <div class="empty"><div class="empty-icon">📂</div><div class="empty-title">Aucun CBZ renseigné</div></div>
+      </div>
+    </div>
+
+    <!-- ONLINE -->
+    <div id="ct-online" style="display:none">
+      <div class="library-header">
+        <button class="library-add-btn" onclick="openM('m-add-online')">＋ Ajouter une lecture en ligne</button>
+      </div>
+      <div id="online-list"></div>
+      <div id="online-empty" style="display:none">
+        <div class="empty"><div class="empty-icon">🌐</div><div class="empty-title">Aucune lecture en ligne</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COVER LIGHTBOX -->
+<div class="cover-lightbox" id="cover-lightbox" onclick="closeCoverLightbox(event)">
+  <button class="clb-close" onclick="document.getElementById('cover-lightbox').classList.remove('on')">✕</button>
+  <img class="cover-lightbox-img" id="cover-lightbox-img" src="" alt="">
+  <div class="cover-lightbox-btns">
+    <input type="file" id="cover-change-input" accept="image/*" style="display:none" onchange="handleCoverChange(this.files[0])">
+    <button class="btn btn-secondary" onclick="event.stopPropagation();document.getElementById('cover-change-input').click()">🖼 Changer la couverture</button>
+    <button class="btn btn-ghost" onclick="document.getElementById('cover-lightbox').classList.remove('on')">Fermer</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<script>
+// ─── ZIP / CBZ library (JSZip via CDN) ───
+const JSZIP_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+let JSZip = null;
+function loadJSZip(){
+  return new Promise(res=>{
+    if(JSZip){res(JSZip);return}
+    const s=document.createElement('script');s.src=JSZIP_URL;
+    s.onload=()=>{JSZip=window.JSZip;res(JSZip)};
+    document.head.appendChild(s);
+  });
+}
+
+// ─── STATE ───
+const S = {
+  profile: {name:'Akira', bio:'Passionné de manga & animé'},
+  tracking: {}, // malId|animeId -> {type,title,cover,status,chapter,volume,episode,rating,reviews:[]}
+  lists: [],
+  collection: {}, // malId -> { volumes: Set-like obj {1:true,3:true}, cbz:[{device,volumes:[]}], online:[{name,url,volumes:[]}] }
+  collectionMeta: {}, // malId -> {title,cover,_knownVolumes,_isOngoing,_customMax} — independent from tracking
+  customCovers: {}, // malId -> dataURL
+  bannerUrl: null,
+  // UI state
+  prevPage: 'home',
+  currentWork: null,
+  currentListId: null,
+  listModalWorkId: null,
+  rvRating: 3,
+  // catalog
+  mangaPage: 1, mangaGenre: '', mangaQuery: '',
+  animePage: 1, animeGenre: '', animeQuery: '',
+  searchTimers: {},
+};
+
+// Persist to localStorage
+function save(){try{localStorage.setItem('ot_v3',JSON.stringify({tracking:S.tracking,lists:S.lists,collection:S.collection,collectionMeta:S.collectionMeta,profile:S.profile,customCovers:S.customCovers,bannerUrl:S.bannerUrl,bannerSize:S.bannerSize,bannerPos:S.bannerPos}))}catch(e){}}
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem('ot_v3')||'{}');
+    if(d.tracking)S.tracking=d.tracking;
+    if(d.lists)S.lists=d.lists;
+    if(d.collection)S.collection=d.collection;
+    if(d.collectionMeta)S.collectionMeta=d.collectionMeta;
+    if(d.profile)S.profile=d.profile;
+    if(d.customCovers)S.customCovers=d.customCovers;
+    if(d.bannerUrl){
+      S.bannerUrl=d.bannerUrl;
+      var bg=document.getElementById('profile-banner-bg');
+      if(bg){
+        bg.style.backgroundImage='url('+d.bannerUrl+')';
+        bg.style.backgroundSize='cover';
+        bg.style.backgroundPosition='center center';
+      }
+      var emptyEl=document.getElementById('profile-banner-empty');
+      if(emptyEl)emptyEl.style.display='none';
+    }
+  }catch(e){}
+}
+
+// ─── JIKAN API ───
+const JIKAN = 'https://api.jikan.moe/v4';
+const cache = {}; // { path: { data, ts } }
+const CACHE_TTL = 60 * 60 * 1000; // 1h
+
+async function jikan(path, retry=3){
+  const now=Date.now();
+  if(cache[path]&&(now-cache[path].ts)<CACHE_TTL)return cache[path].data;
+  await delay(350);
+  for(let i=0;i<retry;i++){
+    try{
+      const r = await fetch(JIKAN+path);
+      if(r.status===429){ await delay(1500*(i+1)); continue; }
+      if(!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      cache[path] = {data:d, ts:now};
+      return d;
+    }catch(e){
+      if(i===retry-1) throw e;
+      await delay(1000*(i+1));
+    }
+  }
+}
+
+function delay(ms){return new Promise(r=>setTimeout(r,ms))}
+
+// ─── NAVIGATION ───
+function nav(page){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.getElementById('pg-'+page).classList.add('on');
+  window.scrollTo(0,0);
+  if(page==='home')renderHome();
+  if(page==='manga'){loadGenres('manga');renderCatalog('manga');}
+  if(page==='anime'){loadGenres('anime');renderCatalog('anime');}
+  if(page==='profile')renderProfile();
+  if(page==='lists')renderLists();
+  if(page==='stats')renderStats();
+  if(page==='collection')renderCollection();
+  if(page==='suivi')renderSuivi();
+}
+
+function activate(el){
+  document.querySelectorAll('.nl').forEach(n=>n.classList.remove('on'));
+  if(el)el.classList.add('on');
+}
+
+function goBack(){
+  nav(S.prevPage);
+  const el=document.querySelector(`[data-page="${S.prevPage}"]`);
+  if(el)activate(el);
+}
+
+function switchTab(btn,panelId){
+  // Find the tabs container (the .tabs div) and the parent that holds both tabs + panels
+  const tabsBar = btn.closest('.tabs');
+  if(tabsBar){tabsBar.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));}
+  btn.classList.add('on');
+  // The panels are siblings of .tabs inside the same parent div
+  const parent = tabsBar ? tabsBar.parentElement : btn.parentElement;
+  if(parent){parent.querySelectorAll('.tp').forEach(p=>p.classList.remove('on'));}
+  document.getElementById(panelId).classList.add('on');
+}
+
+function switchCollTab(btn,id){
+  document.querySelectorAll('.coll-tab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  ['ct-phys','ct-cbz','ct-online'].forEach(cid=>{
+    document.getElementById(cid).style.display=cid===id?'block':'none';
+  });
+}
+
+// ─── COVER CARD HTML ───
+function coverCard(item, showTypePill=false){
+  const t=S.tracking[item.mal_id];
+  const statusDot=t?`<div class="status-dot ${statusClass(t.status)}"></div>`:'';
+  const ratingBadge=t&&t.rating?`<div class="cc-rating">★ ${t.rating}/10</div>`:''
+  const type=item._type||'manga';
+  const typePill=showTypePill?`<div class="type-pill tp-${type}">${type==='manga'?'MANGA':'ANIMÉ'}</div>`:'';
+
+
+  return `<div class="cc" onclick="openWork(${item.mal_id},'${type}')">
+    <div class="cc-wrap">
+      <img class="cc-img" src="${item.images?.jpg?.image_url||item.images?.jpg?.large_image_url||''}" alt="${esc(item.title)}" loading="lazy">
+      ${statusDot}${typePill}
+      <div class="cc-overlay">
+        ${ratingBadge}
+        <div class="cc-ov-btns">
+          <div class="cc-ov-btn" onclick="event.stopPropagation();quickTrack(${item.mal_id},'${type}','${esc(item.title)}','${esc(item.images?.jpg?.image_url||'')}')" title="Suivre">+</div>
+          <div class="cc-ov-btn" onclick="event.stopPropagation();openListModal(${item.mal_id})" title="Liste">☰</div>
+        </div>
+      </div>
+    </div>
+    <div class="cc-title">${esc(item.title)}</div>
+    <div class="cc-meta">${item.year||item.published?.prop?.from?.year||item.aired?.prop?.from?.year||''}</div>
+  </div>`;
+}
+
+function statusClass(s){
+  if(!s)return '';
+  if(s==='En cours')return 'sd-ongoing';
+  if(s==='Terminé')return 'sd-done';
+  if(s==='Abandonné')return 'sd-dropped';
+  return 'sd-planned';
+}
+function esc(s){return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+
+// ─── HOME ───
+async function renderHome(){
+  renderHomeInProgress();
+  loadHomePopular();
+  loadHomeTop();
+  loadRecommendations();
+}
+
+async function loadRecommendations(force=false){
+  const tracked=Object.values(S.tracking);
+  const sec=document.getElementById('home-reco-sec');
+  const wrap=document.getElementById('home-reco-wrap');
+  if(!sec||!wrap) return;
+
+  // Seulement les œuvres notées 7.5 ou plus
+  const seeds=tracked
+    .filter(t=>t.rating>=7.5)
+    .sort((a,b)=>(b.rating||0)-(a.rating||0))
+    .slice(0,5);
+
+  if(!seeds.length){ sec.style.display='none'; return; }
+
+  sec.style.display='block';
+  wrap.innerHTML='<div class="loading"><div class="spin"></div> Recherche de recommandations…</div>';
+
+  try{
+    const trackedIds=new Set(tracked.map(t=>String(t.mal_id)));
+    const results=[];
+
+    for(const seed of seeds){
+      try{
+        const d=await jikan(`/${seed.type}/${seed.mal_id}/recommendations`);
+        const recs=(d.data||[])
+          .map(r=>({...r.entry, _type:seed.type}))
+          .filter(r=>!trackedIds.has(String(r.mal_id)));
+        results.push(...recs.slice(0,3));
+        if(results.length>=12) break;
+      }catch(e){}
+    }
+
+    // Dédupliquer
+    const seen=new Set();
+    const unique=results.filter(r=>{
+      if(seen.has(r.mal_id)) return false;
+      seen.add(r.mal_id); return true;
+    }).slice(0,8);
+
+    if(!unique.length){
+      wrap.innerHTML='<p style="color:var(--t3);font-size:13px">Pas encore de recommandations disponibles pour ces titres.</p>';
+      return;
+    }
+    wrap.innerHTML=`<div class="cg">${unique.map(m=>coverCard(m,true)).join('')}</div>`;
+  }catch(e){
+    wrap.innerHTML='<p style="color:var(--t3);font-size:13px">Erreur lors du chargement des recommandations.</p>';
+  }
+}
+
+function renderHomeInProgress(){
+  const items=Object.values(S.tracking).filter(t=>t.status==='En cours');
+  const sec=document.getElementById('home-inprogress-sec');
+  if(!items.length){sec.style.display='none';return}
+  sec.style.display='block';
+  document.getElementById('home-inprogress').innerHTML=items.map(t=>`
+    <div class="cc" onclick="openWork(${t.mal_id},'${t.type}')">
+      <div class="cc-wrap">
+        <img class="cc-img" src="${t.cover}" loading="lazy">
+        <div class="status-dot sd-ongoing"></div>
+      </div>
+      <div class="cc-title">${esc(t.title)}</div>
+      <div class="cc-meta">${t.type==='manga'?'Ch. '+(t.chapter||0):'Ep. '+(t.episode||0)}</div>
+    </div>`).join('');
+}
+
+async function loadHomePopular(){
+  const el=document.getElementById('home-popular-wrap');
+  try{
+    const d=await jikan('/manga?order_by=members&sort=desc&limit=8&page=1&sfw');
+    el.innerHTML=`<div class="cg">${d.data.map(m=>{m._type='manga';return coverCard(m,true)}).join('')}</div>`;
+  }catch(e){el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de charger (limite API).</p>'}
+}
+
+async function loadHomeTop(){
+  const mEl=document.getElementById('home-manga-wrap');
+  const aEl=document.getElementById('home-anime-wrap');
+  try{
+    const md=await jikan('/top/manga?limit=6&page=1');
+    mEl.innerHTML=`<div class="cg">${md.data.map(m=>{m._type='manga';return coverCard(m)}).join('')}</div>`;
+  }catch(e){mEl.innerHTML='<p style="color:var(--t3);font-size:13px">Erreur API.</p>'}
+  try{
+    const ad=await jikan('/top/anime?limit=6&page=1');
+    aEl.innerHTML=`<div class="cg">${ad.data.map(a=>{a._type='anime';return coverCard(a)}).join('')}</div>`;
+  }catch(e){aEl.innerHTML='<p style="color:var(--t3);font-size:13px">Erreur API.</p>'}
+}
+
+// ─── GENRES DYNAMIQUES ───
+const _genreCache = {};
+// ─── GENRES STATIQUES (évite un appel API lent) ───
+const GENRES_MANGA = [
+  {mal_id:1,name:'Action'},{mal_id:2,name:'Adventure'},{mal_id:5,name:'Avant Garde'},
+  {mal_id:46,name:'Award Winning'},{mal_id:28,name:'Boys Love'},{mal_id:4,name:'Comedy'},
+  {mal_id:8,name:'Drama'},{mal_id:10,name:'Fantasy'},{mal_id:26,name:'Girls Love'},
+  {mal_id:47,name:'Gourmet'},{mal_id:14,name:'Horror'},{mal_id:7,name:'Mystery'},
+  {mal_id:22,name:'Romance'},{mal_id:24,name:'Sci-Fi'},{mal_id:36,name:'Slice of Life'},
+  {mal_id:30,name:'Sports'},{mal_id:37,name:'Supernatural'},{mal_id:45,name:'Suspense'},
+  {mal_id:9,name:'Ecchi'},{mal_id:49,name:'Erotica'},{mal_id:12,name:'Hentai'},
+  {mal_id:50,name:'Adult Cast'},{mal_id:51,name:'Anthropomorphic'},{mal_id:52,name:'CGDCT'},
+  {mal_id:53,name:'Childcare'},{mal_id:54,name:'Combat Sports'},{mal_id:81,name:'Crossdressing'},
+  {mal_id:55,name:'Delinquents'},{mal_id:39,name:'Detective'},{mal_id:56,name:'Educational'},
+  {mal_id:57,name:'Gag Humor'},{mal_id:58,name:'Gore'},{mal_id:35,name:'Harem'},
+  {mal_id:59,name:'High Stakes Game'},{mal_id:13,name:'Historical'},{mal_id:60,name:'Idols (Female)'},
+  {mal_id:61,name:'Idols (Male)'},{mal_id:62,name:'Isekai'},{mal_id:63,name:'Iyashikei'},
+  {mal_id:64,name:'Love Polygon'},{mal_id:65,name:'Magical Sex Shift'},{mal_id:66,name:'Mahou Shoujo'},
+  {mal_id:17,name:'Martial Arts'},{mal_id:18,name:'Mecha'},{mal_id:67,name:'Medical'},
+  {mal_id:38,name:'Military'},{mal_id:19,name:'Music'},{mal_id:6,name:'Mythology'},
+  {mal_id:68,name:'Organized Crime'},{mal_id:69,name:'Otaku Culture'},{mal_id:20,name:'Parody'},
+  {mal_id:70,name:'Performing Arts'},{mal_id:71,name:'Pets'},{mal_id:40,name:'Psychological'},
+  {mal_id:3,name:'Racing'},{mal_id:72,name:'Reincarnation'},{mal_id:73,name:'Reverse Harem'},
+  {mal_id:74,name:'Romantic Subtext'},{mal_id:21,name:'Samurai'},{mal_id:23,name:'School'},
+  {mal_id:75,name:'Showbiz'},{mal_id:29,name:'Space'},{mal_id:76,name:'Strategy Game'},
+  {mal_id:77,name:'Super Power'},{mal_id:31,name:'Survival'},{mal_id:78,name:'Team Sports'},
+  {mal_id:79,name:'Time Travel'},{mal_id:32,name:'Vampire'},{mal_id:80,name:'Video Game'},
+  {mal_id:48,name:'Workplace'},{mal_id:43,name:'Josei'},{mal_id:15,name:'Kids'},
+  {mal_id:42,name:'Seinen'},{mal_id:25,name:'Shoujo'},{mal_id:27,name:'Shounen'}
+].sort((a,b)=>a.name.localeCompare(b.name));
+
+const GENRES_ANIME = [
+  {mal_id:1,name:'Action'},{mal_id:2,name:'Adventure'},{mal_id:5,name:'Avant Garde'},
+  {mal_id:46,name:'Award Winning'},{mal_id:28,name:'Boys Love'},{mal_id:4,name:'Comedy'},
+  {mal_id:8,name:'Drama'},{mal_id:10,name:'Fantasy'},{mal_id:26,name:'Girls Love'},
+  {mal_id:47,name:'Gourmet'},{mal_id:14,name:'Horror'},{mal_id:7,name:'Mystery'},
+  {mal_id:22,name:'Romance'},{mal_id:24,name:'Sci-Fi'},{mal_id:36,name:'Slice of Life'},
+  {mal_id:30,name:'Sports'},{mal_id:37,name:'Supernatural'},{mal_id:45,name:'Suspense'},
+  {mal_id:9,name:'Ecchi'},{mal_id:12,name:'Hentai'},{mal_id:50,name:'Adult Cast'},
+  {mal_id:51,name:'Anthropomorphic'},{mal_id:52,name:'CGDCT'},{mal_id:53,name:'Childcare'},
+  {mal_id:54,name:'Combat Sports'},{mal_id:81,name:'Crossdressing'},{mal_id:55,name:'Delinquents'},
+  {mal_id:39,name:'Detective'},{mal_id:56,name:'Educational'},{mal_id:57,name:'Gag Humor'},
+  {mal_id:58,name:'Gore'},{mal_id:35,name:'Harem'},{mal_id:59,name:'High Stakes Game'},
+  {mal_id:13,name:'Historical'},{mal_id:60,name:'Idols (Female)'},{mal_id:61,name:'Idols (Male)'},
+  {mal_id:62,name:'Isekai'},{mal_id:63,name:'Iyashikei'},{mal_id:64,name:'Love Polygon'},
+  {mal_id:66,name:'Mahou Shoujo'},{mal_id:17,name:'Martial Arts'},{mal_id:18,name:'Mecha'},
+  {mal_id:67,name:'Medical'},{mal_id:38,name:'Military'},{mal_id:19,name:'Music'},
+  {mal_id:6,name:'Mythology'},{mal_id:68,name:'Organized Crime'},{mal_id:69,name:'Otaku Culture'},
+  {mal_id:20,name:'Parody'},{mal_id:70,name:'Performing Arts'},{mal_id:71,name:'Pets'},
+  {mal_id:40,name:'Psychological'},{mal_id:3,name:'Racing'},{mal_id:72,name:'Reincarnation'},
+  {mal_id:73,name:'Reverse Harem'},{mal_id:74,name:'Romantic Subtext'},{mal_id:21,name:'Samurai'},
+  {mal_id:23,name:'School'},{mal_id:75,name:'Showbiz'},{mal_id:29,name:'Space'},
+  {mal_id:76,name:'Strategy Game'},{mal_id:77,name:'Super Power'},{mal_id:31,name:'Survival'},
+  {mal_id:78,name:'Team Sports'},{mal_id:79,name:'Time Travel'},{mal_id:32,name:'Vampire'},
+  {mal_id:80,name:'Video Game'},{mal_id:48,name:'Workplace'},{mal_id:43,name:'Josei'},
+  {mal_id:15,name:'Kids'},{mal_id:42,name:'Seinen'},{mal_id:25,name:'Shoujo'},{mal_id:27,name:'Shounen'}
+].sort((a,b)=>a.name.localeCompare(b.name));
+
+async function loadGenres(type){
+  const genres = type==='manga' ? GENRES_MANGA : GENRES_ANIME;
+  _genreCache[type] = genres;
+  renderGenrePills(type, genres);
+}
+
+function renderGenrePills(type, genres){
+  const pillsEl = document.getElementById(`${type}-genre-pills`);
+  if(!pillsEl) return;
+  const activeIds = (type==='manga'?S.mangaGenres:S.animeGenres)||[];
+  const allActive = activeIds.length===0;
+  const allBtn = `<button class="fb${allActive?' on':''}" data-id="" data-kind="genre" onclick="toggleGenreFilter('${type}','','genre',this)">Tous</button>`;
+  const btns = genres.map(g=>
+    `<button class="fb${activeIds.includes(String(g.mal_id))?' on':''}" data-id="${g.mal_id}" data-kind="genre" onclick="toggleGenreFilter('${type}','${g.mal_id}','genre',this)">${g.name}</button>`
+  ).join('');
+  pillsEl.innerHTML = allBtn + btns;
+}
+
+
+async function renderCatalog(type){
+  const page = type==='manga'?S.mangaPage:S.animePage;
+  const genres = (type==='manga'?S.mangaGenres:S.animeGenres)||[];
+  const themes = (type==='manga'?S.mangaThemes:S.animeThemes)||[];
+  const query = type==='manga'?S.mangaQuery:S.animeQuery;
+  const el=document.getElementById(`${type}-catalog-wrap`);
+  el.innerHTML='<div class="loading"><div class="spin"></div> Chargement…</div>';
+
+  try{
+    let path;
+    if(query){
+      path=`/${type}?q=${encodeURIComponent(query)}&page=${page}&limit=20&sfw`;
+    } else {
+      let params=`page=${page}&limit=20&order_by=members&sort=desc`;
+      const allIds=[...genres,...themes];
+      if(allIds.length) params+=`&genres=${allIds.join(',')}`;
+      path=`/${type}?${params}`;
+    }
+    const data=await jikan(path);
+    const items=data.data||[];
+    if(!items.length){
+      el.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">Aucun résultat</div></div>';
+      document.getElementById(`${type}-pager`).innerHTML='';
+      return;
+    }
+    items.forEach(i=>i._type=type);
+    el.innerHTML=`<div class="cg-lg">${items.map(i=>coverCard(i)).join('')}</div>`;
+    renderPager(type, page, data.pagination);
+  }catch(e){
+    el.innerHTML=`<p style="color:var(--t3);padding:20px 0;font-size:13px">⚠ Erreur de chargement. L'API Jikan a une limite de requêtes — attendez quelques secondes et réessayez.<br><br><button class="btn btn-ghost btn-sm" onclick="renderCatalog('${type}')">Réessayer</button></p>`;
+  }
+}
+
+// Genre ID cache for Jikan
+const genreIdCache = {};
+async function getGenreId(type, genreName){
+  const key=`${type}-${genreName}`;
+  if(genreIdCache[key])return genreIdCache[key];
+  try{
+    const d=await jikan(`/genres/${type}s`);
+    d.data.forEach(g=>{ genreIdCache[`${type}-${g.name}`]=g.mal_id; });
+    return genreIdCache[key]||null;
+  }catch(e){return null}
+}
+
+function renderPager(type, cur, pagination){
+  const el=document.getElementById(`${type}-pager`);
+  if(!pagination||pagination.last_visible_page<=1){el.innerHTML='';return}
+  const last=Math.min(pagination.last_visible_page,20);
+  let html='';
+  if(cur>1) html+=`<button class="page-btn" onclick="setCatalogPage('${type}',${cur-1})">‹</button>`;
+  for(let i=Math.max(1,cur-2);i<=Math.min(last,cur+2);i++)
+    html+=`<button class="page-btn${i===cur?' on':''}" onclick="setCatalogPage('${type}',${i})">${i}</button>`;
+  if(cur<last) html+=`<button class="page-btn" onclick="setCatalogPage('${type}',${cur+1})">›</button>`;
+  el.innerHTML=html;
+}
+
+function setCatalogPage(type, page){
+  if(type==='manga')S.mangaPage=page;
+  else S.animePage=page;
+  renderCatalog(type);
+  document.getElementById(`pg-${type}`).scrollIntoView({behavior:'smooth'});
+}
+
+function toggleGenreFilter(type, id, kind, btn){
+  // kind = 'genre' ou 'theme'
+  const isAll = id === '';
+  const genreKey = type==='manga' ? 'mangaGenres' : 'animeGenres';
+  const themeKey = type==='manga' ? 'mangaThemes' : 'animeThemes';
+  const key = kind==='theme' ? themeKey : genreKey;
+  const pillsId = `${type}-${kind}-pills`;
+
+  if(!S[genreKey]) S[genreKey]=[];
+  if(!S[themeKey]) S[themeKey]=[];
+
+  if(isAll){
+    S[key]=[];
+    document.querySelectorAll(`#${pillsId} .fb`).forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+  } else {
+    const allBtn=document.querySelector(`#${pillsId} .fb[data-id=""]`);
+    if(allBtn) allBtn.classList.remove('on');
+    if(S[key].includes(id)){
+      S[key]=S[key].filter(g=>g!==id);
+      btn.classList.remove('on');
+    } else {
+      S[key].push(id);
+      btn.classList.add('on');
+    }
+    if(S[key].length===0 && allBtn) allBtn.classList.add('on');
+  }
+
+  if(type==='manga'){S.mangaPage=1;S.mangaQuery='';document.getElementById('manga-search').value=''}
+  else{S.animePage=1;S.animeQuery='';document.getElementById('anime-search').value=''}
+  renderCatalog(type);
+}
+
+function setGenreFilter(type, genre, btn){
+  toggleGenreFilter(type, genre, 'genre', btn);
+}
+
+let searchTimer={};
+function onCatalogSearch(type, val){
+  clearTimeout(searchTimer[type]);
+  if(!val.trim()){
+    document.getElementById(`${type}-search-results`).style.display='none';
+    if(type==='manga')S.mangaQuery='';
+    else S.animeQuery='';
+    renderCatalog(type);
+    return;
+  }
+  searchTimer[type]=setTimeout(async()=>{
+    // Show dropdown results
+    const el=document.getElementById(`${type}-search-results`);
+    el.style.display='block';
+    el.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div></div>';
+    try{
+      const d=await jikan(`/${type}?q=${encodeURIComponent(val)}&limit=8&sfw`);
+      if(!d.data||!d.data.length){el.innerHTML='<div style="padding:14px;color:var(--t3);font-size:13px">Aucun résultat</div>';return}
+      el.innerHTML=d.data.map(item=>{
+        const frT=(item.titles||[]).find(t=>t.type==='French')?.title;
+        const dispT=frT||item.title_english||item.title;
+        const origT=(item.title&&item.title!==dispT)?item.title:'';
+        return `<div class="sfr-item" onclick="openWork(${item.mal_id},'${type}');document.getElementById('${type}-search-results').style.display='none'">
+          <img class="sfr-thumb" src="${item.images?.jpg?.image_url||''}" loading="lazy">
+          <div class="sfr-info">
+            <div class="sfr-title">${esc(dispT)}</div>
+            <div class="sfr-meta">${origT?esc(origT)+' · ':''} ${type==='manga'?(item.authors?.[0]?.name||''):(item.studios?.[0]?.name||'')} · ${item.score?'★ '+item.score:''}</div>
+          </div>
+          <div class="sfr-type" style="${type==='manga'?'background:rgba(244,114,182,.15);color:var(--manga)':'background:rgba(56,189,248,.15);color:var(--anime)'}">${type==='manga'?'MANGA':'ANIMÉ'}</div>
+        </div>`;}).join('');
+    }catch(e){el.innerHTML='<div style="padding:14px;color:var(--t3);font-size:13px">Erreur API</div>'}
+  },500);
+}
+
+// Close search results on outside click
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.sf-wrap')){
+    document.querySelectorAll('.sf-results').forEach(el=>el.style.display='none');
+  }
+});
+
+// ─── NAV SEARCH ───
+let navSearchTimer;
+function navSearch(val){
+  if(!val.trim())return;
+  clearTimeout(navSearchTimer);
+  navSearchTimer=setTimeout(async()=>{
+    try{
+      // Search manga first
+      const d=await jikan(`/manga?q=${encodeURIComponent(val)}&limit=1&sfw`);
+      if(d.data&&d.data.length){openWork(d.data[0].mal_id,'manga');document.getElementById('navSearchInput').value='';return}
+      // Then anime
+      const ad=await jikan(`/anime?q=${encodeURIComponent(val)}&limit=1&sfw`);
+      if(ad.data&&ad.data.length){openWork(ad.data[0].mal_id,'anime');document.getElementById('navSearchInput').value='';return}
+    }catch(e){}
+  },600);
+}
+
+// ─── WORK PAGE ───
+async function openWork(malId, type='manga'){
+  S.prevPage = document.querySelector('.pg.on').id.replace('pg-','');
+  nav('work');
+  document.getElementById('work-layout').innerHTML='<div class="loading" style="grid-column:1/-1"><div class="spin"></div> Chargement…</div>';
+  document.getElementById('work-bg').style.backgroundImage='';
+
+  try{
+    const d=await jikan(`/${type}/${malId}/full`);
+    const w=d.data;
+    w._type=type;
+    w.mal_id=malId;
+    S.currentWork=w;
+    S.currentWork._coverFull=w.images?.jpg?.large_image_url||w.images?.jpg?.image_url||'';
+    // Sauvegarder les genres dans le tracking si l'œuvre est suivie
+    if(S.tracking[malId]){
+      const genreNames=(w.genres||[]).concat(w.themes||[]).map(g=>g.name);
+      if(genreNames.length){ S.tracking[malId]._genres=genreNames; save(); }
+    }
+    renderWorkPage(w);
+  }catch(e){
+    document.getElementById('work-layout').innerHTML='<p style="color:var(--t3);grid-column:1/-1">Erreur de chargement. Réessayez.</p>';
+  }
+}
+
+function renderWorkPage(w){
+  const t=S.tracking[w.mal_id]||{};
+  const type=w._type;
+
+  // Backdrop
+  document.getElementById('work-bg').style.backgroundImage=`url(${w.images?.jpg?.large_image_url||w.images?.jpg?.image_url||''})`;
+
+  // Rating 0-10 by 0.5
+  const myRating=t.rating||0;
+  const ratingOptions=[];
+  for(let v=0;v<=20;v++){const val=v/2;ratingOptions.push('<option value="'+val+'"'+(myRating===val?' selected':'')+'>'+( val===0?'— Non noté':val+' / 10')+'</option>');}
+  const ratingHtml='<div class="rating-box"><select class="rating-select" onchange="rateWork('+w.mal_id+',\''+type+'\',parseFloat(this.value))">'+ratingOptions.join('')+'</select>'+(myRating>0?'<span class="rating-display">★ '+myRating+'<span style="color:var(--t3);font-size:12px"> /10</span></span>':'')+'</div>';
+
+  // Genres
+  const genres=(w.genres||[]).concat(w.themes||[]).map(g=>`<span class="gtag">${g.name}</span>`).join('');
+
+  // Meta
+  const metaHtml = type==='manga' ? `
+    <div class="wm-item"><span class="wm-label">Auteur</span><span class="wm-value">${(()=>{
+      const authors = w.authors||[];
+      if(!authors.length) return '—';
+      const fixName = n => { const p=n.split(', '); return p.length===2?p[1]+' '+p[0]:n; };
+      return authors.map(a=>esc(fixName(a.name))).join(', ');
+    })()}</span></div>
+    <div class="wm-item"><span class="wm-label">Volumes</span><span class="wm-value">${w.volumes||'?'}</span></div>
+    <div class="wm-item"><span class="wm-label">Chapitres</span><span class="wm-value">${w.chapters||'?'}</span></div>
+    <div class="wm-item"><span class="wm-label">Statut</span><span class="wm-value">${w.status||'—'}</span></div>
+    <div class="wm-item"><span class="wm-label">Parution</span><span class="wm-value">${w.published?.string||'—'}</span></div>
+    <div class="wm-item"><span class="wm-label"><span class="score-display"><span class="score-val">★ ${w.score||'?'}</span></span></span><span class="wm-value" style="font-size:11px;color:var(--t3)">${w.scored_by?w.scored_by.toLocaleString()+' votes':''}</span></div>
+  ` : `
+    <div class="wm-item"><span class="wm-label">Studio</span><span class="wm-value">${(w.studios||[]).map(s=>`<a href="https://www.nautiljon.com/people/?q=${encodeURIComponent(s.name)}" target="_blank" rel="noopener" style="color:var(--acc);text-decoration:none;border-bottom:1px dashed var(--acc)">${esc(s.name)}</a>`).join(', ')||'—'}</span></div>
+    <div class="wm-item"><span class="wm-label">Épisodes</span><span class="wm-value">${w.episodes||'?'}</span></div>
+    <div class="wm-item"><span class="wm-label">Durée ep.</span><span class="wm-value">${w.duration||'—'}</span></div>
+    <div class="wm-item"><span class="wm-label">Statut</span><span class="wm-value">${w.status||'—'}</span></div>
+    <div class="wm-item"><span class="wm-label">Diffusion</span><span class="wm-value">${w.aired?.string||'—'}</span></div>
+    <div class="wm-item"><span class="wm-label"><span class="score-display"><span class="score-val">★ ${w.score||'?'}</span></span></span><span class="wm-value" style="font-size:11px;color:var(--t3)">${w.scored_by?w.scored_by.toLocaleString()+' votes':''}</span></div>
+  `;
+
+  // French title logic
+  const titlesArr=w.titles||[];
+  const frTitle=titlesArr.find(t=>t.type==='French')?.title||null;
+  const enTitle=w.title_english||null;
+  const displayTitle=frTitle||enTitle||w.title;
+  const altTitles=[];
+  if(frTitle&&enTitle&&enTitle!==frTitle)altTitles.push(enTitle);
+  if(w.title&&w.title!==displayTitle)altTitles.push(w.title);
+  if(w.title_japanese)altTitles.push(w.title_japanese);
+  const searchTitle=frTitle||enTitle||w.title;
+  const tracked=S.tracking[w.mal_id];
+  const coverSrc=(S.customCovers&&S.customCovers[w.mal_id])||w.images?.jpg?.large_image_url||w.images?.jpg?.image_url||'';
+
+  document.getElementById('work-layout').innerHTML=`
+    <div class="work-cover-box">
+      <img src="${coverSrc}" alt="${esc(displayTitle)}" id="work-cover-img">
+      <input type="file" id="cover-change-input-${w.mal_id}" accept="image/*" style="display:none" onchange="handleCoverChange(this.files[0],${w.mal_id})">
+      <button class="cover-change-btn" onclick="document.getElementById('cover-change-input-${w.mal_id}').click()">🖼 Changer la couverture</button>
+    </div>
+    <div>
+      <div class="work-type-pill wtp-${type}">${type==='manga'?'📖 MANGA':'🎬 ANIMÉ'}</div>
+      <h1 class="work-title">${esc(displayTitle)}</h1>
+      ${altTitles.length?`<div class="work-title-alt">${altTitles.map(t=>esc(t)).join(' · ')}</div>`:''}
+      <div class="wm-row">${metaHtml}</div>
+      <div class="genres-row">${genres}</div>
+      <p class="synopsis">${esc((w.synopsis||'Aucun synopsis disponible.').replace('[Written by MAL Rewrite]','').trim())}</p>
+      <div class="work-actions">
+        <div class="your-rating-box"><div class="yr-label">Ma note</div>${ratingHtml}</div>
+        <button class="btn btn-primary btn-sm" onclick="quickTrack(${w.mal_id},'${type}','${esc(displayTitle)}','${esc(w.images?.jpg?.image_url||'')}')">+ Suivre</button>
+        ${tracked?`<button class="btn btn-danger btn-sm" onclick="removeTracking(${w.mal_id})">✕ Retirer</button>`:''}
+        <button class="btn btn-ghost btn-sm" onclick="openListModal(${w.mal_id})">☰ Liste</button>
+        <div class="read-dropdown" id="rd-${w.mal_id}">
+          <button class="btn btn-ghost btn-sm read-dropdown-btn" onclick="toggleReadDropdown('${w.mal_id}')" style="color:#e879f9;border-color:rgba(232,121,249,.3)">
+            ${type==='manga'?'📖 Lire':'▶ Regarder'} ▾
+          </button>
+          <div class="read-dropdown-menu" id="rdm-${w.mal_id}">
+            ${type==='manga'?`
+              <a onclick="closeReadDropdown('${w.mal_id}')" href="https://anime-sama.to/catalogue/?search=${searchTitle.replace(/ /g,'+')}" target="_blank" rel="noopener">📖 Anime-Sama</a>
+            `:`
+              <a onclick="closeReadDropdown('${w.mal_id}')" href="https://anime-sama.to/catalogue/?search=${searchTitle.replace(/ /g,'+')}" target="_blank" rel="noopener">▶ Anime-Sama</a>
+              <a onclick="closeReadDropdown('${w.mal_id}')" href="https://movix.blog/search?q=${encodeURIComponent(searchTitle)}" target="_blank" rel="noopener">▶ Movix</a>
+            `}
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="openNautiljon('${esc(searchTitle)}','${type}')" style="color:#60a5fa;border-color:rgba(96,165,250,.3)">🔍 Nautiljon</button>
+      </div>
+    </div>
+  `;
+
+  renderProgressSection(w, t);
+  renderReviews(w, t);
+  loadSimilar(w);
+  loadRelations(w);
+  renderWorkSidebar(w, t);
+
+  // Show tomes tab only for manga
+  const tabTomes = document.getElementById('tab-tomes');
+  if(tabTomes) tabTomes.style.display = type==='manga' ? '' : 'none';
+  // Reset tomes section
+  const tomesEl = document.getElementById('tomes-section');
+  if(tomesEl) tomesEl.innerHTML = '';
+  window._tomesLoaded = false;
+  window._currentMalId = w.mal_id;
+}
+
+function renderProgressSection(w, t){
+  const type=w._type;
+  // For ongoing works, chapters/episodes may be null
+  // Use 'publishing' chapters count if available, else no max
+  const knownMax=type==='manga'?(w.chapters||null):(w.episodes||null);
+  const isOngoing=!knownMax; // null = ongoing or unknown
+  const max=knownMax||9999;
+  const cur=type==='manga'?(t.chapter||0):(t.episode||0);
+  const vol=t.volume||0;
+  const pct=knownMax?Math.min(100,Math.round(cur/knownMax*100)):0;
+  const statOpts=['En cours','Terminé','Abandonné','Planifié'].map(s=>`<option${(t.status||'')==s?' selected':''}>${s}</option>`).join('');
+  const maxLabel=isOngoing?'∞ (en cours)':knownMax;
+  const volMax=w.volumes||null;
+  const volLabel=volMax||'?';
+
+  document.getElementById('progress-section').innerHTML=`
+    <div class="prog-box">
+      <div class="prog-label">Progression</div>
+      <div class="prog-info">
+        <span>${type==='manga'?'Chapitre':'Épisode'} ${cur} / ${isOngoing?'<span style="color:var(--acc3)">∞</span>':knownMax}</span>
+        ${!isOngoing?`<span>${pct}%</span>`:'<span style="font-size:11px;color:var(--t3)">En cours de publication</span>'}
+      </div>
+      ${!isOngoing?`<div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div>`:''}
+      <div class="prog-row">
+        <span style="font-size:12px;color:var(--t2)">${type==='manga'?'Chap.':'Ep.'}</span>
+        <input type="number" class="prog-num-input" value="${cur}" min="0" max="${max}"
+          oninput="updateTrackProg(${w.mal_id},'${type}',this.value,${max})">
+        <span style="color:var(--t3);font-size:12px">/ ${isOngoing?'?':knownMax}</span>
+      </div>
+      ${type==='manga'?`<div class="prog-row">
+        <span style="font-size:12px;color:var(--t2)">Vol.</span>
+        <input type="number" class="prog-num-input" value="${vol}" min="0" max="${volMax||9999}"
+          oninput="updateTrackVol(${w.mal_id},this.value)">
+        <span style="color:var(--t3);font-size:12px">/ ${volLabel}</span>
+      </div>`:''}
+      <select class="status-sel" onchange="updateStatus(${w.mal_id},'${type}',this.value,'${esc(w.title)}','${esc(w.images?.jpg?.image_url||'')}')">
+        <option value="">— Définir un statut —</option>
+        ${statOpts}
+      </select>
+    </div>
+  `;
+}
+
+function renderReviews(w, t){
+  const revs=t.reviews||[];
+  const html=revs.length?revs.map(r=>`
+    <div class="review-card">
+      <div class="rv-head">
+        <div class="rv-user"><div class="rv-avatar">${S.profile.name[0]}</div>${esc(S.profile.name)}</div>
+        <div class="rv-stars">${'★'.repeat(r.rating||0)}</div>
+      </div>
+      <div class="rv-text">${esc(r.text)}</div>
+    </div>`).join('')
+    :'<p style="color:var(--t3);font-size:13px;padding:8px 0">Aucune critique pour l\'instant.</p>';
+  document.getElementById('reviews-section').innerHTML=html;
+}
+
+async function loadSimilar(w){
+  const el=document.getElementById('similar-section');
+  el.innerHTML='<div class="loading"><div class="spin"></div></div>';
+  try{
+    const d=await jikan(`/${w._type}/${w.mal_id}/recommendations`);
+    const recs=(d.data||[]).slice(0,10);
+    if(!recs.length){el.innerHTML='<p style="color:var(--t3);font-size:13px">Aucune recommandation disponible.</p>';return}
+    el.innerHTML=recs.map(r=>{
+      const item=r.entry;item._type=w._type;
+      return coverCard(item);
+    }).join('');
+  }catch(e){el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de charger.</p>'}
+}
+
+function renderWorkSidebar(w, t){
+  const type=w._type;
+  const statusBtns=['En cours','Terminé','Abandonné','Planifié'].map(s=>`
+    <button class="btn ${(t.status||'')==s?'btn-primary':'btn-ghost'} btn-sm" style="justify-content:flex-start;width:100%;margin-bottom:5px"
+      onclick="updateStatus(${w.mal_id},'${type}','${s}','${esc(w.title)}','${esc(w.images?.jpg?.image_url||'')}')">
+      <span style="width:8px;height:8px;border-radius:50%;background:${s==='En cours'?'var(--green)':s==='Terminé'?'var(--acc2)':s==='Abandonné'?'var(--red)':'var(--t3)'}"></span> ${s}
+    </button>`).join('');
+
+  const physCollData=S.collection[w.mal_id]||{};
+  const ownedVols=physCollData.volumes||{};
+  const ownedCount=Object.keys(ownedVols).length;
+  const collSection=type==='manga'?`
+    <div class="sidebar-box">
+      <div class="sb-title">📚 Ma collection</div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:4px">${ownedCount} tome(s) physique(s)</div>
+      ${(physCollData.cbz||[]).length?`<div style="font-size:12px;color:var(--t3)">${physCollData.cbz.length} support(s) CBZ</div>`:''}
+      ${(physCollData.online||[]).length?`<div style="font-size:12px;color:var(--t3)">${physCollData.online.map(o=>esc(o.name)).join(', ')}</div>`:''}
+      <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px" onclick="nav('collection')">Gérer ma collection →</button>
+    </div>`:'';
+
+  const listsSection=S.lists.map(l=>{
+    const has=l.items.some(i=>i.id==w.mal_id);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:12.5px">${esc(l.title)}</span>
+      <button style="background:${has?'var(--acc)':'var(--surface)'};border:1px solid ${has?'var(--acc)':'var(--border)'};border-radius:5px;padding:2px 9px;color:${has?'#fff':'var(--t2)'};font-size:11px;cursor:pointer"
+        onclick="toggleInList('${l.id}',${w.mal_id},'${esc(w.title)}','${esc(w.images?.jpg?.image_url||'')}','${type}')">${has?'✓':'+'}
+      </button>
+    </div>`;
+  }).join('');
+
+  document.getElementById('work-sidebar').innerHTML=`
+    <div class="sidebar-box"><div class="sb-title">Statut</div>${statusBtns}</div>
+    ${collSection}
+    ${S.lists.length?`<div class="sidebar-box"><div class="sb-title">Mes listes</div>${listsSection}<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:10px" onclick="openM('m-createlist')">+ Créer une liste</button></div>`:''}
+    <div class="sidebar-box">
+      <div class="sb-title">Informations</div>
+      <div style="font-size:12.5px;color:var(--t2);display:flex;flex-direction:column;gap:7px">
+        ${type==='manga'?`<div>Serialization: <strong>${(w.serializations||[]).map(s=>s.name).join(', ')||'—'}</strong></div>`:''}
+        ${type==='anime'?`<div>Diffusion: <strong>${w.broadcast?.string||'—'}</strong></div>`:''}
+        <div>Popularité: <strong>#${w.popularity||'—'}</strong></div>
+        <div>Membres: <strong>${w.members?.toLocaleString()||'—'}</strong></div>
+        <div>Favoris: <strong>${w.favorites?.toLocaleString()||'—'}</strong></div>
+        ${w.rating?`<div>Classement: <strong>${w.rating}</strong></div>`:''}
+        ${(w.external||[]).length?`<div style="margin-top:4px">${w.external.slice(0,3).map(e=>`<a href="${e.url}" target="_blank" style="color:var(--acc2);font-size:12px;display:block">${e.name} ↗</a>`).join('')}</div>`:''}
+      </div>
+    </div>
+  `;
+}
+
+// ─── TRACKING ───
+function quickTrack(malId, type, title, cover){
+  if(!S.tracking[malId]){
+    S.tracking[malId]={mal_id:malId,type,title,cover,status:'Planifié',chapter:0,volume:0,episode:0,rating:0,reviews:[],_addedAt:Date.now()};
+    toast(`"${title}" ajouté au suivi`,'ok');
+  } else {
+    toast(`Déjà dans votre suivi`,'');
+  }
+  save();
+  if(S.currentWork?.mal_id==malId) renderWorkSidebar(S.currentWork, S.tracking[malId]);
+}
+
+function rateWork(malId, type, rating){
+  if(!S.tracking[malId]) S.tracking[malId]={mal_id:malId,type,title:'',cover:'',status:'',chapter:0,volume:0,episode:0,rating:0,reviews:[]};
+  S.tracking[malId].rating=rating;
+  save();
+  if(rating>0) toast('Note sauvegardée : '+rating+'/10','ok');
+}
+
+function updateTrackProg(malId, type, val, max){
+  if(!S.tracking[malId])return;
+  const n=Math.max(0,Math.min(parseInt(val)||0,max===999?99999:max));
+  if(type==='manga')S.tracking[malId].chapter=n;
+  else S.tracking[malId].episode=n;
+  save();
+  const pct=max&&max!==999?Math.min(100,Math.round(n/max*100)):0;
+  const bar=document.querySelector('#progress-section .prog-bar-fill');
+  if(bar)bar.style.width=pct+'%';
+  const info=document.querySelector('#progress-section .prog-info');
+  if(info)info.innerHTML=`<span>${type==='manga'?'Chapitre':'Épisode'} ${n} / ${max===999?'?':max}</span><span>${pct}%</span>`;
+}
+
+function updateTrackVol(malId, val){
+  if(!S.tracking[malId])return;
+  S.tracking[malId].volume=Math.max(0,parseInt(val)||0);
+  save();
+}
+
+function updateStatus(malId, type, status, title, cover){
+  if(!status)return;
+  if(!S.tracking[malId]) S.tracking[malId]={mal_id:malId,type,title,cover,status,chapter:0,volume:0,episode:0,rating:0,reviews:[]};
+  else S.tracking[malId].status=status;
+  if(title)S.tracking[malId].title=title;
+  if(cover)S.tracking[malId].cover=cover;
+  save();
+  toast(`Statut: ${status}`,'ok');
+  if(S.currentWork&&S.currentWork.mal_id==malId) renderWorkSidebar(S.currentWork, S.tracking[malId]);
+}
+
+function updateColl(malId, delta){
+  // legacy compat: init new structure if needed
+  if(!S.collection[malId]||typeof S.collection[malId]==='number'){
+    S.collection[malId]={volumes:{},cbz:[],online:[]};
+  }
+  save();
+  if(S.currentWork&&S.currentWork.mal_id==malId) renderWorkSidebar(S.currentWork, S.tracking[malId]||{});
+}
+
+// ─── LISTS ───
+function renderLists(){
+  const el=document.getElementById('lists-grid');
+  if(!S.lists.length){
+    el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Aucune liste</div><div class="empty-sub">Créez votre première liste personnalisée.</div></div>`;
+    return;
+  }
+  el.innerHTML=`<div class="lists-grid">${S.lists.map(l=>{
+    const covers=l.items.slice(0,4).map(i=>`<div class="lc-cov"><img src="${i.cover||''}" loading="lazy"></div>`).join('');
+    return `<div class="list-card" onclick="openListDetail('${l.id}')">
+      <div class="lc-covers">${covers}</div>
+      <div class="lc-title">${esc(l.title)}</div>
+      <div class="lc-meta">${esc(l.desc||'')} · ${l.items.length} œuvres</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function openListDetail(id){
+  const list=S.lists.find(l=>l.id===id);
+  if(!list)return;
+  S.currentListId=id;
+  S.prevPage='lists';
+  document.getElementById('listdetail-body').innerHTML=`
+    <h1 style="font-size:22px;font-family:'Syne',sans-serif;font-weight:800;margin-bottom:6px">${esc(list.title)}</h1>
+    <p style="color:var(--t2);font-size:13.5px;margin-bottom:28px">${esc(list.desc||'')} · ${list.items.length} œuvres</p>
+    ${list.items.length?`<div class="cg-lg">${list.items.map(item=>`
+      <div class="cc" onclick="openWork(${item.id},'${item.type}')">
+        <div class="cc-wrap"><img class="cc-img" src="${item.cover}" loading="lazy"></div>
+        <div class="cc-title">${esc(item.title)}</div>
+      </div>`).join('')}</div>`
+    :'<div class="empty"><div class="empty-icon">🎌</div><div class="empty-title">Liste vide</div></div>'}
+  `;
+  nav('listdetail');
+}
+
+function doCreateList(){
+  const title=document.getElementById('cl-title').value.trim();
+  const desc=document.getElementById('cl-desc').value.trim();
+  if(!title)return;
+  S.lists.push({id:'l'+Date.now(),title,desc,items:[]});
+  save();
+  closeM('m-createlist');
+  document.getElementById('cl-title').value='';
+  document.getElementById('cl-desc').value='';
+  renderLists();
+  toast('Liste créée !','ok');
+}
+
+// List modal
+function openListModal(malId){
+  S.listModalWorkId=malId;
+  const w=S.currentWork;
+  document.getElementById('m-list-body').innerHTML=S.lists.map(l=>{
+    const has=l.items.some(i=>i.id==malId);
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer">
+      <input type="checkbox" ${has?'checked':''} data-list="${l.id}" style="accent-color:var(--acc);width:15px;height:15px">
+      <span style="font-size:13.5px">${esc(l.title)}</span>
+      <span style="font-size:11px;color:var(--t3);margin-left:auto">${l.items.length} œuvres</span>
+    </label>`;
+  }).join('')+(S.lists.length?'':'<p style="color:var(--t3);font-size:13px">Aucune liste. Créez-en une d\'abord.</p>');
+  openM('m-list');
+}
+
+function confirmList(){
+  const malId=S.listModalWorkId;
+  const w=S.currentWork;
+  if(!w||!malId)return;
+  document.querySelectorAll('#m-list-body input[type=checkbox]').forEach(cb=>{
+    const list=S.lists.find(l=>l.id===cb.dataset.list);
+    if(!list)return;
+    const item={id:malId,title:w.title,cover:w.images?.jpg?.image_url||'',type:w._type};
+    if(cb.checked&&!list.items.some(i=>i.id==malId)) list.items.push(item);
+    if(!cb.checked) list.items=list.items.filter(i=>i.id!=malId);
+  });
+  save();
+  closeM('m-list');
+  toast('Listes mises à jour ✓','ok');
+  if(S.currentWork) renderWorkSidebar(S.currentWork, S.tracking[S.currentWork.mal_id]||{});
+}
+
+function toggleInList(listId, malId, title, cover, type){
+  const list=S.lists.find(l=>l.id===listId);
+  if(!list)return;
+  if(list.items.some(i=>i.id==malId)){
+    list.items=list.items.filter(i=>i.id!=malId);
+    toast('Retiré de la liste','');
+  } else {
+    list.items.push({id:malId,title,cover,type});
+    toast('Ajouté à la liste ✓','ok');
+  }
+  save();
+  if(S.currentWork) renderWorkSidebar(S.currentWork, S.tracking[S.currentWork.mal_id]||{});
+}
+
+// ─── REVIEWS ───
+function setRvRating(n){
+  S.rvRating=n;
+  document.querySelectorAll('#m-review-stars .star').forEach((s,i)=>s.classList.toggle('lit',i<n));
+}
+
+function submitReview(){
+  const text=document.getElementById('rv-text').value.trim();
+  if(!text)return;
+  const w=S.currentWork;
+  if(!w)return;
+  if(!S.tracking[w.mal_id]) S.tracking[w.mal_id]={mal_id:w.mal_id,type:w._type,title:w.title,cover:w.images?.jpg?.image_url||'',status:'',chapter:0,volume:0,episode:0,rating:S.rvRating,reviews:[]};
+  if(!S.tracking[w.mal_id].reviews) S.tracking[w.mal_id].reviews=[];
+  S.tracking[w.mal_id].reviews.unshift({text,rating:S.rvRating,date:new Date().toLocaleDateString('fr')});
+  S.tracking[w.mal_id].rating=S.rvRating;
+  save();
+  closeM('m-review');
+  document.getElementById('rv-text').value='';
+  renderReviews(w, S.tracking[w.mal_id]);
+  toast('Critique publiée ✓','ok');
+}
+
+// ─── PROFILE ───
+function renderProfile(){
+  const emptyEl=document.getElementById('profile-banner-empty');
+  if(emptyEl) emptyEl.style.display=S.bannerUrl?'none':'flex';
+  renderTop5Manual();
+}
+
+function openEditProfile(){
+  document.getElementById('ep-name').value=S.profile.name;
+  document.getElementById('ep-bio').value=S.profile.bio;
+  openM('m-profile');
+}
+
+function saveProfile(){
+  S.profile.name=document.getElementById('ep-name').value.trim()||'Akira';
+  S.profile.bio=document.getElementById('ep-bio').value.trim();
+  save();
+  closeM('m-profile');
+  renderProfile();
+  toast('Profil mis à jour ✓','ok');
+}
+
+// ─── STATS ───
+function renderStats(){
+  const all=Object.values(S.tracking);
+  const mangas=all.filter(t=>t.type==='manga');
+  const animes=all.filter(t=>t.type==='anime');
+  const rated=all.filter(t=>t.rating>0);
+  const avgR=rated.length?(rated.reduce((s,t)=>s+t.rating,0)/rated.length).toFixed(1):'—';
+  const totalCh=mangas.reduce((s,t)=>s+(t.chapter||0),0);
+  const totalEp=animes.reduce((s,t)=>s+(t.episode||0),0);
+  const totalVols=Object.values(S.collection).reduce((s,c)=>{
+    if(!c||typeof c!=='object')return s;
+    return s+Object.keys(c.volumes||{}).length;
+  },0);
+  const readTimeH=Math.round(totalCh*0.08+totalEp*0.37); // ~5min/chap, ~22min/ep
+
+  document.getElementById('stats-grid').innerHTML=`
+    <div class="stat-card"><div class="stat-n" style="color:var(--manga)">${mangas.length}</div><div class="stat-l">Mangas suivis</div></div>
+    <div class="stat-card"><div class="stat-n" style="color:var(--anime)">${animes.length}</div><div class="stat-l">Animés suivis</div></div>
+    <div class="stat-card"><div class="stat-n" style="color:var(--acc2)">${totalCh}</div><div class="stat-l">Chapitres lus</div></div>
+    <div class="stat-card"><div class="stat-n" style="color:var(--green)">${totalEp}</div><div class="stat-l">Épisodes vus</div></div>
+    <div class="stat-card"><div class="stat-n" style="color:var(--yellow)">${avgR}</div><div class="stat-l">Note moyenne</div></div>
+    <div class="stat-card"><div class="stat-n" style="color:var(--orange)">${totalVols}</div><div class="stat-l">Tomes possédés</div></div>
+    <div class="stat-card"><div class="stat-n" style="color:var(--t2)">${all.filter(t=>t.status==='Terminé').length}</div><div class="stat-l">Terminés</div></div>
+    <div class="stat-card"><div class="stat-n" style="color:var(--acc);font-size:18px">${readTimeH}h</div><div class="stat-l">Temps estimé</div></div>
+  `;
+
+  // ── Genres préférés depuis les données de tracking enrichies ──
+  const genreCount={};
+  all.forEach(t=>{ (t._genres||[]).forEach(g=>{ genreCount[g]=(genreCount[g]||0)+1; }); });
+  const genreEl=document.getElementById('genre-bars');
+  if(!Object.keys(genreCount).length){
+    genreEl.innerHTML='<p style="color:var(--t3);font-size:13px">Ajoutez des œuvres à votre suivi pour voir vos genres préférés.</p>';
+  } else {
+    const top=Object.entries(genreCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const maxG=top[0][1];
+    genreEl.innerHTML=top.map(([g,n])=>`
+      <div style="margin-bottom:9px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+          <span style="color:var(--t2);font-weight:600">${g}</span>
+          <span style="color:var(--t3)">${n}</span>
+        </div>
+        <div style="height:6px;border-radius:3px;background:var(--bg4)">
+          <div style="height:100%;border-radius:3px;background:var(--acc);width:${Math.round((n/maxG)*100)}%;transition:width .4s"></div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── Répartition statuts ──
+  const statuses=['Planifié','En cours','Terminé','Abandonné'];
+  const statusColors=['#8b7cf8','#4ade80','#60a5fa','#f87171'];
+  const statusCounts=statuses.map(s=>all.filter(t=>t.status===s).length);
+  const total=all.length||1;
+  let offset=0;
+  const arcs=statusCounts.map((c,i)=>{
+    const pct=(c/total)*100;
+    const arc=`<circle cx="50" cy="50" r="38" fill="none" stroke="${statusColors[i]}" stroke-width="10"
+      stroke-dasharray="${(pct/100)*238.76} ${238.76}" stroke-dashoffset="${-offset/100*238.76}"
+      transform="rotate(-90 50 50)" style="transition:all .4s"/>`;
+    offset+=pct;
+    return arc;
+  });
+
+  document.getElementById('annual-chart').innerHTML=`
+    <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+      <svg width="100" height="100" viewBox="0 0 100 100">${arcs.join('')}<text x="50" y="54" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="700">${all.length}</text></svg>
+      <div>${statuses.map((s,i)=>`
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+          <div style="width:10px;height:10px;border-radius:50%;background:${statusColors[i]};flex-shrink:0"></div>
+          <span style="font-size:12px;color:var(--t2)">${s}</span>
+          <span style="font-size:12px;color:var(--t3);margin-left:auto">${statusCounts[i]}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+    <p style="margin-top:14px;font-size:11px;color:var(--t4)">* Temps estimé : ~5 min/chapitre, ~22 min/épisode</p>
+  `;
+}
+
+// ─── COLLECTION ───
+function renderCollection(){
+  // Build list of manga entries from collection — may or may not be in tracking
+  const collMalIds=Object.keys(S.collection).filter(id=>{
+    const c=S.collection[id];
+    return c&&(Object.keys(c.volumes||{}).length>0||(c.cbz||[]).length>0||(c.online||[]).length>0);
+  });
+
+  function getMeta(malId){
+    // Prefer tracking info, fall back to collectionMeta
+    return S.tracking[malId]||S.collectionMeta?.[malId]||{mal_id:malId,type:'manga',title:'Série #'+malId,cover:''};
+  }
+
+  // ── Physique — vue bibliothèque ──
+  const physEl=document.getElementById('phys-library');
+  const physEmpty=document.getElementById('phys-empty');
+  if(!physEl)return;
+  const physMalIds=collMalIds.filter(id=>{
+    const c=S.collection[id];
+    return c&&Object.keys(c.volumes||{}).length>0;
+  });
+  if(!physMalIds.length){if(physEl)physEl.innerHTML='';physEmpty.style.display='block';}
+  else{
+    physEmpty.style.display='none';
+    physEl.innerHTML=physMalIds.map(id=>{
+      const malId=parseInt(id);
+      const t=getMeta(malId);
+      const coll=S.collection[malId]||{};
+      const owned=coll.volumes||{};
+      const allNums=Object.keys(owned).map(Number).sort((a,b)=>a-b);
+      const meta=S.collectionMeta?.[malId]||S.tracking?.[malId]||{};
+      // Use real known count from meta if available, else max owned
+      const knownMax=meta._customMax||meta._knownVolumes||0;
+      const maxOwned=allNums.length?allNums[allNums.length-1]:0;
+      const maxVol=Math.max(knownMax, maxOwned, 1);
+      const isOngoing=meta._isOngoing||false;
+      const ownedCount=allNums.length;
+
+      // Color palette per series based on malId
+      const hue=((malId*53)%360);
+      const spines=[];
+      for(let i=1;i<=maxVol;i++){
+        const isOwned=!!owned[i];
+        spines.push(
+          '<div class="book-spine'+(isOwned?'':' not-owned')+'" '
+          +'onclick="toggleVol('+malId+','+i+',true)" '
+          +'title="Tome '+i+(isOwned?' ✓':' (manquant)')+'">'
+          +'<div style="width:34px;height:118px;border-radius:3px 7px 7px 3px;overflow:hidden;position:relative;'
+          +'background:hsl('+hue+','+(isOwned?'55%,28%':'30%,18%')+')">'
+          +'<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">'
+          +'<span style="font-size:14px;font-weight:900;color:rgba(255,255,255,'+(isOwned?'0.9':'0.3')+');font-family:\'Syne\',sans-serif;line-height:1">'+i+'</span>'
+          +(isOwned?'<span style="font-size:7px;color:rgba(255,255,255,0.5)">✓</span>':'')
+          +'</div>'
+          +'</div>'
+          +'</div>'
+        );
+      }
+      if(isOngoing) spines.push(
+        '<div class="book-add-slot" style="opacity:.5;height:118px" title="En cours de publication…">…</div>'
+      );
+      spines.push('<div class="book-add-slot" onclick="openEditPhysCollection('+malId+')" title="Modifier" style="height:118px">✏</div>');
+
+      return '<div class="bookshelf">'
+        +'<div class="bookshelf-manga-title">'
+        +'<img src="'+(t.cover||'')+'" style="width:28px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0">'
+        +esc(t.title||'Série #'+malId)
+        +'<span class="shelf-owned-count">'+ownedCount+' / '+maxVol+(isOngoing?' (en cours)':'')+' tomes</span>'
+        +'</div>'
+        +'<div class="bookshelf-row">'+spines.join('')+'</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  // ── CBZ ──
+  const cbzEl=document.getElementById('cbz-list');
+  const cbzEmpty=document.getElementById('cbz-empty');
+  const cbzEntries=[];
+  collMalIds.forEach(id=>{const t=getMeta(parseInt(id));const c=S.collection[id]||{};(c.cbz||[]).forEach((e,i)=>cbzEntries.push({t,entry:e,idx:i,malId:parseInt(id)}));});
+  if(!cbzEntries.length){if(cbzEl)cbzEl.innerHTML='';if(cbzEmpty)cbzEmpty.style.display='block';}
+  else{
+    if(cbzEmpty)cbzEmpty.style.display='none';
+    if(cbzEl)cbzEl.innerHTML=cbzEntries.map(({t,entry,idx,malId})=>`
+      <div class="media-entry media-cbz">
+        <div class="media-entry-icon">📂</div>
+        <div class="coll-cov"><img src="${t.cover}" loading="lazy"></div>
+        <div class="media-entry-info">
+          <div class="media-entry-title">${esc(t.title||'Série #'+malId)}</div>
+          <div class="media-entry-sub">📁 ${esc(entry.device)}</div>
+        </div>
+        <button class="media-entry-del" onclick="removeCbzEntry(${malId},${idx})">🗑</button>
+      </div>`).join('');
+  }
+
+  // ── En ligne ──
+  const onlineEl=document.getElementById('online-list');
+  const onlineEmpty=document.getElementById('online-empty');
+  const onlineEntries=[];
+  collMalIds.forEach(id=>{const t=getMeta(parseInt(id));const c=S.collection[id]||{};(c.online||[]).forEach((e,i)=>onlineEntries.push({t,entry:e,idx:i,malId:parseInt(id)}));});
+  if(!onlineEntries.length){if(onlineEl)onlineEl.innerHTML='';if(onlineEmpty)onlineEmpty.style.display='block';}
+  else{
+    if(onlineEmpty)onlineEmpty.style.display='none';
+    if(onlineEl)onlineEl.innerHTML=onlineEntries.map(({t,entry,idx,malId})=>`
+      <div class="media-entry media-online">
+        <div class="media-entry-icon">🌐</div>
+        <div class="coll-cov"><img src="${t.cover}" loading="lazy"></div>
+        <div class="media-entry-info">
+          <div class="media-entry-title">${esc(t.title||'Série #'+malId)}</div>
+          <div class="media-entry-sub">${esc(entry.name)}${entry.url?' · <a href="'+entry.url+'" target="_blank" style="color:var(--acc2)">'+entry.url.replace(/^https?:\/\//,'').slice(0,30)+'↗</a>':''}</div>
+        </div>
+        <button class="media-entry-del" onclick="removeOnlineEntry(${malId},${idx})">🗑</button>
+      </div>`).join('');
+  }
+}
+
+
+
+// ─── COLLECTION : TOGGLE VOLUME PHYSIQUE ───
+function toggleVol(malId, num, refresh){
+  if(!S.collection[malId])S.collection[malId]={volumes:{},cbz:[],online:[]};
+  const vols=S.collection[malId].volumes||{};
+  if(vols[num])delete vols[num];
+  else vols[num]=true;
+  S.collection[malId].volumes=vols;
+  save();
+  if(refresh)renderCollection();
+}
+
+// Open the phys modal pre-filled for an existing series
+async function openEditPhysCollection(malId){
+  const meta=S.collectionMeta?.[malId]||S.tracking?.[malId]||{};
+  const title=meta.title||'Série #'+malId;
+  const cover=meta.cover||'';
+  const maxVols=meta._knownVolumes||0;
+  _collPickTarget={malId,title,cover,maxVols};
+  document.getElementById('phys-search-input').value=title;
+  document.getElementById('phys-search-results').innerHTML='';
+  openM('m-add-phys');
+  // Trigger picker directly
+  await selectCollItem(malId,title,cover,'phys',maxVols);
+}
+
+// ─── COLLECTION : CBZ ───
+function addCbzEntry(malId){
+  const device=document.getElementById('cbz-device-'+malId)?.value?.trim();
+  if(!device)return toast('Indiquez le support','');
+  if(!S.collection[malId])S.collection[malId]={volumes:{},cbz:[],online:[]};
+  if(!S.collection[malId].cbz)S.collection[malId].cbz=[];
+  S.collection[malId].cbz.push({device,volumes:{}});
+  save();
+  renderCollection();
+  toast('CBZ ajouté','ok');
+}
+function removeCbzEntry(malId, idx){
+  S.collection[malId].cbz.splice(idx,1);
+  save();
+  renderCollection();
+}
+
+// ─── COLLECTION : EN LIGNE ───
+function addOnlineEntry(malId){
+  const name=document.getElementById('online-name-'+malId)?.value?.trim();
+  const url=document.getElementById('online-url-'+malId)?.value?.trim()||'';
+  if(!name)return toast('Indiquez le nom du site','');
+  if(!S.collection[malId])S.collection[malId]={volumes:{},cbz:[],online:[]};
+  if(!S.collection[malId].online)S.collection[malId].online=[];
+  S.collection[malId].online.push({name,url});
+  save();
+  renderCollection();
+  toast('Lecture en ligne ajoutée','ok');
+}
+function removeOnlineEntry(malId, idx){
+  S.collection[malId].online.splice(idx,1);
+  save();
+  renderCollection();
+}
+
+
+// ─── TOMES via MangaDex ───
+async function loadTomes(){
+  if(window._tomesLoaded) return;
+  window._tomesLoaded = true;
+
+  const el = document.getElementById('tomes-section');
+  if(!el) return;
+  el.innerHTML = '<div class="loading"><div class="spin"></div></div>';
+
+  const titleEl = document.querySelector('.work-title');
+  const searchTitle = titleEl ? titleEl.textContent.trim() : '';
+  if(!searchTitle){ el.innerHTML='<p style="color:var(--t3)">Titre introuvable.</p>'; return; }
+
+  try {
+    const proxy = 'https://corsproxy.io/?url=';
+    const searchRes = await fetch(proxy + encodeURIComponent(`https://api.mangadex.org/manga?title=${encodeURIComponent(searchTitle)}&limit=10&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica`));
+    const searchJson = await searchRes.json();
+    const results = searchJson.data || [];
+    if(!results.length){ el.innerHTML='<p style="color:var(--t3);padding:12px 0">Manga introuvable sur MangaDex.</p>'; return; }
+
+    // Meilleur match
+    let manga = results.find(m=>Object.values(m.attributes.title||{}).some(t=>t.toLowerCase()===searchTitle.toLowerCase())) || results[0];
+    const mangaId = manga.id;
+
+    // Récupérer TOUTES les couvertures sans filtre de langue
+    let covers = [], offset = 0;
+    while(true){
+      const covRes = await fetch(proxy + encodeURIComponent(`https://api.mangadex.org/cover?manga[]=${mangaId}&limit=100&offset=${offset}&order[volume]=asc`));
+      const covJson = await covRes.json();
+      const batch = covJson.data || [];
+      covers = covers.concat(batch);
+      if(batch.length < 100) break;
+      offset += 100;
+    }
+
+    if(!covers.length){ el.innerHTML='<p style="color:var(--t3);padding:12px 0">Aucune couverture trouvée.</p>'; return; }
+
+    // Grouper par volume — garder une couverture par tome (préférence fr > en > ja > autre)
+    const byVol = {};
+    for(const c of covers){
+      const vol = c.attributes.volume;
+      if(!vol) continue; // ignorer les covers sans numéro de tome
+      if(!byVol[vol]) byVol[vol] = [];
+      byVol[vol].push({locale: c.attributes.locale||'', fileName: c.attributes.fileName, mangaId});
+    }
+
+    const pickCover = arr =>
+      arr.find(c=>c.locale==='fr') ||
+      arr.find(c=>c.locale==='en') ||
+      arr.find(c=>c.locale==='ja'||c.locale==='ja-ro') ||
+      arr[0];
+
+    const volKeys = Object.keys(byVol).sort((a,b)=>{
+      const na=parseFloat(a), nb=parseFloat(b);
+      if(isNaN(na)&&isNaN(nb)) return 0;
+      if(isNaN(na)) return 1;
+      if(isNaN(nb)) return -1;
+      return na-nb;
+    });
+
+    const volumes = volKeys.map(vol=>{
+      const c = pickCover(byVol[vol]);
+      return { number:vol, cover:`https://uploads.mangadex.org/covers/${c.mangaId}/${c.fileName}.256.jpg`, isFr:c.locale==='fr' };
+    });
+
+    renderTomesGrid(el, volumes, 'mangadex');
+
+  } catch(e) {
+    console.error('[Tomes]', e);
+    el.innerHTML = '<p style="color:var(--t3);padding:12px 0">Impossible de charger les tomes.</p>';
+  }
+}
+
+function renderTomesGrid(el, volumes, source){
+  const sourceLabel = source==='nautiljon'
+    ? '<span style="background:#16a34a;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;font-family:Syne,sans-serif">✓ Nautiljon</span>'
+    : '<span style="background:var(--bg4);color:var(--t3);font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;font-family:Syne,sans-serif">MangaDex</span>';
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:14px;padding:16px 0';
+
+  for(const vol of volumes){
+    const card = document.createElement('div');
+    card.style.cssText = 'text-align:center;cursor:'+(source==='nautiljon'?'pointer':'default');
+    if(source==='nautiljon') card.onclick = () => openTomeModal(vol);
+    card.innerHTML = `
+      <div style="position:relative;border-radius:8px;overflow:hidden;background:var(--bg3);aspect-ratio:2/3;margin-bottom:6px;box-shadow:0 4px 12px rgba(0,0,0,.4)">
+        ${vol.cover
+          ? `<img src="${vol.cover}" alt="Tome ${vol.number}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px\\'>📖</div>'">`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">📖</div>`}
+        ${source==='nautiljon'?'<div style="position:absolute;top:5px;right:5px;background:#2563eb;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;font-family:Syne,sans-serif">VF</div>':''}
+        ${vol.score?`<div style="position:absolute;bottom:5px;left:5px;background:rgba(0,0,0,.75);color:#fbbf24;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">★ ${vol.score}</div>`:''}
+      </div>
+      <div style="font-size:11px;font-weight:700;font-family:'Syne',sans-serif;color:var(--t2)">Tome ${vol.number}</div>
+      ${vol.date_fr?`<div style="font-size:10px;color:var(--t4)">${vol.date_fr}</div>`:''}
+    `;
+    grid.appendChild(card);
+  }
+
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">${sourceLabel}<span style="font-size:12px;color:var(--t3)">${volumes.length} tome${volumes.length>1?'s':''}</span></div>`;
+  el.appendChild(grid);
+}
+
+function openTomeModal(vol){
+  const existing = document.getElementById('tome-modal-overlay');
+  if(existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'tome-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)';
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:28px;max-width:380px;width:90%;position:relative">
+      <button onclick="document.getElementById('tome-modal-overlay').remove()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer">✕</button>
+      <div style="display:flex;gap:16px;align-items:flex-start">
+        ${vol.cover?`<img src="${vol.cover}" style="width:80px;border-radius:8px;flex-shrink:0;box-shadow:0 4px 16px rgba(0,0,0,.5)">`:''}
+        <div>
+          <div style="font-size:16px;font-weight:800;font-family:'Syne',sans-serif;margin-bottom:8px">Tome ${vol.number}${vol.title?' — '+vol.title:''}</div>
+          ${vol.score?`<div style="color:#fbbf24;font-weight:700;margin-bottom:6px">★ ${vol.score} / 10</div>`:''}
+          ${vol.date_jp?`<div style="font-size:12px;color:var(--t3);margin-bottom:3px">🇯🇵 Sortie JP : ${vol.date_jp}</div>`:''}
+          ${vol.date_fr?`<div style="font-size:12px;color:var(--t3);margin-bottom:3px">🇫🇷 Sortie FR : ${vol.date_fr}</div>`:''}
+          ${vol.pages?`<div style="font-size:12px;color:var(--t3)">📄 ${vol.pages} pages</div>`:''}
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+async function loadRelations(w){
+  const el=document.getElementById('relations-section');
+  if(!el)return;
+  el.innerHTML='<div class="loading"><div class="spin"></div></div>';
+
+  const labelFr={
+    'SEQUEL':'Suite','PREQUEL':'Préquel','SIDE_STORY':'Histoire parallèle',
+    'SPIN_OFF':'Spin-off','ALTERNATIVE':'Version alternative',
+    'SUMMARY':'Résumé','PARENT':'Histoire principale','OTHER':'Autre',
+    'CHARACTER':'Même personnage','ADAPTATION':'Adaptation'
+  };
+
+  const mediaType = w._type==='manga' ? 'MANGA' : 'ANIME';
+
+  const query=`
+    query($malId:Int,$type:MediaType){
+      Media(idMal:$malId,type:$type){
+        relations{
+          edges{
+            relationType(version:2)
+            node{
+              idMal
+              type
+              title{ romaji english }
+              coverImage{ medium }
+              status
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  try{
+    const res=await fetch('https://graphql.anilist.co',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({query,variables:{malId:w.mal_id,type:mediaType}})
+    });
+    const json=await res.json();
+    const edges=(json?.data?.Media?.relations?.edges)||[];
+
+    if(!edges.length){
+      el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:8px 0">Aucune relation trouvée.</p>';
+      return;
+    }
+
+    // Group by relation type
+    const byType={};
+    for(const edge of edges){
+      const rel=edge.relationType;
+      const node=edge.node;
+      const mt=node.type==='MANGA'?'manga':'anime';
+      if(!byType[rel])byType[rel]=[];
+      byType[rel].push({
+        malId:node.idMal,
+        name:node.title.english||node.title.romaji||'?',
+        cover:node.coverImage?.medium||'',
+        mediaType:mt
+      });
+    }
+
+    const container=document.createElement('div');
+
+    for(const [rel,entries] of Object.entries(byType)){
+      const label=labelFr[rel]||rel;
+      const groupDiv=document.createElement('div');
+      groupDiv.className='relation-group';
+      groupDiv.innerHTML='<div class="relation-group-title">'+label+'</div>';
+      const grid=document.createElement('div');
+      grid.className='cg';
+
+      for(const {malId,name,cover,mediaType:mt} of entries){
+        const card=document.createElement('div');
+        card.className='cc';
+        card.style.cursor='pointer';
+        card.innerHTML=
+          '<div class="cc-wrap">'
+          +(cover?'<img class="cc-img" src="'+cover+'" loading="lazy">'
+            :'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;background:var(--bg4)">'+(mt==='manga'?'📖':'🎬')+'</div>')
+          +'<div class="cc-overlay"><div class="cc-ov-btns">'
+          +(malId?'<div class="cc-ov-btn" onclick="event.stopPropagation();quickTrack('+malId+',\''+mt+'\',\''+esc(name)+'\',\''+esc(cover)+'\')" title="Suivre">+</div>':'')
+          +'</div></div>'
+          +'</div>'
+          +'<div class="cc-title">'+esc(name)+'</div>'
+          +'<div class="cc-meta">'+label+' · '+(mt==='manga'?'Manga':'Animé')+'</div>';
+        if(malId) card.addEventListener('click',()=>openWork(malId,mt));
+        grid.appendChild(card);
+      }
+
+      groupDiv.appendChild(grid);
+      container.appendChild(groupDiv);
+    }
+
+    el.innerHTML='';
+    el.appendChild(container);
+
+  }catch(e){
+    console.error('[Relations AniList]',e);
+    el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de charger les relations.</p>';
+  }
+}
+
+// ─── SUIVI ───
+function renderSuivi(){
+  const query=(document.getElementById('suivi-search')?.value||'').toLowerCase().trim();
+  const sort=document.getElementById('suivi-sort')?.value||'title';
+  const all=Object.values(S.tracking);
+  const statusMap={'Planifié':'watchlist','En cours':'ongoing','Terminé':'done','Abandonné':'dropped'};
+
+  function sortItems(arr){
+    return arr.slice().sort((a,b)=>{
+      if(sort==='title') return (a.title||'').localeCompare(b.title||'');
+      if(sort==='title-desc') return (b.title||'').localeCompare(a.title||'');
+      if(sort==='rating') return (b.rating||0)-(a.rating||0);
+      if(sort==='rating-asc') return (a.rating||0)-(b.rating||0);
+      if(sort==='progress'){
+        const pa=a.type==='manga'?a.chapter||0:a.episode||0;
+        const pb=b.type==='manga'?b.chapter||0:b.episode||0;
+        return pb-pa;
+      }
+      if(sort==='date-desc') return (b._addedAt||0)-(a._addedAt||0);
+      if(sort==='date-asc') return (a._addedAt||0)-(b._addedAt||0);
+      return 0;
+    });
+  }
+
+  ['manga','anime'].forEach(type=>{
+    const items=all.filter(t=>t.type===type&&(!query||t.title.toLowerCase().includes(query)));
+    ['watchlist','ongoing','done','dropped'].forEach(tab=>{
+      const filtered=sortItems(items.filter(t=>(statusMap[t.status||'']||'watchlist')===tab));
+      const el=document.getElementById('tg-'+type+'-'+tab);
+      if(!el)return;
+      if(!filtered.length){
+        el.innerHTML='<p style="color:var(--t3);font-size:13px;grid-column:1/-1;padding:8px 0">'
+          +(query?'Aucun résultat pour "'+esc(query)+'"':'Aucune œuvre ici.')+'</p>';
+        return;
+      }
+      el.innerHTML=filtered.map(t=>{
+        const prog=type==='manga'?t.chapter||0:t.episode||0;
+        const maxProg=type==='manga'?t._maxChapter||0:t._maxEpisode||0;
+        const pct=maxProg>0?Math.min(100,Math.round((prog/maxProg)*100)):0;
+        const progressBar=maxProg>0?`<div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(0,0,0,.5)"><div style="height:100%;width:${pct}%;background:var(--acc);transition:width .3s"></div></div>`:'';
+        const ratingBadge=t.rating?'<div class="cc-rating" style="position:absolute;top:5px;left:5px;z-index:2">★ '+t.rating+'</div>':'';
+        return `<div class="cc" onclick="openWork(${t.mal_id},'${t.type}')">
+          <div class="cc-wrap">
+            <img class="cc-img" src="${t.cover}" loading="lazy">
+            <div class="status-dot ${statusClass(t.status)}"></div>
+            ${ratingBadge}
+            ${progressBar}
+            <div class="cc-overlay">
+              <div class="cc-ov-btns">
+                <div class="cc-ov-btn" onclick="event.stopPropagation();removeTracking(${t.mal_id})" title="Retirer du suivi" style="font-size:11px">✕</div>
+              </div>
+            </div>
+          </div>
+          <div class="cc-title">${esc(t.title)}</div>
+          <div class="cc-meta">${type==='manga'?'Ch.':'Ep.'} ${prog}${maxProg?' / '+maxProg:''}${t.rating?' · ★'+t.rating:''}</div>
+        </div>`;
+      }).join('');
+    });
+  });
+}
+
+function switchTrackTab(type,tab,btn){
+  document.querySelectorAll('#'+type+'-track-tabs .tracking-tab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  ['watchlist','ongoing','done','dropped'].forEach(t=>{
+    const s=document.getElementById('ts-'+type+'-'+t);
+    if(s)s.classList.toggle('on',t===tab);
+  });
+}
+
+// ─── TOP 5 MANUEL ───
+function renderTop5Manual(){
+  ['manga','anime'].forEach(type=>{
+    const el=document.getElementById('top5-'+type);
+    if(!el)return;
+    const top=S.profile['top5_'+type]||[null,null,null,null,null];
+    el.innerHTML=top.map((item,i)=>{
+      if(item){
+        return `<div class="top5-slot filled" onclick="openWork(${item.mal_id},'${type}')">
+          <div class="top5-slot-cover"><img src="${item.cover||''}" loading="lazy"></div>
+          <div class="top5-rank">#${i+1}</div>
+          <div class="top5-title">${esc(item.title||'')}</div>
+          <button class="top5-slot-del" onclick="event.stopPropagation();removeTop5('${type}',${i})" title="Retirer">✕</button>
+        </div>`;
+      } else {
+        return `<div class="top5-slot" onclick="openTop5Picker('${type}',${i})">
+          <div class="top5-slot-cover">＋</div>
+          <div class="top5-rank">#${i+1}</div>
+          <div class="top5-title" style="color:var(--t3)">Ajouter</div>
+        </div>`;
+      }
+    }).join('');
+  });
+}
+
+function openTop5Picker(type,slot){
+  S._top5Picking={type,slot};
+  const items=Object.values(S.tracking).filter(t=>t.type===type);
+  const el=document.getElementById('top5-pick-list');
+  if(!items.length){el.innerHTML='<p style="color:var(--t3);padding:12px">Aucun '+type+' suivi.</p>';openM('m-top5-pick');return;}
+  el.innerHTML=items.map(t=>`
+    <div class="lib-search-item" onclick="selectTop5Item(${t.mal_id})">
+      <img src="${t.cover||''}" loading="lazy">
+      <div>
+        <div style="font-size:13px;font-weight:700;font-family:'Syne',sans-serif">${esc(t.title)}</div>
+        <div style="font-size:11px;color:var(--t3)">${t.status||''}</div>
+      </div>
+    </div>`).join('');
+  openM('m-top5-pick');
+}
+
+function selectTop5Item(malId){
+  const {type,slot}=S._top5Picking||{};
+  if(type===undefined||slot===undefined)return;
+  const t=S.tracking[malId];
+  if(!t)return;
+  if(!S.profile['top5_'+type])S.profile['top5_'+type]=[null,null,null,null,null];
+  S.profile['top5_'+type][slot]={mal_id:malId,title:t.title,cover:t.cover};
+  save();
+  closeM('m-top5-pick');
+  renderTop5Manual();
+  toast('Top 5 mis à jour','ok');
+}
+
+function removeTop5(type,slot){
+  if(!S.profile['top5_'+type])return;
+  S.profile['top5_'+type][slot]=null;
+  save();
+  renderTop5Manual();
+}
+
+// ─── COLLECTION SEARCH ───
+let _collSearchTimer=null;
+let _collPickTarget={type:'phys',malId:null,title:'',cover:''};
+
+async function searchForCollection(val,mode){
+  clearTimeout(_collSearchTimer);
+  const resId=mode+'-search-results';
+  const el=document.getElementById(resId);
+  if(!val||val.length<2){el.innerHTML='';return;}
+  _collSearchTimer=setTimeout(async()=>{
+    el.innerHTML='<div class="loading" style="padding:12px"><div class="spin"></div></div>';
+    try{
+      const d=await jikan('/manga?q='+encodeURIComponent(val)+'&limit=6&sfw');
+      el.innerHTML=(d.data||[]).map(item=>`
+        <div class="lib-search-item" onclick="selectCollItem(${item.mal_id},'${esc(item.title_english||item.title)}','${esc(item.images?.jpg?.image_url||'')}','${mode}',${item.volumes||0})">
+          <img src="${item.images?.jpg?.image_url||''}" loading="lazy">
+          <div>
+            <div style="font-size:13px;font-weight:700;font-family:'Syne',sans-serif">${esc(item.title_english||item.title)}</div>
+            <div style="font-size:11px;color:var(--t3)">${item.volumes||'?'} tomes · ${item.status||''}</div>
+          </div>
+        </div>`).join('');
+    }catch(e){el.innerHTML='<p style="color:var(--t3);padding:10px;font-size:12px">Erreur de recherche</p>';}
+  },500);
+}
+
+async function selectCollItem(malId,title,cover,mode,maxVols){
+  _collPickTarget={malId,title,cover,maxVols:maxVols||30};
+  // Store minimal info for collection without adding to tracking/planning
+  if(!S.collectionMeta) S.collectionMeta={};
+  if(!S.collectionMeta[malId]) S.collectionMeta[malId]={mal_id:malId,type:'manga',title,cover};
+  document.getElementById(mode+'-search-results').innerHTML='';
+  document.getElementById(mode+'-search-input').value=title;
+
+  if(mode==='phys'){
+    document.getElementById('phys-picker-title').textContent=title;
+    document.getElementById('phys-picker-area').style.display='block';
+    document.getElementById('phys-vol-picker').innerHTML='<div class="loading" style="padding:10px"><div class="spin"></div></div>';
+
+    // Fetch real volume count from Jikan (handles ongoing series)
+    let realMax=maxVols||0;
+    let isOngoing=false;
+    try{
+      const info=await jikan('/manga/'+malId);
+      const data=info.data||{};
+      // For ongoing: volumes may be null but we can use chapters as proxy
+      // Use volumes if available, else estimate from chapters (~10 ch/vol)
+      realMax=data.volumes||Math.ceil((data.chapters||0)/10)||realMax||0;
+      isOngoing=!data.volumes;
+      // Store on collectionMeta (not tracking) for later use in library
+      if(!S.collectionMeta)S.collectionMeta={};
+      if(!S.collectionMeta[malId])S.collectionMeta[malId]={mal_id:malId,type:'manga',title,cover};
+      S.collectionMeta[malId]._knownVolumes=realMax;
+      S.collectionMeta[malId]._isOngoing=isOngoing;
+      save();
+    }catch(e){}
+
+    const coll=S.collection[malId]||{};
+    const owned=coll.volumes||{};
+    const existingCustomMax=S.collectionMeta?.[malId]?._customMax||0;
+    // For ongoing: use customMax if set by user, else realMax, else owned count
+    const n=Math.max(realMax, Object.keys(owned).map(Number).reduce((a,b)=>Math.max(a,b),0)||0, existingCustomMax);
+
+    function buildPhysPicker(count){
+      let picker='';
+      for(let i=1;i<=count;i++) picker+='<button class="vp-num'+(owned[i]?' owned':'')+'" onclick="togglePhysPick('+malId+','+i+',this)">'+i+'</button>';
+      return picker;
+    }
+
+    if(isOngoing){
+      const displayMax=n||1;
+      document.getElementById('phys-vol-picker').innerHTML=`
+        <div style="width:100%;margin-bottom:10px;display:flex;align-items:center;gap:8px;background:rgba(139,124,248,.08);border:1px solid rgba(139,124,248,.2);border-radius:8px;padding:8px 12px">
+          <span style="font-size:12px;color:var(--t2)">📖 Série en cours — nombre de tomes parus :</span>
+          <input type="number" id="phys-ongoing-max" min="1" max="9999" value="${displayMax}"
+            style="width:65px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:13px;outline:none;text-align:center"
+            oninput="updatePhysPickerMax(${malId},this.value)">
+        </div>
+        <div id="phys-vol-buttons" style="display:flex;flex-wrap:wrap;gap:5px">${buildPhysPicker(displayMax)}</div>`;
+    } else {
+      document.getElementById('phys-vol-picker').innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:5px">${buildPhysPicker(n||1)}</div>`;
+    }
+  } else if(mode==='cbz'){
+    document.getElementById('cbz-form-title').textContent=title;
+    document.getElementById('cbz-form-area').style.display='block';
+  } else if(mode==='online'){
+    document.getElementById('online-form-title').textContent=title;
+    document.getElementById('online-form-area').style.display='block';
+  }
+}
+
+function togglePhysPick(malId,num,btn){
+  if(!S.collection[malId])S.collection[malId]={volumes:{},cbz:[],online:[]};
+  const vols=S.collection[malId].volumes||{};
+  if(vols[num])delete vols[num]; else vols[num]=true;
+  S.collection[malId].volumes=vols;
+  save();
+  btn.classList.toggle('owned',!!vols[num]);
+}
+
+function updatePhysPickerMax(malId,val){
+  const n=Math.max(1,parseInt(val)||1);
+  if(!S.collectionMeta)S.collectionMeta={};
+  if(!S.collectionMeta[malId])S.collectionMeta[malId]={};
+  S.collectionMeta[malId]._customMax=n;
+  save();
+  const coll=S.collection[malId]||{};
+  const owned=coll.volumes||{};
+  let html='';
+  for(let i=1;i<=n;i++) html+='<button class="vp-num'+(owned[i]?' owned':'')+'" onclick="togglePhysPick('+malId+','+i+',this)">'+i+'</button>';
+  const container=document.getElementById('phys-vol-buttons');
+  if(container)container.innerHTML=html;
+}
+
+function confirmPhysAdd(){
+  closeM('m-add-phys');
+  document.getElementById('phys-picker-area').style.display='none';
+  document.getElementById('phys-search-input').value='';
+  renderCollection();
+  toast('Collection mise à jour','ok');
+}
+
+function confirmCbzAdd(){
+  const device=document.getElementById('cbz-device-input').value.trim();
+  if(!device)return toast('Indiquez le support','');
+  const {malId}=_collPickTarget;
+  if(!S.collection[malId])S.collection[malId]={volumes:{},cbz:[],online:[]};
+  if(!S.collection[malId].cbz)S.collection[malId].cbz=[];
+  S.collection[malId].cbz.push({device,volumes:{}});
+  save();
+  closeM('m-add-cbz');
+  document.getElementById('cbz-device-input').value='';
+  document.getElementById('cbz-form-area').style.display='none';
+  document.getElementById('cbz-search-input').value='';
+  renderCollection();
+  toast('CBZ ajouté','ok');
+}
+
+function confirmOnlineAdd(){
+  const name=document.getElementById('online-name-input').value.trim();
+  const url=document.getElementById('online-url-input').value.trim()||'';
+  if(!name)return toast('Indiquez le nom du site','');
+  const {malId}=_collPickTarget;
+  if(!S.collection[malId])S.collection[malId]={volumes:{},cbz:[],online:[]};
+  if(!S.collection[malId].online)S.collection[malId].online=[];
+  S.collection[malId].online.push({name,url});
+  save();
+  closeM('m-add-online');
+  document.getElementById('online-name-input').value='';
+  document.getElementById('online-url-input').value='';
+  document.getElementById('online-form-area').style.display='none';
+  document.getElementById('online-search-input').value='';
+  renderCollection();
+  toast('Lecture en ligne ajoutée','ok');
+}
+
+
+// ─── REMOVE TRACKING ───
+function removeTracking(malId){
+  if(!S.tracking[malId])return;
+  const title=S.tracking[malId].title||'';
+  delete S.tracking[malId];
+  save();
+  toast('"'+title+'" retiré du suivi','ok');
+  if(S.currentWork&&S.currentWork.mal_id==malId)renderWorkPage(S.currentWork);
+}
+
+// ─── COVER LIGHTBOX ───
+function openCoverLightbox(malId){
+  const defaultUrl=(S.currentWork&&S.currentWork._coverFull)||'';
+  const url=(S.customCovers&&S.customCovers[malId])||defaultUrl;
+  const lb=document.getElementById('cover-lightbox');
+  document.getElementById('cover-lightbox-img').src=url;
+  lb.dataset.malid=malId;
+  lb.classList.add('on');
+}
+function closeCoverLightbox(e){
+  if(e.target===document.getElementById('cover-lightbox'))document.getElementById('cover-lightbox').classList.remove('on');
+}
+function handleCoverChange(file,malId){
+  if(!file||!malId)return;
+  const r=new FileReader();
+  r.onload=function(ev){
+    if(!S.customCovers)S.customCovers={};
+    S.customCovers[malId]=ev.target.result;
+    save();
+    const wci=document.getElementById('work-cover-img');
+    if(wci)wci.src=ev.target.result;
+    toast('Couverture mise à jour','ok');
+  };
+  r.readAsDataURL(file);
+}
+
+// ─── PROFILE BANNER ───
+function handleBannerUpload(file){
+  if(!file) return;
+  const r = new FileReader();
+  r.onload = function(ev){
+    openBannerCrop(ev.target.result);
+  };
+  r.readAsDataURL(file);
+}
+
+function openBannerCrop(dataUrl){
+  const existing = document.getElementById('banner-crop-overlay');
+  if(existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'banner-crop-overlay';
+  overlay.innerHTML = `
+    <div id="banner-crop-box">
+      <div style="padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:14px;font-weight:800;font-family:'Syne',sans-serif">Recadrer la bannière</span>
+        <span style="font-size:11px;color:var(--t3)">Glisse pour repositionner</span>
+      </div>
+      <div id="banner-crop-preview">
+        <img id="banner-crop-img" src="${dataUrl}" draggable="false">
+      </div>
+      <div id="banner-crop-controls">
+        <div class="crop-zoom-row">
+          <label>Zoom</label>
+          <input type="range" id="crop-zoom" min="0.5" max="3" step="0.01" value="1">
+          <span id="crop-zoom-val" style="font-size:12px;color:var(--t2);width:35px">100%</span>
+        </div>
+        <div class="crop-btns">
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('banner-crop-overlay').remove()">Annuler</button>
+          <button class="btn btn-primary btn-sm" onclick="applyBannerCrop('${dataUrl}')">✓ Appliquer</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // Init drag + zoom
+  const preview = document.getElementById('banner-crop-preview');
+  const img = document.getElementById('banner-crop-img');
+  const zoomSlider = document.getElementById('crop-zoom');
+  const zoomVal = document.getElementById('crop-zoom-val');
+
+  let scale = 1, tx = 0, ty = 0;
+  let dragging = false, startX, startY, startTx, startTy;
+
+  function applyTransform(){
+    img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  }
+
+  img.onload = function(){
+    // Auto-fit
+    const pw = preview.offsetWidth, ph = preview.offsetHeight;
+    scale = Math.max(pw / img.naturalWidth, ph / img.naturalHeight);
+    zoomSlider.min = 0.1;
+    zoomSlider.value = scale;
+    tx = (pw - img.naturalWidth * scale) / 2;
+    ty = (ph - img.naturalHeight * scale) / 2;
+    applyTransform();
+    zoomVal.textContent = Math.round(scale * 100) + '%';
+  };
+
+  zoomSlider.oninput = function(){
+    const newScale = parseFloat(this.value);
+    const pw = preview.offsetWidth, ph = preview.offsetHeight;
+    // Zoom centered
+    tx = pw/2 - (pw/2 - tx) * (newScale/scale);
+    ty = ph/2 - (ph/2 - ty) * (newScale/scale);
+    scale = newScale;
+    zoomVal.textContent = Math.round(scale * 100) + '%';
+    applyTransform();
+  };
+
+  preview.addEventListener('mousedown', e=>{
+    dragging = true; startX = e.clientX; startY = e.clientY; startTx = tx; startTy = ty;
+    preview.classList.add('dragging');
+  });
+  window.addEventListener('mousemove', e=>{
+    if(!dragging) return;
+    tx = startTx + (e.clientX - startX);
+    ty = startTy + (e.clientY - startY);
+    applyTransform();
+  });
+  window.addEventListener('mouseup', ()=>{ dragging=false; preview.classList.remove('dragging'); });
+
+  // Touch support
+  preview.addEventListener('touchstart', e=>{
+    dragging=true; startX=e.touches[0].clientX; startY=e.touches[0].clientY; startTx=tx; startTy=ty;
+  },{passive:true});
+  window.addEventListener('touchmove', e=>{
+    if(!dragging) return;
+    tx=startTx+(e.touches[0].clientX-startX); ty=startTy+(e.touches[0].clientY-startY);
+    applyTransform();
+  },{passive:true});
+  window.addEventListener('touchend', ()=>{ dragging=false; });
+}
+
+function applyBannerCrop(dataUrl){
+  const preview = document.getElementById('banner-crop-preview');
+  const img = document.getElementById('banner-crop-img');
+  const style = img.style.transform;
+  const match = style.match(/translate\(([^,]+)px,([^p]+)px\) scale\(([^)]+)\)/);
+  if(!match){ document.getElementById('banner-crop-overlay').remove(); return; }
+
+  const tx = parseFloat(match[1]);
+  const ty = parseFloat(match[2]);
+  const scale = parseFloat(match[3]);
+  const pw = preview.offsetWidth;
+  const ph = preview.offsetHeight;
+
+  // Draw cropped result on canvas at full banner width
+  const canvas = document.createElement('canvas');
+  const dpr = 2;
+  canvas.width = pw * dpr;
+  canvas.height = ph * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const srcImg = new Image();
+  srcImg.onload = function(){
+    ctx.drawImage(
+      srcImg,
+      tx * dpr,
+      ty * dpr,
+      srcImg.naturalWidth * scale * dpr,
+      srcImg.naturalHeight * scale * dpr
+    );
+    const result = canvas.toDataURL('image/jpeg', 0.92);
+    S.bannerUrl = result;
+
+    // Use background-image so it fills the full banner width
+    const bannerBg = document.getElementById('profile-banner-bg');
+    if(bannerBg){
+      bannerBg.style.backgroundImage = `url(${result})`;
+      bannerBg.style.backgroundSize = 'cover';
+      bannerBg.style.backgroundPosition = 'center center';
+      bannerBg.style.display = 'block';
+    }
+    // Hide the img tag
+    const bannerImg = document.getElementById('profile-banner-img');
+    if(bannerImg) bannerImg.style.display = 'none';
+
+    const emptyEl = document.getElementById('profile-banner-empty');
+    if(emptyEl) emptyEl.style.display = 'none';
+    save();
+    document.getElementById('banner-crop-overlay').remove();
+    toast('Bannière mise à jour ✓', 'ok');
+  };
+  srcImg.src = dataUrl;
+}
+
+// ─── ANIME-SAMA ───
+function slugify(str){
+  return str.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'-')
+    .replace(/^-|-$/g,'');
+}
+function openAnimeSama(title){
+  window.open('https://anime-sama.tv/catalogue/?search='+encodeURIComponent(title),'_blank','noopener');
+}
+function openNautiljon(title, type){
+  const section = type==='anime' ? 'animes' : 'mangas';
+  window.open('https://www.nautiljon.com/'+section+'/?q='+encodeURIComponent(title),'_blank','noopener');
+}
+function toggleReadDropdown(id){
+  const menu=document.getElementById('rdm-'+id);
+  if(!menu)return;
+  const isOpen=menu.classList.contains('on');
+  document.querySelectorAll('.read-dropdown-menu.on').forEach(m=>m.classList.remove('on'));
+  if(!isOpen)menu.classList.add('on');
+}
+function closeReadDropdown(id){
+  const menu=document.getElementById('rdm-'+id);
+  if(menu)setTimeout(()=>menu.classList.remove('on'),100);
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.read-dropdown')){
+    document.querySelectorAll('.read-dropdown-menu.on').forEach(m=>m.classList.remove('on'));
+  }
+});
+
+// ─── MODALS ───
+function openM(id){document.getElementById(id).classList.add('on')}
+function closeM(id){document.getElementById(id).classList.remove('on')}
+document.addEventListener('click',e=>{
+  if(e.target.classList.contains('modal-bg'))e.target.classList.remove('on');
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    document.querySelectorAll('.modal-bg.on').forEach(m=>m.classList.remove('on'));
+    document.getElementById('cover-lightbox').classList.remove('on');
+  }
+});
+
+// ─── TOAST ───
+function toast(msg, type=''){
+  const el=document.createElement('div');
+  el.className=`toast ${type}`;
+  el.textContent=msg;
+  document.getElementById('toastZone').appendChild(el);
+  setTimeout(()=>el.remove(),3000);
+}
+
+// ─── EXPORT PROFIL IMAGE ───
+async function exportProfileImage(){
+  toast('⏳ Génération de l\'image…');
+  const all=Object.values(S.tracking);
+  const mangas=all.filter(t=>t.type==='manga');
+  const animes=all.filter(t=>t.type==='anime');
+  const totalCh=mangas.reduce((s,t)=>s+(t.chapter||0),0);
+  const totalEp=animes.reduce((s,t)=>s+(t.episode||0),0);
+  const avgR=all.filter(t=>t.rating>0).length
+    ?(all.filter(t=>t.rating>0).reduce((s,t)=>s+t.rating,0)/all.filter(t=>t.rating>0).length).toFixed(1):'—';
+  const top5m=(S.profile?.top5_manga||[]).slice(0,5);
+  const top5a=(S.profile?.top5_anime||[]).slice(0,5);
+
+  const W=900, H=500;
+  const canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+
+  // Fond
+  ctx.fillStyle='#09090d';
+  ctx.fillRect(0,0,W,H);
+
+  // Bannière
+  if(S.bannerUrl){
+    try{
+      const img=new Image();
+      img.crossOrigin='anonymous';
+      await new Promise((res,rej)=>{img.onload=res;img.onerror=res;img.src=S.bannerUrl;});
+      ctx.drawImage(img,0,0,W,180);
+      // Gradient overlay
+      const grad=ctx.createLinearGradient(0,80,0,180);
+      grad.addColorStop(0,'rgba(9,9,13,0)');
+      grad.addColorStop(1,'rgba(9,9,13,1)');
+      ctx.fillStyle=grad;
+      ctx.fillRect(0,0,W,180);
+    }catch(e){}
+  } else {
+    ctx.fillStyle='#13131a';
+    ctx.fillRect(0,0,W,120);
+  }
+
+  // Titre OtakuTrack
+  ctx.fillStyle='#8b7cf8';
+  ctx.font='bold 13px sans-serif';
+  ctx.fillText('OtakuTrack',30,36);
+
+  // Stats
+  const stats=[
+    {label:'Mangas',val:mangas.length,color:'#f472b6'},
+    {label:'Animés',val:animes.length,color:'#38bdf8'},
+    {label:'Chapitres',val:totalCh,color:'#a99cff'},
+    {label:'Épisodes',val:totalEp,color:'#4ade80'},
+    {label:'Note moy.',val:avgR,color:'#fbbf24'},
+  ];
+  const statsY=200;
+  stats.forEach((s,i)=>{
+    const x=30+i*170;
+    ctx.fillStyle='#13131a';
+    roundRect(ctx,x,statsY,155,70,8);
+    ctx.fillStyle=s.color;
+    ctx.font='bold 26px sans-serif';
+    ctx.fillText(String(s.val),x+14,statsY+38);
+    ctx.fillStyle='#888';
+    ctx.font='12px sans-serif';
+    ctx.fillText(s.label,x+14,statsY+58);
+  });
+
+  // Top 5 manga covers
+  const coversY=300;
+  ctx.fillStyle='#a99cff';
+  ctx.font='bold 13px sans-serif';
+  ctx.fillText('Top Mangas',30,coversY-10);
+  ctx.fillText('Top Animés',30+5*82,coversY-10);
+
+  async function drawCovers(list, startX){
+    for(let i=0;i<Math.min(5,list.length);i++){
+      const item=list[i];
+      const cover=item.cover||'';
+      const x=startX+i*82;
+      ctx.fillStyle='#1e1e28';
+      roundRect(ctx,x,coversY,72,108,6);
+      if(cover){
+        try{
+          const img=new Image();
+          img.crossOrigin='anonymous';
+          await new Promise((res)=>{img.onload=res;img.onerror=res;img.src=cover;});
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(x,coversY,72,108,6);
+          ctx.clip();
+          ctx.drawImage(img,x,coversY,72,108);
+          ctx.restore();
+        }catch(e){}
+      }
+    }
+  }
+  await drawCovers(top5m,30);
+  await drawCovers(top5a,30+5*82);
+
+  // Footer
+  ctx.fillStyle='#333';
+  ctx.fillRect(0,H-28,W,28);
+  ctx.fillStyle='#666';
+  ctx.font='11px sans-serif';
+  ctx.fillText('otakutrack • '+new Date().toLocaleDateString('fr-FR'),30,H-10);
+
+  // Télécharger
+  const a=document.createElement('a');
+  a.download='otakutrack-profil.png';
+  a.href=canvas.toDataURL('image/png');
+  a.click();
+  toast('✅ Image téléchargée !');
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.roundRect(x,y,w,h,r);
+  ctx.fill();
+}
+
+function exportSyncCode(){
+  const data = {
+    tracking: S.tracking, lists: S.lists,
+    collection: S.collection, collectionMeta: S.collectionMeta,
+    profile: S.profile, bannerUrl: S.bannerUrl,
+    bannerSize: S.bannerSize, bannerPos: S.bannerPos,
+    _ts: Date.now()
+  };
+  const json = JSON.stringify(data);
+  const b64 = btoa(unescape(encodeURIComponent(json)));
+
+  // Affiche dans une modal simple
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px';
+  box.innerHTML = `
+    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:14px;padding:24px;max-width:520px;width:100%">
+      <h3 style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:8px">📤 Ton code de sync</h3>
+      <p style="font-size:13px;color:var(--t3);margin-bottom:14px">Copie ce code et colle-le sur l'autre appareil via "Importer un code".</p>
+      <textarea readonly style="width:100%;height:130px;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:11px;font-family:monospace;resize:none;outline:none;box-sizing:border-box;word-break:break-all">${b64}</textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+        <button onclick="this.closest('div[style]').remove()" style="background:var(--surface);border:1px solid var(--border);color:var(--t2);padding:7px 16px;border-radius:8px;cursor:pointer;font-size:13px">Fermer</button>
+        <button onclick="navigator.clipboard.writeText(document.querySelector('textarea[readonly]').value).then(()=>toast('✅ Code copié !'))" style="background:var(--acc);border:none;color:#fff;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">📋 Copier</button>
+      </div>
+    </div>`;
+  document.body.appendChild(box);
+  box.addEventListener('click', e=>{ if(e.target===box) box.remove(); });
+}
+
+function openImportSync(){
+  document.getElementById('sync-code-input').value='';
+  openM('m-sync');
+}
+
+function importSyncCode(){
+  const raw = document.getElementById('sync-code-input').value.trim();
+  if(!raw){ toast('❌ Code vide'); return; }
+  try{
+    const json = decodeURIComponent(escape(atob(raw)));
+    const remote = JSON.parse(json);
+    const merged = mergeSyncData(remote);
+    applyMergedData(merged);
+    save();
+    closeM('m-sync');
+    toast('✅ Données fusionnées !');
+    // Refresh page courante
+    const cur = document.querySelector('.pg.on');
+    if(cur) nav(cur.id.replace('pg-',''));
+  }catch(e){
+    toast('❌ Code invalide');
+  }
+}
+
+function mergeSyncData(remote){
+  const tracking = { ...(remote.tracking||{}) };
+  Object.entries(S.tracking||{}).forEach(([id,v])=>{
+    if(!tracking[id]) tracking[id]=v;
+  });
+  const listsMap = {};
+  [...(remote.lists||[]), ...(S.lists||[])].forEach(l=>{ listsMap[l.id]=l; });
+  const collection = { ...(remote.collection||{}), ...(S.collection||{}) };
+  const collectionMeta = { ...(remote.collectionMeta||{}), ...(S.collectionMeta||{}) };
+  return {
+    tracking, lists: Object.values(listsMap),
+    collection, collectionMeta,
+    profile: S.profile || remote.profile,
+    bannerUrl: S.bannerUrl || remote.bannerUrl,
+    bannerSize: S.bannerSize || remote.bannerSize,
+    bannerPos: S.bannerPos || remote.bannerPos,
+    _ts: Date.now()
+  };
+}
+
+function applyMergedData(d){
+  if(d.tracking) S.tracking=d.tracking;
+  if(d.lists) S.lists=d.lists;
+  if(d.collection) S.collection=d.collection;
+  if(d.collectionMeta) S.collectionMeta=d.collectionMeta;
+  if(d.profile) S.profile=d.profile;
+  if(d.bannerUrl) S.bannerUrl=d.bannerUrl;
+  if(d.bannerSize) S.bannerSize=d.bannerSize;
+  if(d.bannerPos) S.bannerPos=d.bannerPos;
+}
+
+
+// ─── FIREBASE SYNC ───
+const FB_CONFIG = {
+  apiKey: "AIzaSyB53VvGSNMzmqAZPpAlj9sIgkBRH5iEukc",
+  authDomain: "otackutrack.firebaseapp.com",
+  projectId: "otackutrack",
+  storageBucket: "otackutrack.firebasestorage.app",
+  messagingSenderId: "628087711358",
+  appId: "1:628087711358:web:37f09e4e19427eaa4ada2f"
+};
+
+let fbApp, fbAuth, fbDb, fbUser=null, fbUnsub=null, fbSyncPaused=false;
+
+function initFirebase(){
+  try{
+    fbApp = firebase.initializeApp(FB_CONFIG);
+    fbAuth = firebase.auth();
+    fbDb   = firebase.firestore();
+
+    // Gérer le retour après redirect (mobile)
+    fbAuth.getRedirectResult().then(result=>{
+      if(result.user) toast('✅ Connecté ! Sync activée');
+    }).catch(e=>{ if(e.code!=='auth/no-current-user') console.error(e); });
+
+    fbAuth.onAuthStateChanged(user=>{
+      fbUser = user;
+      if(user){
+        updateAuthBtn(user);
+        startFirestoreSync();
+      } else {
+        updateAuthBtn(null);
+        if(fbUnsub){ fbUnsub(); fbUnsub=null; }
+      }
+    });
+  }catch(e){ console.error('Firebase init error', e); }
+}
+
+function updateAuthBtn(user){
+  const btn = document.getElementById('fb-auth-btn');
+  const lbl = document.getElementById('fb-auth-label');
+  if(!btn||!lbl) return;
+  if(user){
+    btn.style.borderColor='#4ade80';
+    btn.style.color='#4ade80';
+    const name = user.displayName?.split(' ')[0] || user.email?.split('@')[0] || 'Connecté';
+    lbl.textContent = name;
+    btn.title = 'Connecté en tant que ' + user.email + ' — cliquer pour se déconnecter';
+  } else {
+    btn.style.borderColor='var(--border)';
+    btn.style.color='var(--t2)';
+    lbl.textContent='Connexion';
+    btn.title='Se connecter avec Google';
+  }
+}
+
+function handleAuthClick(){
+  if(fbUser){
+    if(confirm('Se déconnecter de la sync Firebase ?')){
+      fbAuth.signOut();
+      toast('👋 Déconnecté');
+    }
+  } else {
+    if(location.protocol==='file:'){
+      toast('⚠️ Connexion impossible en local — héberge le fichier d\'abord (GitHub Pages, etc.)');
+      return;
+    }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    if(isMobile){
+      fbAuth.signInWithRedirect(provider);
+    } else {
+      fbAuth.signInWithPopup(provider)
+        .then(()=>toast('✅ Connecté ! Sync activée'))
+        .catch(e=>{
+          if(e.code==='auth/popup-blocked'||e.code==='auth/popup-closed-by-user'){
+            fbAuth.signInWithRedirect(provider);
+          } else {
+            toast('❌ Erreur connexion : '+e.code);
+            console.error(e);
+          }
+        });
+    }
+  }
+}
+
+// Données à syncer (sans les covers en base64 trop lourdes)
+function getFirestoreData(){
+  return {
+    tracking: S.tracking,
+    lists: S.lists,
+    collection: S.collection,
+    collectionMeta: S.collectionMeta,
+    profile: S.profile,
+    bannerUrl: S.bannerUrl||null,
+    bannerSize: S.bannerSize||null,
+    bannerPos: S.bannerPos||null,
+    _updatedAt: Date.now()
+  };
+}
+
+function applyFirestoreData(data){
+  if(!data) return;
+  fbSyncPaused = true;
+  if(data.tracking) S.tracking = data.tracking;
+  if(data.lists) S.lists = data.lists;
+  if(data.collection) S.collection = data.collection;
+  if(data.collectionMeta) S.collectionMeta = data.collectionMeta;
+  if(data.profile) S.profile = data.profile;
+  if(data.bannerUrl) S.bannerUrl = data.bannerUrl;
+  if(data.bannerSize) S.bannerSize = data.bannerSize;
+  if(data.bannerPos) S.bannerPos = data.bannerPos;
+  // Sauvegarder localement aussi
+  try{ localStorage.setItem('ot_v3', JSON.stringify(getFirestoreData())); }catch(e){}
+  fbSyncPaused = false;
+  // Refresh page courante
+  const cur = document.querySelector('.pg.on');
+  if(cur) { const p=cur.id.replace('pg-',''); if(p!=='work') nav(p); }
+  renderTop5Manual();
+}
+
+let fbSaveTimer = null;
+function fbSave(){
+  if(!fbUser || fbSyncPaused) return;
+  clearTimeout(fbSaveTimer);
+  fbSaveTimer = setTimeout(async ()=>{
+    try{
+      const doc = fbDb.collection('users').doc(fbUser.uid);
+      await doc.set(getFirestoreData(), {merge:true});
+    }catch(e){ console.error('Firebase save error', e); }
+  }, 1000); // Debounce 1s pour éviter trop d'écritures
+}
+
+function startFirestoreSync(){
+  if(!fbUser) return;
+  const doc = fbDb.collection('users').doc(fbUser.uid);
+
+  // Écoute temps réel — se déclenche dès qu'un autre appareil sauvegarde
+  fbUnsub = doc.onSnapshot(snap=>{
+    if(!snap.exists) {
+      // Première connexion → upload les données locales
+      fbSave();
+      return;
+    }
+    const remote = snap.data();
+    const localTs = S._updatedAt || 0;
+    const remoteTs = remote._updatedAt || 0;
+
+    if(remoteTs > localTs + 2000){
+      // Données distantes plus récentes → merge et appliquer
+      const merged = mergeFirestoreData(remote);
+      applyFirestoreData(merged);
+      toast('🔄 Sync depuis un autre appareil');
+    }
+  }, e=>console.error('Firestore listener error', e));
+
+  toast('☁ Sync Firebase active');
+}
+
+function mergeFirestoreData(remote){
+  const tracking = { ...(remote.tracking||{}) };
+  Object.entries(S.tracking||{}).forEach(([id,v])=>{ if(!tracking[id]) tracking[id]=v; });
+  const listsMap = {};
+  [...(remote.lists||[]), ...(S.lists||[])].forEach(l=>{ listsMap[l.id]=l; });
+  const collection = { ...(remote.collection||{}), ...(S.collection||{}) };
+  const collectionMeta = { ...(remote.collectionMeta||{}), ...(S.collectionMeta||{}) };
+  return {
+    tracking, lists:Object.values(listsMap), collection, collectionMeta,
+    profile: S.profile||remote.profile,
+    bannerUrl: S.bannerUrl||remote.bannerUrl,
+    bannerSize: S.bannerSize||remote.bannerSize,
+    bannerPos: S.bannerPos||remote.bannerPos,
+    _updatedAt: Date.now()
+  };
+}
+
+// Intercepter save() pour aussi écrire sur Firebase
+const _origSave = save;
+window.save = function(){
+  _origSave();
+  S._updatedAt = Date.now();
+  fbSave();
+};
+
+// ─── INIT ───
+load();
+initFirebase();
+renderHome();
+renderTop5Manual();
+
+
+
+</script>
+</body>
+</html>
