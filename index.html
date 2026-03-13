@@ -691,7 +691,7 @@ textarea.fi{resize:vertical;min-height:72px}
   border-radius:0 0 14px 14px;
 }
 .bookshelf-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:14px;font-family:'Syne',sans-serif}
-.bookshelf-row{display:flex;gap:6px;padding-bottom:22px;overflow-x:auto;min-height:160px;align-items:flex-end;scrollbar-width:thin;scrollbar-color:var(--border2) var(--bg4)}
+.bookshelf-row{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:22px;min-height:160px;align-items:flex-end;}
 .book-spine{
   width:34px;flex-shrink:0;border-radius:3px 6px 6px 3px;
   cursor:pointer;position:relative;transition:transform .2s,filter .2s;
@@ -720,6 +720,20 @@ textarea.fi{resize:vertical;min-height:72px}
 
 /* ── TOP 5 MANUEL ── */
 .top5-manual{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
+.char-card{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;width:90px}
+.char-card-img{width:80px;height:110px;object-fit:cover;border-radius:8px;background:var(--bg3);border:2px solid var(--border);transition:border-color .2s}
+.char-card:hover .char-card-img{border-color:var(--acc)}
+.char-card-name{font-size:11px;font-weight:700;text-align:center;color:var(--t2);font-family:'Syne',sans-serif;line-height:1.2}
+.char-card-series{font-size:10px;color:var(--t3);text-align:center}
+.chars-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:14px;padding:8px 0}
+.combat-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;display:flex;align-items:center;gap:12px;padding:10px;cursor:default;position:relative}
+.combat-card-img{width:56px;height:72px;object-fit:cover;border-radius:7px;flex-shrink:0;background:var(--bg4)}
+.combat-card-rank{font-size:18px;font-weight:900;color:var(--acc);font-family:'Syne',sans-serif;min-width:24px;text-align:center;flex-shrink:0}
+.combat-card-info{flex:1;min-width:0}
+.combat-card-name{font-size:13px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.combat-card-work{font-size:11px;color:var(--t3)}
+.combat-add-btn{background:var(--bg3);border:1.5px dashed var(--border2);border-radius:10px;padding:12px;text-align:center;color:var(--t3);cursor:pointer;font-size:13px;margin-bottom:10px;transition:all .15s}
+.combat-add-btn:hover{border-color:var(--acc);color:var(--acc)}
 .top5-slot{
   width:88px;cursor:pointer;position:relative;
 }
@@ -933,6 +947,69 @@ textarea.fi{resize:vertical;min-height:72px}
   </div>
 </div>
 
+<!-- Modal recherche personnage -->
+<div class="modal-bg" id="m-char-pick">
+  <div class="modal" style="max-width:480px;width:100%">
+    <div class="modal-title">Choisir un personnage <span class="modal-close" onclick="closeM('m-char-pick')">✕</span></div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input id="char-search-input" type="text" placeholder="Nom du personnage…"
+        style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"
+        oninput="searchCharDebounce(this.value)">
+    </div>
+    <div class="lib-search-results" id="char-pick-list" style="max-height:360px">
+      <p style="color:var(--t3);font-size:13px;padding:12px">Tapez un nom pour chercher…</p>
+    </div>
+  </div>
+</div>
+
+<!-- Modal fiche personnage -->
+<div class="modal-bg" id="m-char-page">
+  <div class="modal" style="max-width:560px;width:100%;max-height:85vh;overflow-y:auto">
+    <div class="modal-title"><span id="char-page-name">Personnage</span> <span class="modal-close" onclick="closeM('m-char-page')">✕</span></div>
+    <div id="char-page-content"></div>
+  </div>
+</div>
+
+<!-- Modal ajout combat -->
+<div class="modal-bg" id="m-combat-add">
+  <div class="modal" style="max-width:480px;width:100%">
+    <div class="modal-title">⚔️ Ajouter un combat <span class="modal-close" onclick="closeM('m-combat-add')">✕</span></div>
+
+    <div style="margin-bottom:12px">
+      <label style="font-size:12px;color:var(--t3);display:block;margin-bottom:5px">Nom du combat *</label>
+      <input id="combat-name" type="text" placeholder="ex: Goku vs Vegeta" maxlength="80"
+        style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;box-sizing:border-box">
+    </div>
+
+    <div style="margin-bottom:12px">
+      <label style="font-size:12px;color:var(--t3);display:block;margin-bottom:5px">Œuvre (manga ou animé)</label>
+      <div style="display:flex;gap:8px">
+        <input id="combat-work-search" type="text" placeholder="Chercher un manga / animé…"
+          style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"
+          oninput="combatWorkSearchDebounce(this.value)">
+      </div>
+      <div id="combat-work-results" style="margin-top:6px;max-height:140px;overflow-y:auto"></div>
+      <div id="combat-work-selected" style="display:none;margin-top:8px;display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:8px 10px">
+        <img id="combat-work-img" src="" style="width:32px;height:44px;object-fit:cover;border-radius:4px">
+        <span id="combat-work-title" style="font-size:13px;font-weight:700;color:var(--text)"></span>
+        <button onclick="clearCombatWork()" style="margin-left:auto;background:none;border:none;color:var(--t3);cursor:pointer;font-size:14px">✕</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <label style="font-size:12px;color:var(--t3);display:block;margin-bottom:5px">Image custom (optionnel)</label>
+      <input type="file" id="combat-img-file" accept="image/*" style="display:none" onchange="handleCombatImg(this.files[0])">
+      <button class="btn btn-ghost" onclick="document.getElementById('combat-img-file').click()" style="font-size:12px">📷 Choisir une image</button>
+      <span id="combat-img-name" style="font-size:11px;color:var(--t3);margin-left:8px"></span>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeM('m-combat-add')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveCombat()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════════ -->
 <!-- PAGE: HOME -->
 <!-- ═══════════════════════════════════════════ -->
@@ -1052,6 +1129,7 @@ textarea.fi{resize:vertical;min-height:72px}
       <div class="tabs" id="work-tabs">
         <button class="tab on" onclick="switchTab(this,'tp-progress')">Progression</button>
         <button class="tab" onclick="switchTab(this,'tp-reviews')">Critiques</button>
+        <button class="tab" onclick="switchTab(this,'tp-chars');loadCharacters()">Personnages</button>
         <button class="tab" onclick="switchTab(this,'tp-similar')">Similaires</button>
         <button class="tab" onclick="switchTab(this,'tp-relations')">Relations</button>
         <button class="tab" id="tab-tomes" style="display:none" onclick="switchTab(this,'tp-tomes');loadTomes()">Tomes</button>
@@ -1061,6 +1139,7 @@ textarea.fi{resize:vertical;min-height:72px}
         <div id="reviews-section"></div>
         <button class="btn btn-ghost" onclick="openM('m-review')" style="margin-top:10px">+ Écrire une critique</button>
       </div>
+      <div class="tp" id="tp-chars"><div id="chars-section"></div></div>
       <div class="tp" id="tp-similar"><div class="cg" id="similar-section"></div></div>
       <div class="tp" id="tp-relations"><div id="relations-section"></div></div>
       <div class="tp" id="tp-tomes"><div id="tomes-section"></div></div>
@@ -1170,6 +1249,23 @@ textarea.fi{resize:vertical;min-height:72px}
           <h2 class="sh-title">Top 5 Animés <span class="badge b-anime">ANIMÉ</span></h2>
         </div>
         <div class="top5-manual" id="top5-anime"></div>
+      </div>
+    </div>
+
+    <!-- TOP 5 PERSONNAGES -->
+    <!-- TOP 10 PERSONNAGES + TOP 5 COMBATS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:32px">
+      <div>
+        <div class="sh" style="margin-bottom:14px">
+          <h2 class="sh-title">Top 10 Personnages <span class="badge" style="background:rgba(251,191,36,.15);color:#fbbf24">PERSO</span></h2>
+        </div>
+        <div class="top5-manual" id="top5-chars"></div>
+      </div>
+      <div>
+        <div class="sh" style="margin-bottom:14px">
+          <h2 class="sh-title">Top 5 Combats <span class="badge" style="background:rgba(248,113,113,.15);color:#f87171">COMBAT</span></h2>
+        </div>
+        <div id="top5-combats"></div>
       </div>
     </div>
 
@@ -1319,7 +1415,14 @@ function load(){
     if(d.collection)S.collection=d.collection;
     if(d.collectionMeta)S.collectionMeta=d.collectionMeta;
     if(d.profile)S.profile=d.profile;
-    if(d.customCovers)S.customCovers=d.customCovers;
+    if(d.customCovers){
+      S.customCovers=d.customCovers;
+      // Appliquer les covers custom dans tracking et collectionMeta
+      Object.entries(d.customCovers).forEach(([id,url])=>{
+        if(S.tracking[id]) S.tracking[id].cover=url;
+        if(S.collectionMeta[id]) S.collectionMeta[id].cover=url;
+      });
+    }
     if(d.bannerUrl){
       S.bannerUrl=d.bannerUrl;
       var bg=document.getElementById('profile-banner-bg');
@@ -2791,6 +2894,8 @@ function renderTop5Manual(){
       }
     }).join('');
   });
+  renderTop5Chars();
+  renderTop5Combats();
 }
 
 function openTop5Picker(type,slot){
@@ -2829,7 +2934,254 @@ function removeTop5(type,slot){
   renderTop5Manual();
 }
 
-// ─── COLLECTION SEARCH ───
+// ─── TOP 5 PERSONNAGES ───
+function renderTop5Chars(){
+  const el=document.getElementById('top5-chars');
+  if(!el)return;
+  const top=S.profile.top5_chars||Array(10).fill(null);
+  // Assurer 10 slots
+  while(top.length<10) top.push(null);
+  el.innerHTML=top.slice(0,10).map((item,i)=>{
+    if(item){
+      return `<div class="top5-slot filled" onclick="openCharPage(${item.id})">
+        <div class="top5-slot-cover"><img src="${item.image||''}" loading="lazy" style="width:100%;height:100%;object-fit:cover"></div>
+        <div class="top5-rank">#${i+1}</div>
+        <div class="top5-title">${esc(item.name||'')}</div>
+        <button class="top5-slot-del" onclick="event.stopPropagation();removeTop5Char(${i})" title="Retirer">✕</button>
+      </div>`;
+    } else {
+      return `<div class="top5-slot" onclick="openCharPicker(${i})">
+        <div class="top5-slot-cover">＋</div>
+        <div class="top5-rank">#${i+1}</div>
+        <div class="top5-title" style="color:var(--t3)">Ajouter</div>
+      </div>`;
+    }
+  }).join('');
+}
+
+function removeTop5Char(slot){
+  if(!S.profile.top5_chars) return;
+  S.profile.top5_chars[slot]=null;
+  save(); renderTop5Chars();
+}
+
+function openCharPicker(slot){
+  S._charPickSlot=slot;
+  document.getElementById('char-search-input').value='';
+  document.getElementById('char-pick-list').innerHTML='<p style="color:var(--t3);font-size:13px;padding:12px">Tapez un nom pour chercher…</p>';
+  openM('m-char-pick');
+}
+
+let _charSearchTimer=null;
+function searchCharDebounce(q){
+  clearTimeout(_charSearchTimer);
+  if(!q.trim()){ document.getElementById('char-pick-list').innerHTML='<p style="color:var(--t3);font-size:13px;padding:12px">Tapez un nom pour chercher…</p>'; return; }
+  _charSearchTimer=setTimeout(()=>searchChars(q),500);
+}
+
+async function searchChars(q){
+  const el=document.getElementById('char-pick-list');
+  el.innerHTML='<div class="loading"><div class="spin"></div></div>';
+  try{
+    const d=await jikan(`/characters?q=${encodeURIComponent(q)}&limit=12`);
+    const results=d.data||[];
+    if(!results.length){ el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:12px">Aucun résultat.</p>'; return; }
+    el.innerHTML=results.map(c=>{
+      const img=c.images?.jpg?.image_url||c.images?.webp?.image_url||'';
+      const series=[...(c.manga||[]),...(c.anime||[])].map(s=>s.manga?.title||s.anime?.title).filter(Boolean)[0]||'';
+      return `<div class="lib-search-item" onclick="selectChar(${c.mal_id},'${esc(c.name)}','${img.replace(/'/g,"\\'")}','${esc(series)}')">
+        <img src="${img}" loading="lazy" style="width:44px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0">
+        <div>
+          <div style="font-size:13px;font-weight:700;font-family:'Syne',sans-serif">${esc(c.name)}</div>
+          <div style="font-size:11px;color:var(--t3)">${esc(series)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:12px">Erreur API.</p>'; }
+}
+
+function selectChar(id,name,image,series){
+  const slot=S._charPickSlot;
+  if(slot===undefined) return;
+  if(!S.profile.top5_chars) S.profile.top5_chars=[null,null,null,null,null];
+  S.profile.top5_chars[slot]={id,name,image,series};
+  save(); closeM('m-char-pick'); renderTop5Chars();
+  toast('Personnage ajouté','ok');
+}
+
+// ─── PAGE PERSONNAGE ───
+async function openCharPage(charId){
+  document.getElementById('char-page-name').textContent='Chargement…';
+  document.getElementById('char-page-content').innerHTML='<div class="loading"><div class="spin"></div></div>';
+  openM('m-char-page');
+  try{
+    const d=await jikan(`/characters/${charId}/full`);
+    const c=d.data;
+    const img=c.images?.jpg?.image_url||c.images?.webp?.image_url||'';
+    const mangas=(c.manga||[]).slice(0,6);
+    const animes=(c.anime||[]).slice(0,6);
+    const about=(c.about||'').replace(/\n\n+/g,'\n').slice(0,600);
+    document.getElementById('char-page-name').textContent=c.name||'Personnage';
+    document.getElementById('char-page-content').innerHTML=`
+      <div style="display:flex;gap:18px;margin-bottom:18px;flex-wrap:wrap">
+        ${img?`<img src="${img}" style="width:110px;height:160px;object-fit:cover;border-radius:10px;flex-shrink:0">`:''} 
+        <div style="flex:1;min-width:160px">
+          ${c.name_kanji?`<div style="font-size:14px;color:var(--t3);margin-bottom:6px">${esc(c.name_kanji)}</div>`:''}
+          ${c.nicknames?.length?`<div style="font-size:12px;color:var(--t3);margin-bottom:10px">Alias : ${c.nicknames.slice(0,3).join(', ')}</div>`:''}
+          ${about?`<p style="font-size:12px;color:var(--t2);line-height:1.6;margin:0">${esc(about)}${c.about?.length>600?'…':''}</p>`:'<p style="color:var(--t3);font-size:12px">Pas de description disponible.</p>'}
+        </div>
+      </div>
+      ${mangas.length?`<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:var(--t3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Apparaît dans (manga)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${mangas.map(m=>`<span class="gtag" style="cursor:pointer" onclick="closeM('m-char-page');openWork(${m.manga.mal_id},'manga')">${esc(m.manga.title)}</span>`).join('')}</div></div>`:''}
+      ${animes.length?`<div><div style="font-size:12px;font-weight:700;color:var(--t3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Apparaît dans (animé)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${animes.map(a=>`<span class="gtag" style="cursor:pointer;background:rgba(56,189,248,.1);color:#38bdf8" onclick="closeM('m-char-page');openWork(${a.anime.mal_id},'anime')">${esc(a.anime.title)}</span>`).join('')}</div></div>`:''}
+    `;
+  }catch(e){
+    document.getElementById('char-page-content').innerHTML='<p style="color:var(--t3)">Erreur de chargement.</p>';
+  }
+}
+
+// ─── PERSONNAGES D'UNE ŒUVRE ───
+async function loadCharacters(){
+  const el=document.getElementById('chars-section');
+  const w=S.currentWork;
+  if(!el||!w) return;
+  if(el.dataset.loaded===String(w.mal_id)) return; // déjà chargé
+  el.innerHTML='<div class="loading"><div class="spin"></div> Chargement des personnages…</div>';
+  try{
+    const d=await jikan(`/${w._type}/${w.mal_id}/characters`);
+    const chars=d.data||[];
+    if(!chars.length){ el.innerHTML='<p style="color:var(--t3);font-size:13px">Aucun personnage trouvé.</p>'; return; }
+    el.dataset.loaded=String(w.mal_id);
+    el.innerHTML=`<div class="chars-grid">${chars.map(c=>{
+      const char=c.character;
+      const img=char.images?.jpg?.image_url||char.images?.webp?.image_url||'';
+      const role=c.role||'';
+      return `<div class="char-card" onclick="openCharPage(${char.mal_id})">
+        <div style="position:relative">
+          <img class="char-card-img" src="${img}" loading="lazy">
+          ${role==='Main'?`<div style="position:absolute;top:4px;right:4px;background:var(--acc);color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px">MAIN</div>`:''}
+        </div>
+        <div class="char-card-name">${esc(char.name)}</div>
+        <div class="char-card-series">${esc(role)}</div>
+      </div>`;
+    }).join('')}</div>`;
+  }catch(e){ el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de charger les personnages.</p>'; }
+}
+
+// ─── TOP 5 COMBATS ───
+function renderTop5Combats(){
+  const el=document.getElementById('top5-combats');
+  if(!el)return;
+  const combats=S.profile.top5_combats||[];
+  let html='';
+  // Slots remplis
+  combats.slice(0,5).forEach((c,i)=>{
+    const img=c.image||c.workCover||'';
+    html+=`<div class="combat-card">
+      <div class="combat-card-rank">#${i+1}</div>
+      ${img?`<img class="combat-card-img" src="${img}" loading="lazy">`:`<div class="combat-card-img" style="display:flex;align-items:center;justify-content:center;font-size:22px">⚔️</div>`}
+      <div class="combat-card-info">
+        <div class="combat-card-name">${esc(c.name)}</div>
+        ${c.workTitle?`<div class="combat-card-work">📖 ${esc(c.workTitle)}</div>`:''}
+      </div>
+      <button onclick="removeCombat(${i})" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:13px;padding:4px;flex-shrink:0" title="Retirer">✕</button>
+    </div>`;
+  });
+  // Bouton ajouter si moins de 5
+  if(combats.length<5){
+    html+=`<div class="combat-add-btn" onclick="openAddCombat()">＋ Ajouter un combat</div>`;
+  }
+  el.innerHTML=html;
+}
+
+function removeCombat(i){
+  if(!S.profile.top5_combats) return;
+  S.profile.top5_combats.splice(i,1);
+  save(); renderTop5Combats();
+}
+
+function openAddCombat(){
+  S._combatWork=null;
+  S._combatImg=null;
+  document.getElementById('combat-name').value='';
+  document.getElementById('combat-work-search').value='';
+  document.getElementById('combat-work-results').innerHTML='';
+  document.getElementById('combat-work-selected').style.display='none';
+  document.getElementById('combat-img-name').textContent='';
+  document.getElementById('combat-img-file').value='';
+  openM('m-combat-add');
+}
+
+let _combatWorkTimer=null;
+function combatWorkSearchDebounce(q){
+  clearTimeout(_combatWorkTimer);
+  const el=document.getElementById('combat-work-results');
+  if(!q.trim()){ el.innerHTML=''; return; }
+  _combatWorkTimer=setTimeout(()=>combatWorkSearch(q),500);
+}
+
+async function combatWorkSearch(q){
+  const el=document.getElementById('combat-work-results');
+  el.innerHTML='<div class="loading" style="padding:8px"><div class="spin"></div></div>';
+  try{
+    const [md,ad]=await Promise.allSettled([
+      jikan(`/manga?q=${encodeURIComponent(q)}&limit=4&sfw`),
+      jikan(`/anime?q=${encodeURIComponent(q)}&limit=4&sfw`)
+    ]);
+    const mangas=(md.status==='fulfilled'?md.value.data:[]).map(m=>({...m,_type:'manga'}));
+    const animes=(ad.status==='fulfilled'?ad.value.data:[]).map(a=>({...a,_type:'anime'}));
+    const results=[...mangas,...animes].slice(0,6);
+    if(!results.length){ el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:6px">Aucun résultat.</p>'; return; }
+    el.innerHTML=results.map(r=>{
+      const cover=r.images?.jpg?.image_url||'';
+      return `<div class="lib-search-item" onclick="selectCombatWork(${r.mal_id},'${esc(r.title)}','${cover.replace(/'/g,"\\'")}')">
+        <img src="${cover}" loading="lazy" style="width:32px;height:44px;object-fit:cover;border-radius:4px;flex-shrink:0">
+        <div>
+          <div style="font-size:12px;font-weight:700">${esc(r.title)}</div>
+          <div style="font-size:10px;color:var(--t3)">${r._type}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML=''; }
+}
+
+function selectCombatWork(malId, title, cover){
+  S._combatWork={malId,title,cover};
+  document.getElementById('combat-work-results').innerHTML='';
+  document.getElementById('combat-work-search').value='';
+  document.getElementById('combat-work-img').src=cover;
+  document.getElementById('combat-work-title').textContent=title;
+  document.getElementById('combat-work-selected').style.display='flex';
+}
+
+function clearCombatWork(){
+  S._combatWork=null;
+  document.getElementById('combat-work-selected').style.display='none';
+}
+
+function handleCombatImg(file){
+  if(!file) return;
+  const r=new FileReader();
+  r.onload=ev=>{ S._combatImg=ev.target.result; document.getElementById('combat-img-name').textContent=file.name; };
+  r.readAsDataURL(file);
+}
+
+function saveCombat(){
+  const name=document.getElementById('combat-name').value.trim();
+  if(!name){ toast('Donne un nom au combat','err'); return; }
+  if(!S.profile.top5_combats) S.profile.top5_combats=[];
+  if(S.profile.top5_combats.length>=5){ toast('Maximum 5 combats','err'); return; }
+  S.profile.top5_combats.push({
+    name,
+    workTitle: S._combatWork?.title||'',
+    workCover: S._combatWork?.cover||'',
+    workMalId: S._combatWork?.malId||null,
+    image: S._combatImg||S._combatWork?.cover||''
+  });
+  save(); closeM('m-combat-add'); renderTop5Combats();
+  toast('Combat ajouté ⚔️','ok');
+}
 let _collSearchTimer=null;
 let _collPickTarget={type:'phys',malId:null,title:'',cover:''};
 
@@ -3013,9 +3365,15 @@ function handleCoverChange(file,malId){
   r.onload=function(ev){
     if(!S.customCovers)S.customCovers={};
     S.customCovers[malId]=ev.target.result;
+    // Mettre à jour partout : tracking, collectionMeta
+    if(S.tracking[malId]) S.tracking[malId].cover=ev.target.result;
+    if(S.collectionMeta[malId]) S.collectionMeta[malId].cover=ev.target.result;
     save();
     const wci=document.getElementById('work-cover-img');
     if(wci)wci.src=ev.target.result;
+    // Rafraîchir les cartes visibles
+    document.querySelectorAll(`img[data-malid="${malId}"]`).forEach(img=>img.src=ev.target.result);
+    renderHomeInProgress();
     toast('Couverture mise à jour','ok');
   };
   r.readAsDataURL(file);
