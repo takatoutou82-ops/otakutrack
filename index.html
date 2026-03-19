@@ -388,7 +388,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;o
 
 /* ── LISTS ── */
 .lists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
-.list-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s,transform .15s}
+.list-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s,transform .15s;position:relative}
 .list-card:hover{border-color:var(--acc);transform:translateY(-2px)}
 .lc-covers{display:flex;gap:5px;margin-bottom:12px}
 .lc-cov{width:42px;height:60px;border-radius:5px;overflow:hidden;background:var(--bg4)}
@@ -734,6 +734,20 @@ textarea.fi{resize:vertical;min-height:72px}
 .combat-card-work{font-size:11px;color:var(--t3)}
 .combat-add-btn{background:var(--bg3);border:1.5px dashed var(--border2);border-radius:10px;padding:12px;text-align:center;color:var(--t3);cursor:pointer;font-size:13px;margin-bottom:10px;transition:all .15s}
 .combat-add-btn:hover{border-color:var(--acc);color:var(--acc)}
+/* TIER LIST */
+.tier-row{display:flex;gap:0;margin-bottom:6px;border-radius:10px;overflow:hidden;min-height:60px}
+.tier-label{width:90px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-family:'Syne',sans-serif;font-size:12px;text-align:center;padding:6px;line-height:1.2}
+.tier-items{flex:1;display:flex;flex-wrap:wrap;gap:4px;padding:6px;background:var(--bg3);border:1px solid var(--border);border-left:none;align-items:center;min-height:60px}
+.tier-item{width:38px;height:54px;border-radius:4px;overflow:hidden;cursor:grab;position:relative;flex-shrink:0}
+.tier-item img{width:100%;height:100%;object-fit:cover}
+.tier-item-title{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.75);font-size:7px;font-weight:700;text-align:center;padding:2px;color:#fff;line-height:1.1}
+.tier-empty{font-size:11px;color:var(--t4);font-style:italic;padding:4px}
+/* FANART MODAL */
+.fanart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;max-height:400px;overflow-y:auto}
+.fanart-item{border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:border-color .15s;aspect-ratio:2/3}
+.fanart-item.wide{aspect-ratio:16/9}
+.fanart-item:hover{border-color:var(--acc)}
+.fanart-item img{width:100%;height:100%;object-fit:cover}
 .top5-slot{
   width:88px;cursor:pointer;position:relative;
 }
@@ -1010,6 +1024,56 @@ textarea.fi{resize:vertical;min-height:72px}
   </div>
 </div>
 
+<!-- Modal choix couverture (local ou Fanart.tv) -->
+<div class="modal-bg" id="m-cover-picker">
+  <div class="modal" style="max-width:600px;width:100%;max-height:88vh;overflow-y:auto">
+    <div class="modal-title">🖼 Changer la couverture <span class="modal-close" onclick="closeM('m-cover-picker')">✕</span></div>
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <button class="btn btn-primary" id="cp-tab-fanart" onclick="switchCoverTab('fanart')">🎨 Fanart.tv</button>
+      <button class="btn btn-ghost" id="cp-tab-local" onclick="switchCoverTab('local')">📁 Importer</button>
+    </div>
+    <div id="cp-fanart-section">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <select id="cp-fanart-type" onchange="loadFanartCovers()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:12px;outline:none">
+          <option value="posters">Posters</option>
+          <option value="backgrounds">Fonds d'écran</option>
+          <option value="banners">Bannières</option>
+        </select>
+        <span style="font-size:12px;color:var(--t3);align-self:center" id="cp-fanart-hint">Images pour l'œuvre courante</span>
+      </div>
+      <div id="cp-fanart-grid"><div class="loading"><div class="spin"></div> Chargement…</div></div>
+    </div>
+    <div id="cp-local-section" style="display:none">
+      <input type="file" id="cp-local-input" accept="image/*" style="display:none" onchange="applyLocalCover(this.files[0])">
+      <button class="btn btn-ghost" onclick="document.getElementById('cp-local-input').click()">📁 Choisir un fichier</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal choix bannière profil (local ou Fanart.tv) -->
+<div class="modal-bg" id="m-banner-picker">
+  <div class="modal" style="max-width:600px;width:100%;max-height:88vh;overflow-y:auto">
+    <div class="modal-title">🖼 Changer la bannière <span class="modal-close" onclick="closeM('m-banner-picker')">✕</span></div>
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <button class="btn btn-primary" id="bp-tab-local" onclick="switchBannerTab('local')">📁 Importer</button>
+      <button class="btn btn-ghost" id="bp-tab-fanart" onclick="switchBannerTab('fanart')">🎨 Fanart.tv</button>
+    </div>
+    <div id="bp-local-section">
+      <input type="file" id="bp-local-input" accept="image/*" style="display:none" onchange="handleBannerUpload(this.files[0]);closeM('m-banner-picker')">
+      <button class="btn btn-ghost" onclick="document.getElementById('bp-local-input').click()">📁 Choisir un fichier</button>
+    </div>
+    <div id="bp-fanart-section" style="display:none">
+      <p style="font-size:12px;color:var(--t3);margin-bottom:10px">Choisir un fond depuis Fanart.tv — recherche par œuvre</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input id="bp-fanart-search" type="text" placeholder="Nom du manga / animé…"
+          style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"
+          oninput="bannerFanartSearchDebounce(this.value)">
+      </div>
+      <div id="bp-fanart-grid"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════════ -->
 <!-- PAGE: HOME -->
 <!-- ═══════════════════════════════════════════ -->
@@ -1232,43 +1296,45 @@ textarea.fi{resize:vertical;min-height:72px}
       <span style="font-size:13px;font-family:'Syne',sans-serif;font-weight:600;color:var(--t3)">Ajoute une bannière</span>
     </div>
     <input type="file" id="banner-file-input" accept="image/*" style="display:none" onchange="handleBannerUpload(this.files[0])">
-    <button class="profile-banner-upload" onclick="document.getElementById('banner-file-input').click()">🖼 Changer la bannière</button>
+    <button class="profile-banner-upload" onclick="openBannerPicker()">🖼 Changer la bannière</button>
   </div>
 
   <div class="wrap pt32 pb40">
-    <!-- TOP 5 -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px">
+    <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:32px;align-items:start">
+
+      <!-- COLONNE GAUCHE : TOPS -->
       <div>
         <div class="sh" style="margin-bottom:14px">
           <h2 class="sh-title">Top 5 Mangas <span class="badge b-manga">MANGA</span></h2>
         </div>
         <div class="top5-manual" id="top5-manga"></div>
-      </div>
-      <div>
-        <div class="sh" style="margin-bottom:14px">
+
+        <div class="sh" style="margin-bottom:14px;margin-top:24px">
           <h2 class="sh-title">Top 5 Animés <span class="badge b-anime">ANIMÉ</span></h2>
         </div>
         <div class="top5-manual" id="top5-anime"></div>
-      </div>
-    </div>
 
-    <!-- TOP 5 PERSONNAGES -->
-    <!-- TOP 10 PERSONNAGES + TOP 5 COMBATS -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:32px">
-      <div>
-        <div class="sh" style="margin-bottom:14px">
+        <div class="sh" style="margin-bottom:14px;margin-top:24px">
           <h2 class="sh-title">Top 10 Personnages <span class="badge" style="background:rgba(251,191,36,.15);color:#fbbf24">PERSO</span></h2>
         </div>
         <div class="top5-manual" id="top5-chars"></div>
-      </div>
-      <div>
-        <div class="sh" style="margin-bottom:14px">
+
+        <div class="sh" style="margin-bottom:14px;margin-top:24px">
           <h2 class="sh-title">Top 5 Combats <span class="badge" style="background:rgba(248,113,113,.15);color:#f87171">COMBAT</span></h2>
         </div>
         <div id="top5-combats"></div>
       </div>
-    </div>
 
+      <!-- COLONNE DROITE : TIER LIST -->
+      <div>
+        <div class="sh" style="margin-bottom:14px">
+          <h2 class="sh-title">Tier List <span class="badge" style="background:rgba(139,124,248,.15);color:var(--acc)">AUTO</span></h2>
+          <button class="btn btn-ghost" style="font-size:11px" onclick="renderTierList()">↺ Actualiser</button>
+        </div>
+        <div id="tier-list-wrap"></div>
+      </div>
+
+    </div>
   </div>
 </div>
 <!-- ═══════════════════════════════════════════ -->
@@ -1953,7 +2019,7 @@ function renderWorkPage(w){
     <div class="work-cover-box">
       <img src="${coverSrc}" alt="${esc(displayTitle)}" id="work-cover-img">
       <input type="file" id="cover-change-input-${w.mal_id}" accept="image/*" style="display:none" onchange="handleCoverChange(this.files[0],${w.mal_id})">
-      <button class="cover-change-btn" onclick="document.getElementById('cover-change-input-${w.mal_id}').click()">🖼 Changer la couverture</button>
+      <button class="cover-change-btn" onclick="openCoverPicker(${w.mal_id},'${esc(w.title||displayTitle)}')">🖼 Changer la couverture</button>
     </div>
     <div>
       <div class="work-type-pill wtp-${type}">${type==='manga'?'📖 MANGA':'🎬 ANIMÉ'}</div>
@@ -2192,8 +2258,16 @@ function renderLists(){
       <div class="lc-covers">${covers}</div>
       <div class="lc-title">${esc(l.title)}</div>
       <div class="lc-meta">${esc(l.desc||'')} · ${l.items.length} œuvres</div>
+      <button onclick="event.stopPropagation();deleteList('${l.id}')" style="position:absolute;top:8px;right:8px;background:rgba(248,113,113,.15);border:none;border-radius:6px;padding:4px 8px;color:#f87171;font-size:11px;cursor:pointer;font-weight:700">🗑 Supprimer</button>
     </div>`;
   }).join('')}</div>`;
+}
+
+function deleteList(id){
+  if(!confirm('Supprimer cette liste ?')) return;
+  S.lists=S.lists.filter(l=>l.id!==id);
+  save(); renderLists();
+  toast('Liste supprimée','ok');
 }
 
 function openListDetail(id){
@@ -2300,6 +2374,7 @@ function renderProfile(){
   const emptyEl=document.getElementById('profile-banner-empty');
   if(emptyEl) emptyEl.style.display=S.bannerUrl?'none':'flex';
   renderTop5Manual();
+  renderTierList();
 }
 
 function openEditProfile(){
@@ -3182,6 +3257,194 @@ function saveCombat(){
   save(); closeM('m-combat-add'); renderTop5Combats();
   toast('Combat ajouté ⚔️','ok');
 }
+
+// ─── TIER LIST ───
+const TIERS=[
+  {label:"Chef d'œuvre absolu", min:10,  color:'#ff4d4d',bg:'rgba(255,77,77,.22)'},
+  {label:'INCROYABLE',          min:9.5, color:'#ff7f00',bg:'rgba(255,127,0,.22)'},
+  {label:'MASTERCLASS',         min:9,   color:'#ffd700',bg:'rgba(255,215,0,.22)'},
+  {label:'TROPPPP BIENN',       min:8.5, color:'#adff2f',bg:'rgba(173,255,47,.22)'},
+  {label:'TROPP COOL',          min:8,   color:'#00e5ff',bg:'rgba(0,229,255,.22)'},
+  {label:'Pas mal',             min:7.5, color:'#7c4dff',bg:'rgba(124,77,255,.22)'},
+  {label:'A lire',              min:7,   color:'#ff80ab',bg:'rgba(255,128,171,.22)'},
+  {label:'Je relirais pas',     min:0,   color:'#607d8b',bg:'rgba(96,125,139,.22)'},
+];
+
+function getTierIndex(rating){
+  if(rating>=10) return 0;
+  if(rating>=9.5) return 1;
+  if(rating>=9)   return 2;
+  if(rating>=8.5) return 3;
+  if(rating>=8)   return 4;
+  if(rating>=7.5) return 5;
+  if(rating>=7)   return 6;
+  if(rating>0)    return 7;
+  return -1;
+}
+
+function renderTierList(){
+  const el=document.getElementById('tier-list-wrap');
+  if(!el) return;
+  const all=Object.values(S.tracking).filter(t=>t.rating>0);
+  const groups=TIERS.map(()=>[]);
+  all.forEach(t=>{ const i=getTierIndex(t.rating); if(i>=0) groups[i].push(t); });
+  if(!all.length){
+    el.innerHTML='<p style="color:var(--t3);font-size:13px">Note des œuvres pour les voir apparaître ici.</p>';
+    return;
+  }
+  el.innerHTML=TIERS.map((tier,i)=>`
+    <div class="tier-row">
+      <div class="tier-label" style="background:${tier.bg};color:${tier.color}">${tier.label}</div>
+      <div class="tier-items">
+        ${groups[i].length
+          ? groups[i].map(t=>`<div class="tier-item" title="${esc(t.title)} ★${t.rating}" onclick="openWork(${t.mal_id},'${t.type}')">
+              <img src="${t.cover||''}" loading="lazy">
+              <div class="tier-item-title">${esc((t.title||'').slice(0,12))}</div>
+            </div>`).join('')
+          : '<span class="tier-empty">—</span>'}
+      </div>
+    </div>`).join('');
+}
+
+// ─── FANART.TV COVER PICKER ───
+const FANART_KEY='77d9e980130db612d843400629bfe608';
+let _coverPickMalId=null;
+
+function openCoverPicker(malId,title){
+  _coverPickMalId=malId;
+  document.getElementById('cp-fanart-type').value='posters';
+  switchCoverTab('fanart');
+  openM('m-cover-picker');
+  loadFanartCovers();
+}
+
+function switchCoverTab(tab){
+  document.getElementById('cp-fanart-section').style.display=tab==='fanart'?'block':'none';
+  document.getElementById('cp-local-section').style.display=tab==='local'?'block':'none';
+  document.getElementById('cp-tab-fanart').className='btn '+(tab==='fanart'?'btn-primary':'btn-ghost');
+  document.getElementById('cp-tab-local').className='btn '+(tab==='local'?'btn-primary':'btn-ghost');
+}
+
+async function loadFanartCovers(){
+  const grid=document.getElementById('cp-fanart-grid');
+  const type=document.getElementById('cp-fanart-type').value;
+  const malId=_coverPickMalId;
+  if(!malId||!grid) return;
+  grid.innerHTML='<div class="loading"><div class="spin"></div> Chargement Fanart.tv…</div>';
+  try{
+    const r=await fetch(`https://webservice.fanart.tv/v3/anime/${malId}?api_key=${FANART_KEY}`);
+    const d=await r.json();
+    let imgs=[];
+    if(type==='posters') imgs=[...(d.animeposter||[]),(d.tvposter||[])].flat();
+    else if(type==='backgrounds') imgs=[...(d.showbackground||[]),(d.hdtvart||[])].flat();
+    else if(type==='banners') imgs=[...(d.tvbanner||[]),(d.animebanner||[])].flat();
+    if(!imgs.length) throw new Error('no images');
+    const isWide=type!=='posters';
+    grid.innerHTML=`<div class="fanart-grid">${imgs.slice(0,30).map(img=>`
+      <div class="fanart-item${isWide?' wide':''}" onclick="applyCoverFromUrl('${img.url}',${malId})">
+        <img src="${img.url}" loading="lazy">
+      </div>`).join('')}</div>`;
+  }catch(e){
+    grid.innerHTML=`<div style="text-align:center;padding:20px">
+      <p style="color:var(--t3);font-size:13px;margin-bottom:12px">Aucune image Fanart.tv pour cette œuvre.<br>Utilise l'import local.</p>
+      <button class="btn btn-ghost" onclick="switchCoverTab('local')">📁 Importer depuis mon appareil</button>
+    </div>`;
+  }
+}
+
+function applyCoverFromUrl(url,malId){
+  fetch(url).then(r=>r.blob()).then(blob=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{ applyCustomCover(malId,ev.target.result); closeM('m-cover-picker'); };
+    reader.readAsDataURL(blob);
+  }).catch(()=>{ applyCustomCover(malId,url); closeM('m-cover-picker'); });
+}
+
+function applyLocalCover(file){
+  if(!file||!_coverPickMalId) return;
+  const r=new FileReader();
+  r.onload=ev=>{ applyCustomCover(_coverPickMalId,ev.target.result); closeM('m-cover-picker'); };
+  r.readAsDataURL(file);
+}
+
+function applyCustomCover(malId,dataUrl){
+  if(!S.customCovers) S.customCovers={};
+  S.customCovers[malId]=dataUrl;
+  if(S.tracking[malId]) S.tracking[malId].cover=dataUrl;
+  if(S.collectionMeta[malId]) S.collectionMeta[malId].cover=dataUrl;
+  ['manga','anime'].forEach(type=>{
+    (S.profile['top5_'+type]||[]).forEach(item=>{ if(item&&item.mal_id==malId) item.cover=dataUrl; });
+  });
+  save();
+  const wci=document.getElementById('work-cover-img');
+  if(wci) wci.src=dataUrl;
+  // Maj toutes les images visibles avec ce malId
+  document.querySelectorAll('.cc-img').forEach(img=>{
+    const cc=img.closest('.cc');
+    if(cc&&cc.getAttribute('onclick')&&cc.getAttribute('onclick').includes(String(malId))) img.src=dataUrl;
+  });
+  renderHomeInProgress();
+  renderTop5Manual();
+  renderTierList();
+  toast('Couverture mise à jour ✅','ok');
+}
+
+// ─── BANNER PICKER ───
+function openBannerPicker(){
+  switchBannerTab('local');
+  if(document.getElementById('bp-fanart-search')) document.getElementById('bp-fanart-search').value='';
+  if(document.getElementById('bp-fanart-grid')) document.getElementById('bp-fanart-grid').innerHTML='';
+  openM('m-banner-picker');
+}
+
+function switchBannerTab(tab){
+  document.getElementById('bp-local-section').style.display=tab==='local'?'block':'none';
+  document.getElementById('bp-fanart-section').style.display=tab==='fanart'?'block':'none';
+  document.getElementById('bp-tab-local').className='btn '+(tab==='local'?'btn-primary':'btn-ghost');
+  document.getElementById('bp-tab-fanart').className='btn '+(tab==='fanart'?'btn-primary':'btn-ghost');
+}
+
+let _bannerSearchTimer=null;
+function bannerFanartSearchDebounce(q){
+  clearTimeout(_bannerSearchTimer);
+  if(!q.trim()){ document.getElementById('bp-fanart-grid').innerHTML=''; return; }
+  _bannerSearchTimer=setTimeout(()=>bannerFanartSearch(q),600);
+}
+
+async function bannerFanartSearch(q){
+  const grid=document.getElementById('bp-fanart-grid');
+  grid.innerHTML='<div class="loading"><div class="spin"></div></div>';
+  try{
+    const d=await jikan(`/anime?q=${encodeURIComponent(q)}&limit=3`);
+    const results=d.data||[];
+    if(!results.length){ grid.innerHTML='<p style="color:var(--t3);font-size:12px">Aucun résultat.</p>'; return; }
+    const mal_id=results[0].mal_id;
+    const r=await fetch(`https://webservice.fanart.tv/v3/anime/${mal_id}?api_key=${FANART_KEY}`);
+    const fa=await r.json();
+    const imgs=[...(fa.showbackground||[]),(fa.hdtvart||[]),(fa.animebanner||[])].flat().slice(0,20);
+    if(!imgs.length){ grid.innerHTML='<p style="color:var(--t3);font-size:12px">Pas d\'images disponibles.</p>'; return; }
+    grid.innerHTML=`<div class="fanart-grid">${imgs.map(img=>`
+      <div class="fanart-item wide" onclick="applyBannerFromFanart('${img.url}')">
+        <img src="${img.url}" loading="lazy">
+      </div>`).join('')}</div>`;
+  }catch(e){ grid.innerHTML='<p style="color:var(--t3);font-size:12px">Erreur de chargement.</p>'; }
+}
+
+function applyBannerFromFanart(url){
+  fetch(url).then(r=>r.blob()).then(blob=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{ openBannerCrop(ev.target.result); closeM('m-banner-picker'); };
+    reader.readAsDataURL(blob);
+  }).catch(()=>{
+    S.bannerUrl=url; save();
+    const bg=document.getElementById('profile-banner-bg');
+    if(bg){ bg.style.backgroundImage=`url(${url})`; bg.style.backgroundSize='cover'; bg.style.backgroundPosition='center'; }
+    document.getElementById('profile-banner-empty').style.display='none';
+    closeM('m-banner-picker');
+    toast('Bannière mise à jour ✅','ok');
+  });
+}
+
 let _collSearchTimer=null;
 let _collPickTarget={type:'phys',malId:null,title:'',cover:''};
 
