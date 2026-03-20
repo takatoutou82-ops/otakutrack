@@ -721,7 +721,7 @@ textarea.fi{resize:vertical;min-height:72px}
 /* ── TOP 5 MANUEL ── */
 .top5-manual{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
 .char-card{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;width:90px}
-.char-card-img{width:80px;height:110px;object-fit:cover;border-radius:8px;background:var(--bg3);border:2px solid var(--border);transition:border-color .2s}
+.char-card-img{width:80px;height:80px;object-fit:cover;border-radius:50%;background:var(--bg3);border:2px solid var(--border);transition:border-color .2s;flex-shrink:0}
 .char-card:hover .char-card-img{border-color:var(--acc)}
 .char-card-name{font-size:11px;font-weight:700;text-align:center;color:var(--t2);font-family:'Syne',sans-serif;line-height:1.2}
 .char-card-series{font-size:10px;color:var(--t3);text-align:center}
@@ -923,6 +923,10 @@ textarea.fi{resize:vertical;min-height:72px}
     <div id="cbz-form-area" style="display:none">
       <div style="font-size:13px;font-weight:700;margin:14px 0 8px;font-family:'Syne',sans-serif" id="cbz-form-title"></div>
       <div class="fg"><label class="fl">Support (tablette, clé USB…)</label><input class="fi" id="cbz-device-input" placeholder="ex: tablette"></div>
+      <div style="display:flex;gap:10px">
+        <div class="fg" style="flex:1"><label class="fl">Tome du</label><input class="fi" id="cbz-from-input" type="number" min="1" placeholder="1"></div>
+        <div class="fg" style="flex:1"><label class="fl">Tome au</label><input class="fi" id="cbz-to-input" type="number" min="1" placeholder="38"></div>
+      </div>
       <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="confirmCbzAdd()">Ajouter</button>
     </div>
   </div>
@@ -957,12 +961,21 @@ textarea.fi{resize:vertical;min-height:72px}
 <div class="modal-bg" id="m-char-pick">
   <div class="modal" style="max-width:480px;width:100%">
     <div class="modal-title">Choisir un personnage <span class="modal-close" onclick="closeM('m-char-pick')">✕</span></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+      <label style="font-size:12px;color:var(--t3);white-space:nowrap">Position :</label>
+      <select id="char-pick-position" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;outline:none">
+        <option value="0">#1</option><option value="1">#2</option><option value="2">#3</option>
+        <option value="3">#4</option><option value="4">#5</option><option value="5">#6</option>
+        <option value="6">#7</option><option value="7">#8</option><option value="8">#9</option>
+        <option value="9">#10</option>
+      </select>
+    </div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <input id="char-search-input" type="text" placeholder="Nom du personnage…"
         style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"
         oninput="searchCharDebounce(this.value)">
     </div>
-    <div class="lib-search-results" id="char-pick-list" style="max-height:360px">
+    <div class="lib-search-results" id="char-pick-list" style="max-height:320px">
       <p style="color:var(--t3);font-size:13px;padding:12px">Tapez un nom pour chercher…</p>
     </div>
   </div>
@@ -1670,7 +1683,7 @@ function renderHomeInProgress(){
         <div class="status-dot sd-ongoing"></div>
       </div>
       <div class="cc-title">${esc(t.title)}</div>
-      <div class="cc-meta">${t.type==='manga'?'Ch. '+(t.chapter||0):'Ep. '+(t.episode||0)}</div>
+      <div class="cc-meta">${t.type==='manga'?'Ch. '+(t.chapter||0)+(t.volume?' · T.'+t.volume:''):'Ep. '+(t.episode||0)}${t.rating?' · ★'+t.rating:''}</div>
     </div>`).join('');
 }
 
@@ -2108,12 +2121,24 @@ function renderReviews(w, t){
     <div class="review-card" style="position:relative">
       <div class="rv-head">
         <div class="rv-user"><div class="rv-avatar">${S.profile.name[0]}</div>${esc(S.profile.name)}</div>
-        <button onclick="deleteReview(${w.mal_id},${i})" style="background:rgba(248,113,113,.15);border:none;border-radius:6px;padding:3px 8px;color:#f87171;font-size:11px;cursor:pointer;font-weight:700">🗑 Supprimer</button>
+        <div style="display:flex;gap:6px">
+          <button onclick="editReview(${w.mal_id},${i})" style="background:rgba(139,124,248,.15);border:none;border-radius:6px;padding:3px 8px;color:var(--acc);font-size:11px;cursor:pointer;font-weight:700">✏ Modifier</button>
+          <button onclick="deleteReview(${w.mal_id},${i})" style="background:rgba(248,113,113,.15);border:none;border-radius:6px;padding:3px 8px;color:#f87171;font-size:11px;cursor:pointer;font-weight:700">🗑 Supprimer</button>
+        </div>
       </div>
       <div class="rv-text" style="white-space:pre-wrap">${esc(r.text)}</div>
+      <div style="font-size:10px;color:var(--t4);margin-top:6px">${r.date||''}</div>
     </div>`).join('')
     :'<p style="color:var(--t3);font-size:13px;padding:8px 0">Aucune critique pour l\'instant.</p>';
   document.getElementById('reviews-section').innerHTML=html;
+}
+
+function editReview(malId, idx){
+  const r=S.tracking[malId]?.reviews?.[idx];
+  if(!r) return;
+  S._editingReview={malId,idx};
+  document.getElementById('rv-text').value=r.text;
+  openM('m-review');
 }
 
 function deleteReview(malId, idx){
@@ -2356,12 +2381,20 @@ function submitReview(){
   if(!w) return;
   if(!S.tracking[w.mal_id]) S.tracking[w.mal_id]={mal_id:w.mal_id,type:w._type,title:w.title,cover:w.images?.jpg?.image_url||'',status:'',chapter:0,volume:0,episode:0,rating:0,reviews:[]};
   if(!S.tracking[w.mal_id].reviews) S.tracking[w.mal_id].reviews=[];
-  S.tracking[w.mal_id].reviews.unshift({text,date:new Date().toLocaleDateString('fr')});
+
+  // Mode édition
+  if(S._editingReview&&S._editingReview.malId==w.mal_id){
+    S.tracking[w.mal_id].reviews[S._editingReview.idx].text=text;
+    S._editingReview=null;
+    toast('Critique modifiée ✓','ok');
+  } else {
+    S.tracking[w.mal_id].reviews.unshift({text,date:new Date().toLocaleDateString('fr')});
+    toast('Critique publiée ✓','ok');
+  }
   save();
   closeM('m-review');
   document.getElementById('rv-text').value='';
   renderReviews(w, S.tracking[w.mal_id]);
-  toast('Critique publiée ✓','ok');
 }
 
 // ─── PROFILE ───
@@ -2545,16 +2578,20 @@ function renderCollection(){
   if(!cbzEntries.length){if(cbzEl)cbzEl.innerHTML='';if(cbzEmpty)cbzEmpty.style.display='block';}
   else{
     if(cbzEmpty)cbzEmpty.style.display='none';
-    if(cbzEl)cbzEl.innerHTML=cbzEntries.map(({t,entry,idx,malId})=>`
-      <div class="media-entry media-cbz">
+    if(cbzEl)cbzEl.innerHTML=cbzEntries.map(({t,entry,idx,malId})=>{
+      const tomeRange=entry.fromTome&&entry.toTome?`Tome ${entry.fromTome} à ${entry.toTome}`
+        :entry.fromTome?`Depuis tome ${entry.fromTome}`
+        :entry.toTome?`Jusqu\'au tome ${entry.toTome}`:'';
+      return `<div class="media-entry media-cbz">
         <div class="media-entry-icon">📂</div>
         <div class="coll-cov"><img src="${t.cover}" loading="lazy"></div>
         <div class="media-entry-info">
           <div class="media-entry-title">${esc(t.title||'Série #'+malId)}</div>
-          <div class="media-entry-sub">📁 ${esc(entry.device)}</div>
+          <div class="media-entry-sub">📁 ${esc(entry.device)}${tomeRange?' · 📖 '+tomeRange:''}</div>
         </div>
         <button class="media-entry-del" onclick="removeCbzEntry(${malId},${idx})">🗑</button>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   // ── En ligne ──
@@ -2925,7 +2962,7 @@ function renderSuivi(){
             </div>
           </div>
           <div class="cc-title">${esc(t.title)}</div>
-          <div class="cc-meta">${type==='manga'?'Ch.':'Ep.'} ${prog}${maxProg?' / '+maxProg:''}${t.rating?' · ★'+t.rating:''}</div>
+          <div class="cc-meta">${type==='manga'?'Ch.':'Ep.'} ${prog}${maxProg?' / '+maxProg:''}${t.volume?' · T.'+t.volume:''}${t.rating?' · ★'+t.rating:''}</div>
         </div>`;
       }).join('');
     });
@@ -3037,6 +3074,8 @@ function removeTop5Char(slot){
 
 function openCharPicker(slot){
   S._charPickSlot=slot;
+  const sel=document.getElementById('char-pick-position');
+  if(sel) sel.value=String(slot);
   document.getElementById('char-search-input').value='';
   document.getElementById('char-pick-list').innerHTML='<p style="color:var(--t3);font-size:13px;padding:12px">Tapez un nom pour chercher…</p>';
   openM('m-char-pick');
@@ -3071,12 +3110,14 @@ async function searchChars(q){
 }
 
 function selectChar(id,name,image,series){
-  const slot=S._charPickSlot;
-  if(slot===undefined) return;
-  if(!S.profile.top5_chars) S.profile.top5_chars=[null,null,null,null,null];
+  const sel=document.getElementById('char-pick-position');
+  const slot=sel?parseInt(sel.value):S._charPickSlot;
+  if(slot===undefined||slot===null) return;
+  if(!S.profile.top5_chars) S.profile.top5_chars=Array(10).fill(null);
+  while(S.profile.top5_chars.length<10) S.profile.top5_chars.push(null);
   S.profile.top5_chars[slot]={id,name,image,series};
   save(); closeM('m-char-pick'); renderTop5Chars();
-  toast('Personnage ajouté','ok');
+  toast('Personnage ajouté en position #'+(slot+1),'ok');
 }
 
 // ─── PAGE PERSONNAGE ───
@@ -3311,25 +3352,133 @@ function renderTierList(){
     </div>`).join('');
 }
 
-let _tierDragging={malId:null,type:null};
-function tierDragStart(e,malId,type){
-  _tierDragging={malId,type};
+function renderTierList(){
+  const el=document.getElementById('tier-list-wrap');
+  if(!el) return;
+  const all=Object.values(S.tracking).filter(t=>t.rating>0);
+  const groups=TIERS.map(()=>[]);
+  const overrides=S.profile.tierOverrides||{};
+  const orders=S.profile.tierOrders||{};
+  const customLabels=S.profile.tierLabels||{};
+
+  all.forEach(t=>{
+    const key=t.mal_id+'_'+t.type;
+    const idx=overrides[key]!==undefined?overrides[key]:getTierIndex(t.rating);
+    if(idx>=0&&idx<groups.length) groups[idx].push(t);
+  });
+
+  // Appliquer l'ordre custom à l'intérieur de chaque tier
+  groups.forEach((g,i)=>{
+    const order=orders[i]||[];
+    if(order.length){
+      g.sort((a,b)=>{
+        const ia=order.indexOf(a.mal_id+'_'+a.type);
+        const ib=order.indexOf(b.mal_id+'_'+b.type);
+        return (ia===-1?9999:ia)-(ib===-1?9999:ib);
+      });
+    }
+  });
+
+  if(!all.length){
+    el.innerHTML='<p style="color:var(--t3);font-size:13px">Note des œuvres pour les voir apparaître ici.</p>';
+    return;
+  }
+
+  el.innerHTML=TIERS.map((tier,i)=>{
+    const label=customLabels[i]||tier.label;
+    return `<div class="tier-row">
+      <div class="tier-label" style="background:${tier.bg};color:${tier.color}"
+        title="Cliquer pour renommer"
+        onclick="renameTierLabel(${i},this)"
+        data-tier="${i}">${label}</div>
+      <div class="tier-items" data-tier="${i}"
+        ondragover="event.preventDefault();this.classList.add('tier-drag-over')"
+        ondragleave="this.classList.remove('tier-drag-over')"
+        ondrop="tierDrop(event,${i})">
+        ${groups[i].length
+          ? groups[i].map(t=>`
+            <div class="tier-item" draggable="true"
+              data-malid="${t.mal_id}" data-type="${t.type}" data-tier="${i}"
+              ondragstart="tierDragStart(event,${t.mal_id},'${t.type}',${i})"
+              ondragend="tierDragEnd(event)"
+              title="${esc(t.title)} ★${t.rating}">
+              <img src="${t.cover||''}" loading="lazy">
+              <div class="tier-item-title">${esc((t.title||'').slice(0,12))}</div>
+            </div>`).join('')
+          : '<span class="tier-empty">—</span>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let _tierDragging={malId:null,type:null,fromTier:null};
+function tierDragStart(e,malId,type,fromTier){
+  _tierDragging={malId,type,fromTier};
   e.dataTransfer.effectAllowed='move';
   e.currentTarget.style.opacity='0.4';
+  // Stocker l'élément pour réordonnancement
+  _tierDragEl=e.currentTarget;
 }
 function tierDragEnd(e){
   e.currentTarget.style.opacity='1';
   document.querySelectorAll('.tier-drag-over').forEach(el=>el.classList.remove('tier-drag-over'));
+  _tierDragEl=null;
 }
+let _tierDragEl=null;
 function tierDrop(e,newTierIdx){
   e.preventDefault();
   e.currentTarget.classList.remove('tier-drag-over');
-  const {malId,type}=_tierDragging;
+  const {malId,type,fromTier}=_tierDragging;
   if(!malId) return;
   if(!S.profile.tierOverrides) S.profile.tierOverrides={};
   S.profile.tierOverrides[malId+'_'+type]=newTierIdx;
+
+  // Réordonner à l'intérieur du tier selon position du drop
+  if(!S.profile.tierOrders) S.profile.tierOrders={};
+  const container=e.currentTarget;
+  const items=[...container.querySelectorAll('.tier-item')];
+  // Trouver après quel item on a droppé
+  let insertBefore=null;
+  for(const item of items){
+    const rect=item.getBoundingClientRect();
+    if(e.clientX < rect.left+rect.width/2){ insertBefore=item; break; }
+  }
+  // Reconstruire l'ordre
+  const newOrder=[];
+  for(const item of items){
+    const k=item.dataset.malid+'_'+item.dataset.type;
+    if(k===malId+'_'+type) continue; // on skip le draggé
+    if(insertBefore===item) newOrder.push(malId+'_'+type);
+    newOrder.push(k);
+  }
+  if(!newOrder.includes(malId+'_'+type)) newOrder.push(malId+'_'+type);
+  S.profile.tierOrders[newTierIdx]=newOrder;
+
   save();
   renderTierList();
+}
+
+function renameTierLabel(idx, el){
+  const customLabels=S.profile.tierLabels||{};
+  const current=customLabels[idx]||TIERS[idx].label;
+  const input=document.createElement('input');
+  input.value=current;
+  input.style.cssText='background:transparent;border:none;border-bottom:1px solid currentColor;color:inherit;font:inherit;text-align:center;width:100%;outline:none;font-size:11px';
+  el.innerHTML='';
+  el.appendChild(input);
+  input.focus();
+  input.select();
+  function save_label(){
+    const val=input.value.trim();
+    if(val){
+      if(!S.profile.tierLabels) S.profile.tierLabels={};
+      S.profile.tierLabels[idx]=val;
+      save();
+    }
+    renderTierList();
+  }
+  input.onblur=save_label;
+  input.onkeydown=e=>{ if(e.key==='Enter') input.blur(); if(e.key==='Escape'){ input.value=current; input.blur(); } };
 }
 
 // ─── FANART.TV COVER PICKER ───
@@ -3593,14 +3742,18 @@ function confirmPhysAdd(){
 
 function confirmCbzAdd(){
   const device=document.getElementById('cbz-device-input').value.trim();
-  if(!device)return toast('Indiquez le support','');
+  if(!device) return toast('Indiquez le support','');
+  const fromTome=parseInt(document.getElementById('cbz-from-input').value)||null;
+  const toTome=parseInt(document.getElementById('cbz-to-input').value)||null;
   const {malId}=_collPickTarget;
-  if(!S.collection[malId])S.collection[malId]={volumes:{},cbz:[],online:[]};
-  if(!S.collection[malId].cbz)S.collection[malId].cbz=[];
-  S.collection[malId].cbz.push({device,volumes:{}});
+  if(!S.collection[malId]) S.collection[malId]={volumes:{},cbz:[],online:[]};
+  if(!S.collection[malId].cbz) S.collection[malId].cbz=[];
+  S.collection[malId].cbz.push({device,fromTome,toTome,volumes:{}});
   save();
   closeM('m-add-cbz');
   document.getElementById('cbz-device-input').value='';
+  document.getElementById('cbz-from-input').value='';
+  document.getElementById('cbz-to-input').value='';
   document.getElementById('cbz-form-area').style.display='none';
   document.getElementById('cbz-search-input').value='';
   renderCollection();
