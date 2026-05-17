@@ -6,25 +6,27 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'Missing GROQ_API_KEY' });
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Missing OPENROUTER_API_KEY' });
 
   try {
     const { system, messages, max_tokens } = req.body;
 
-    const groqMessages = [];
-    if (system) groqMessages.push({ role: 'system', content: system });
-    groqMessages.push(...messages.map(m => ({ role: m.role, content: m.content })));
+    const orMessages = [];
+    if (system) orMessages.push({ role: 'system', content: system });
+    orMessages.push(...messages.map(m => ({ role: m.role, content: m.content })));
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://otakutrack-seven.vercel.app',
+        'X-Title': 'OtakuTrack'
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: groqMessages,
+        model: 'google/gemini-2.0-flash-001',
+        messages: orMessages,
         max_tokens: max_tokens || 1000,
         temperature: 0.9
       })
