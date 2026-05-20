@@ -4921,7 +4921,7 @@ function openTmdbPicker(malId){
     modal = document.createElement('div');
     modal.id = 'tmdb-picker-modal';
     modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:16px';
-    modal.onclick = e => { if(e.target===modal) modal.remove(); };
+    modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
     document.body.appendChild(modal);
   }
 
@@ -4931,11 +4931,10 @@ function openTmdbPicker(malId){
         <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px">Choisir la bonne série TMDB</div>
         <span onclick="document.getElementById('tmdb-picker-modal').remove()" style="cursor:pointer;color:var(--t3);font-size:18px">✕</span>
       </div>
-      <div style="overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px">
+      <div style="overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px" id="tmdb-picker-list">
         ${results.map(r => `
-          <div onclick="selectTmdbShow(${malId},${r.id},'${(r.name||r.original_name||'').replace(/'/g,"\'")}')"
-            style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;cursor:pointer;border:1px solid var(--border);transition:border-color .15s"
-            onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div class="tmdb-pick-item" data-malid="${malId}" data-tmdbid="${r.id}" data-name="${esc(r.name||r.original_name||'')}"
+            style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;cursor:pointer;border:1px solid var(--border);transition:border-color .15s">
             <img src="${r.poster_path ? `https://image.tmdb.org/t/p/w92${r.poster_path}` : ''}"
               style="width:40px;height:56px;border-radius:6px;object-fit:cover;background:var(--bg3);flex-shrink:0"
               onerror="this.style.display='none'">
@@ -4948,6 +4947,15 @@ function openTmdbPicker(malId){
           </div>`).join('')}
       </div>
     </div>`;
+
+  // Attacher les events après render
+  modal.querySelectorAll('.tmdb-pick-item').forEach(item => {
+    item.addEventListener('mouseover', () => item.style.borderColor='var(--acc)');
+    item.addEventListener('mouseout', () => item.style.borderColor='var(--border)');
+    item.addEventListener('click', () => {
+      selectTmdbShow(parseInt(item.dataset.malid), parseInt(item.dataset.tmdbid), item.dataset.name);
+    });
+  });
 }
 
 function selectTmdbShow(malId, tmdbId, tmdbName){
