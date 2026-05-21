@@ -1444,9 +1444,9 @@ textarea.fi{resize:vertical;min-height:72px}
       <h1 class="sh-title" style="font-size:22px">Mon Suivi</h1>
     </div>
 
-    <!-- Search + Sort bar -->
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
-      <div style="flex:1;min-width:200px;display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 14px">
+    <!-- Search + Sort + Filters -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+      <div style="flex:1;min-width:180px;display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 14px">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--t3);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input id="suivi-search" type="text" placeholder="Rechercher dans mon suivi…"
           style="background:none;border:none;outline:none;color:var(--text);font-size:13px;width:100%"
@@ -1457,17 +1457,35 @@ textarea.fi{resize:vertical;min-height:72px}
         <option value="title">A → Z</option>
         <option value="title-desc">Z → A</option>
         <option value="community-desc" selected>Mieux notés (communauté)</option>
-        <option value="community-asc">Moins bien notés (communauté)</option>
+        <option value="community-asc">Moins bien notés</option>
         <option value="my-rating-desc">Ma note ↓</option>
         <option value="my-rating-asc">Ma note ↑</option>
         <option value="date-desc">Ajouté récemment</option>
-        <option value="date-asc">Ajouté anciennement</option>
         <option value="progress">Progression ↓</option>
       </select>
       <select id="suivi-genre-filter" onchange="renderSuivi()"
         style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;cursor:pointer">
         <option value="">Tous les genres</option>
       </select>
+      <select id="suivi-demo-filter" onchange="renderSuivi()"
+        style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;cursor:pointer">
+        <option value="">Toutes démographies</option>
+        <option value="Shounen">Shōnen</option>
+        <option value="Seinen">Seinen</option>
+        <option value="Shoujo">Shōjo</option>
+        <option value="Josei">Josei</option>
+        <option value="Kids">Kids</option>
+      </select>
+      <select id="suivi-score-filter" onchange="renderSuivi()"
+        style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;cursor:pointer">
+        <option value="">Toutes notes</option>
+        <option value="10">★ 10</option>
+        <option value="9">★ 9+</option>
+        <option value="8">★ 8+</option>
+        <option value="7">★ 7+</option>
+        <option value="notrated">Non noté</option>
+      </select>
+      <button onclick="resetSuiviFilters()" style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px;color:var(--t3);font-size:12px;cursor:pointer" title="Réinitialiser les filtres">✕</button>
     </div>
 
     <!-- TABS: Manga / Animé -->
@@ -2494,6 +2512,17 @@ function navSearch(val){
         </div>
       </div>`).join('');
   }
+  // Chercher dans les listes
+  const matchedLists=(S.lists||[]).filter(l=>l.name.toLowerCase().includes(q)).slice(0,3);
+  if(matchedLists.length){
+    html+=`<div style="padding:8px 12px 4px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase">Listes</div>`;
+    html+=matchedLists.map(l=>`
+      <div class="nav-sr-item" onclick="closeNavDropdown();document.getElementById('navSearchInput').value='';openListDetail('${l.id}')">
+        <div style="width:28px;height:40px;background:var(--bg3);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">📋</div>
+        <div><div style="font-size:12px;font-weight:700">${esc(l.name)}</div>
+        <div style="font-size:10px;color:var(--t3)">${l.items?.length||0} titres</div></div>
+      </div>`).join('');
+  }
   html+=`<div style="padding:8px 12px 4px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase">MAL <span id="nav-sr-loading">…</span></div><div id="nav-sr-mal"></div>`;
   dd.innerHTML=html;
   dd.style.display='block';
@@ -2543,6 +2572,9 @@ async function openWork(malId, type='manga'){
     if(S.tracking[malId]){
       const genreNames=(w.genres||[]).concat(w.themes||[]).map(g=>g.name);
       if(genreNames.length) S.tracking[malId]._genres=genreNames;
+      // Sauvegarder les démographies (Shounen, Seinen, etc.)
+      const demoNames=(w.demographics||[]).map(d=>d.name);
+      if(demoNames.length) S.tracking[malId]._demographics=demoNames;
       // Sauvegarder le score communauté pour le tri
       const communityScore=w.score||0;
       if(communityScore) S.tracking[malId]._communityScore=communityScore;
@@ -3005,6 +3037,21 @@ function renderListDetail(){
       if(!r) return;
       const idx=getTierIndex(r);
       if(idx>=0) groups[idx].push(item);
+    });
+    // Appliquer l'ordre personnalisé dans chaque tier
+    const tierOrders=list.tierOrders||{};
+    groups.forEach((group,i)=>{
+      if(tierOrders[i]&&tierOrders[i].length){
+        const order=tierOrders[i];
+        group.sort((a,b)=>{
+          const ai=order.indexOf(String(a.id));
+          const bi=order.indexOf(String(b.id));
+          if(ai===-1&&bi===-1) return 0;
+          if(ai===-1) return 1;
+          if(bi===-1) return -1;
+          return ai-bi;
+        });
+      }
     });
     const hasAny=groups.some(g=>g.length>0);
     if(hasAny){
@@ -3951,6 +3998,17 @@ async function fetchMissingScores(){
 }
 
 // ─── SUIVI ───
+function resetSuiviFilters(){
+  const ids=['suivi-search','suivi-sort','suivi-genre-filter','suivi-demo-filter','suivi-score-filter'];
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    if(el.tagName==='INPUT') el.value='';
+    else el.selectedIndex=0;
+  });
+  renderSuivi();
+}
+
 function populateSuiviGenreFilter(){
   const sel=document.getElementById('suivi-genre-filter');
   if(!sel) return;
@@ -4020,11 +4078,16 @@ function renderSuivi(){
     });
   }
 
+  const demoFilter=document.getElementById('suivi-demo-filter')?.value||'';
+  const scoreFilter=document.getElementById('suivi-score-filter')?.value||'';
+
   ['manga','anime'].forEach(type=>{
     const items=all.filter(t=>
       t.type===type &&
       (!query||t.title.toLowerCase().includes(query)) &&
-      (!genreFilter||(t._genres||[]).includes(genreFilter))
+      (!genreFilter||(t._genres||[]).includes(genreFilter)) &&
+      (!demoFilter||(t._demographics||[]).includes(demoFilter)) &&
+      (!scoreFilter||(scoreFilter==='notrated'?!t.rating:t.rating>=(parseFloat(scoreFilter)||0)))
     );
     ['watchlist','ongoing','done','dropped'].forEach(tab=>{
       const filtered=sortItems(items.filter(t=>(statusMap[t.status||'']||'watchlist')===tab));
@@ -5390,13 +5453,15 @@ function uniTierDrop(e, newTier, ctx) {
     // On garde la note actuelle si elle est déjà dans ce tier, sinon on met le mid
     const curRating = list.ratings?.[item.id] || 0;
     const curTierIdx = getTierIndex(curRating);
+    if (!list.ratings) list.ratings = {};
     if (curTierIdx !== newTier) {
-      if (!list.ratings) list.ratings = {};
-      // Arrondir au 0.5 le plus proche dans la plage du tier
-      const tierMin = [9, 7.5, 6, 4.5, 0][newTier] || 0;
-      const tierMax = [10, 8.5, 7, 5.5, 4][newTier] || 10;
-      const clamped = Math.min(tierMax, Math.max(tierMin, curRating || (tierMin + tierMax) / 2));
-      list.ratings[item.id] = roundHalf(clamped);
+      // Ajuster la note pour correspondre au tier cible
+      const tierMins = [10, 9.5, 9, 8.5, 8, 7.5, 7, 0];
+      const tierMaxs = [10, 9.9, 9.4, 8.9, 8.4, 7.9, 7.4, 6.9];
+      const tierMin = tierMins[newTier] || 0;
+      const tierMax = tierMaxs[newTier] || 10;
+      const mid = roundHalf((tierMin + tierMax) / 2);
+      list.ratings[item.id] = mid;
     }
     // Réordonner dans le tier
     if (!list.tierOrders) list.tierOrders = {};
