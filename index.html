@@ -1674,7 +1674,20 @@ const S = {
 };
 
 // Persist to localStorage
-function save(){try{localStorage.setItem('ot_v3',JSON.stringify({tracking:S.tracking,lists:S.lists,collection:S.collection,collectionMeta:S.collectionMeta,profile:S.profile,customCovers:S.customCovers,bannerUrl:S.bannerUrl,bannerSize:S.bannerSize,bannerPos:S.bannerPos,physCategories:S.physCategories||[],tierImg:S.tierImg||null,arcsImgs:S.arcsImgs||{}}));localStorage.setItem('ot_last_update',String(Date.now()));}catch(e){}}
+function save(){
+  try{
+    localStorage.setItem('ot_v3',JSON.stringify({
+      tracking:S.tracking,lists:S.lists,collection:S.collection,
+      collectionMeta:S.collectionMeta,profile:S.profile,
+      customCovers:S.customCovers,bannerUrl:S.bannerUrl,
+      bannerSize:S.bannerSize,bannerPos:S.bannerPos,
+      physCategories:S.physCategories||[],
+      tierImg:S.tierImg||null,arcsImgs:S.arcsImgs||{}
+    }));
+    localStorage.setItem('ot_last_update',String(Date.now()));
+  }catch(e){}
+  if(typeof fbSave==='function') fbSave();
+}
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem('ot_v3')||'{}');
@@ -4351,13 +4364,16 @@ function tierDragStart(e,malId,type,fromTier){
 }
 function tierDragEnd(e){
   e.currentTarget.style.opacity='1';
-  document.querySelectorAll('.tier-drag-over').forEach(el=>el.classList.remove('tier-drag-over'));
+  document.querySelectorAll('.tier-drag-over,.tier-item-drop-target').forEach(el=>el.classList.remove('tier-drag-over','tier-item-drop-target'));
   _tierDragEl=null;
+  _tierLinkHandled=false;
 }
 let _tierDragEl=null;
 function tierDrop(e,newTierIdx){
   e.preventDefault();
   e.currentTarget.classList.remove('tier-drag-over');
+  // Si tierItemDrop a déjà géré ce drop (lien), on ignore
+  if(_tierLinkHandled){ _tierLinkHandled=false; return; }
   const {malId,type,fromTier}=_tierDragging;
   if(!malId) return;
   if(!S.profile.tierOverrides) S.profile.tierOverrides={};
@@ -4411,13 +4427,14 @@ function tierItemDragLeave(e){
   e.currentTarget.classList.remove('tier-item-drop-target');
 }
 
+let _tierLinkHandled = false;
+
 function tierItemDrop(e, targetMalId, targetType){
   const rect = e.currentTarget.getBoundingClientRect();
   const cx = rect.left + rect.width/2;
   const cy = rect.top + rect.height/2;
   const dx = Math.abs(e.clientX - cx);
   const dy = Math.abs(e.clientY - cy);
-  // Seulement si on est dans la zone centrale
   if(dx >= rect.width*0.4 || dy >= rect.height*0.4) return;
 
   e.preventDefault();
@@ -4426,7 +4443,6 @@ function tierItemDrop(e, targetMalId, targetType){
 
   const {malId, type} = _tierDragging;
   if(!malId) return;
-  // Pas de lien sur soi-même
   if(malId === targetMalId && type === targetType) return;
 
   const targetKey = targetMalId+'_'+targetType;
@@ -4435,12 +4451,14 @@ function tierItemDrop(e, targetMalId, targetType){
   if(!S.profile.tierLinks) S.profile.tierLinks = {};
   if(!S.profile.tierLinks[targetKey]) S.profile.tierLinks[targetKey] = [];
 
-  // Éviter les doublons
   if(!S.profile.tierLinks[targetKey].includes(srcKey)){
     S.profile.tierLinks[targetKey].push(srcKey);
+    _tierLinkHandled = true; // bloque tierDrop
     save();
     renderTierList();
     toast('Œuvre liée ✓','ok');
+  } else {
+    _tierLinkHandled = true; // déjà lié, bloquer quand même le move
   }
 }
 
@@ -5601,12 +5619,6 @@ function fbSave(){
     }catch(e){ console.error('Firebase save error',e); }
   },1500);
 }
-
-const _origSave = save;
-window.save = function(){
-  _origSave();
-  fbSave();
-};
 
 // ─── INIT ───
 load();
