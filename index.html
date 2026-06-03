@@ -4292,13 +4292,12 @@ function renderTierList(){
 
   // Construire l'ensemble de toutes les œuvres qui sont "dans" une autre (liées)
   const linkedSrcs=new Set();
-  Object.values(tierLinks).forEach(arr=>arr.forEach(k=>linkedSrcs.add(k)));
+  Object.values(tierLinks).forEach(arr=>arr.forEach(k=>linkedSrcs.add(String(k))));
 
   const all=Object.values(S.tracking).filter(t=>{
     if(t.rating<=0) return false;
     if(filter!=='all'&&t.type!==filter) return false;
-    // Exclure les œuvres qui sont liées à une autre (elles n'apparaissent que dans le popup)
-    if(linkedSrcs.has(t.mal_id+'_'+t.type)) return false;
+    if(linkedSrcs.has(String(t.mal_id)+'_'+t.type)) return false;
     return true;
   });
   const groups=TIERS.map(()=>[]);
@@ -4345,7 +4344,7 @@ function renderTierList(){
               const badge=filter==='all'
                 ? `<div style="position:absolute;top:2px;left:2px;width:6px;height:6px;border-radius:50%;background:${t.type==='manga'?'var(--manga)':'var(--anime)'}"></div>`
                 : '';
-              const linked = (S.profile.tierLinks||{})[t.mal_id+'_'+t.type]||[];
+              const linked = (S.profile.tierLinks||{})[String(t.mal_id)+'_'+t.type]||[];
               const linkBadge = linked.length ? `<div class="tier-link-badge">+${linked.length}</div>` : '';
               return `<div class="tier-item" draggable="true"
                 data-malid="${t.mal_id}" data-type="${t.type}" data-tier="${i}"
@@ -4397,8 +4396,8 @@ function tierDrop(e,newTierIdx){
       const targetType=item.dataset.type;
       if(malId===targetMalId && type===targetType) break;
       // LIER les deux oeuvres
-      const targetKey=targetMalId+'_'+targetType;
-      const srcKey=malId+'_'+type;
+      const targetKey=String(targetMalId)+'_'+targetType;
+      const srcKey=String(malId)+'_'+type;
       if(!S.profile.tierLinks) S.profile.tierLinks={};
       if(!S.profile.tierLinks[targetKey]) S.profile.tierLinks[targetKey]=[];
       if(!S.profile.tierLinks[targetKey].includes(srcKey)){
@@ -4444,7 +4443,7 @@ function tierItemClick(e, malId, type, el){
   if(_tierDragging.malId) return;
   e.stopPropagation();
 
-  const key = malId+'_'+type;
+  const key = String(malId)+'_'+type;
   const linked = (S.profile.tierLinks||{})[key]||[];
   if(!linked.length) return; // rien à afficher, pas de popup
 
@@ -5558,8 +5557,18 @@ function fbSave(immediate=true){
     fbSaveTimer=null;
     _fbPending=true;
     try{
+      // Exclure les images base64 (trop lourdes pour Firestore 1MB limit)
+      // customCovers, arcsImgs, tierImg restent uniquement en localStorage
+      const trackingClean={};
+      Object.entries(S.tracking).forEach(([id,t])=>{
+        trackingClean[id]={...t};
+        // Retirer les covers custom base64 (garder seulement les URLs normales)
+        if(trackingClean[id].cover && trackingClean[id].cover.startsWith('data:')){
+          delete trackingClean[id].cover;
+        }
+      });
       await fbDb.collection('users').doc(getDeviceId()).set({
-        tracking:S.tracking,
+        tracking:trackingClean,
         lists:S.lists,
         collection:S.collection,
         collectionMeta:S.collectionMeta,
