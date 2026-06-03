@@ -3572,10 +3572,11 @@ async function loadRelations(w){
 
 // ─── MIGRATION : récupérer les scores communauté manquants ───
 async function fetchMissingScores(){
-  const missing=Object.values(S.tracking).filter(t=>!t._communityScore);
+  const missing=Object.values(S.tracking).filter(t=>!t._communityScore && t.mal_id && t.type && t.mal_id!=='undefined' && t.type!=='undefined');
   if(!missing.length) return;
   let changed=false;
   for(const t of missing){
+    if(!t.mal_id || !t.type || t.mal_id==='undefined' || t.type==='undefined') continue;
     try{
       const d=await jikan(`/${t.type}/${t.mal_id}`);
       const score=d.data?.score||0;
