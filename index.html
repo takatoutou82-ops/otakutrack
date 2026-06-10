@@ -1366,12 +1366,9 @@ textarea.fi{resize:vertical;min-height:72px}
 
     <!-- Filtres avancés -->
     <div class="suivi-adv-filters" id="suivi-adv-filters" style="display:none">
-      <div class="saf-row">
-        <span class="saf-label">Genre</span>
-        <select id="suivi-genre-filter" onchange="renderSuivi()"
-          style="background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--text);font-size:12px;outline:none;cursor:pointer">
-          <option value="">Tous les genres</option>
-        </select>
+      <div class="saf-row" style="align-items:flex-start">
+        <span class="saf-label" style="padding-top:4px">Genres & Thèmes</span>
+        <div id="suivi-genre-pills" style="display:flex;flex-wrap:wrap;gap:5px;flex:1"></div>
       </div>
       <div class="saf-row">
         <span class="saf-label">Ma note</span>
@@ -2270,8 +2267,10 @@ async function openWork(malId, type='manga'){
     S.currentWork._coverFull=w.images?.jpg?.large_image_url||w.images?.jpg?.image_url||'';
     // Sauvegarder les genres dans le tracking si l'œuvre est suivie
     if(S.tracking[malId]){
-      const genreNames=(w.genres||[]).concat(w.themes||[]).map(g=>g.name);
+      const genreNames=(w.genres||[]).map(g=>g.name);
       if(genreNames.length) S.tracking[malId]._genres=genreNames;
+      const themeNames=(w.themes||[]).map(g=>g.name);
+      if(themeNames.length) S.tracking[malId]._themes=themeNames;
       // Statut de publication (Finished/Publishing/On Hiatus)
       const pubStatus=w.status||'';
       if(pubStatus) S.tracking[malId]._pubStatus=pubStatus;
@@ -2315,14 +2314,14 @@ function renderWorkPage(w){
     })()}</span></div>
     <div class="wm-item"><span class="wm-label">Volumes</span><span class="wm-value">${w.volumes||'?'}</span></div>
     <div class="wm-item"><span class="wm-label">Chapitres</span><span class="wm-value">${w.chapters||'?'}</span></div>
-    <div class="wm-item"><span class="wm-label">Statut</span><span class="wm-value">${w.status||'—'}</span></div>
+    <div class="wm-item"><span class="wm-label">Publication</span><span class="wm-value">${({'Finished':'Terminée','Publishing':'En cours','On Hiatus':'En pause','Discontinued':'Arrêtée'}[w.status]||w.status||'—')}</span></div>
     <div class="wm-item"><span class="wm-label">Parution</span><span class="wm-value">${w.published?.string||'—'}</span></div>
     <div class="wm-item"><span class="wm-label"><span class="score-display"><span class="score-val">★ ${w.score||'?'}</span></span></span><span class="wm-value" style="font-size:11px;color:var(--t3)">${w.scored_by?w.scored_by.toLocaleString()+' votes':''}</span></div>
   ` : `
     <div class="wm-item"><span class="wm-label">Studio</span><span class="wm-value">${(w.studios||[]).map(s=>`<a href="https://www.nautiljon.com/people/?q=${encodeURIComponent(s.name)}" target="_blank" rel="noopener" style="color:var(--acc);text-decoration:none;border-bottom:1px dashed var(--acc)">${esc(s.name)}</a>`).join(', ')||'—'}</span></div>
     <div class="wm-item"><span class="wm-label">Épisodes</span><span class="wm-value">${w.episodes||'?'}</span></div>
     <div class="wm-item"><span class="wm-label">Durée ep.</span><span class="wm-value">${w.duration||'—'}</span></div>
-    <div class="wm-item"><span class="wm-label">Statut</span><span class="wm-value">${w.status||'—'}</span></div>
+    <div class="wm-item"><span class="wm-label">Publication</span><span class="wm-value">${({'Finished':'Terminée','Publishing':'En cours','On Hiatus':'En pause','Discontinued':'Arrêtée'}[w.status]||w.status||'—')}</span></div>
     <div class="wm-item"><span class="wm-label">Diffusion</span><span class="wm-value">${w.aired?.string||'—'}</span></div>
     <div class="wm-item"><span class="wm-label"><span class="score-display"><span class="score-val">★ ${w.score||'?'}</span></span></span><span class="wm-value" style="font-size:11px;color:var(--t3)">${w.scored_by?w.scored_by.toLocaleString()+' votes':''}</span></div>
   `;
@@ -2407,7 +2406,7 @@ function renderProgressSection(w, t){
   const cur=type==='manga'?(t.chapter||0):(t.episode||0);
   const vol=t.volume||0;
   const pct=knownMax?Math.min(100,Math.round(cur/knownMax*100)):0;
-  const statOpts=['En cours','Terminé','Abandonné','Planifié'].map(s=>`<option${(t.status||'')==s?' selected':''}>${s}</option>`).join('');
+  const statOpts=['En cours','Terminé','Abandonné','Planifié','À jour'].map(s=>`<option${(t.status||'')==s?' selected':''}>${s}</option>`).join('');
   const maxLabel=isOngoing?'∞ (en cours)':knownMax;
   const volMax=w.volumes||null;
   const volLabel=volMax||'?';
@@ -2491,10 +2490,10 @@ async function loadSimilar(w){
 
 function renderWorkSidebar(w, t){
   const type=w._type;
-  const statusBtns=['En cours','Terminé','Abandonné','Planifié'].map(s=>`
+  const statusBtns=['En cours','Terminé','Abandonné','Planifié','À jour'].map(s=>`
     <button class="btn ${(t.status||'')==s?'btn-primary':'btn-ghost'} btn-sm" style="justify-content:flex-start;width:100%;margin-bottom:5px"
       onclick="updateStatus(${w.mal_id},'${type}','${s}','${esc(w.title)}','${esc(w.images?.jpg?.image_url||'')}')">
-      <span style="width:8px;height:8px;border-radius:50%;background:${s==='En cours'?'var(--green)':s==='Terminé'?'var(--acc2)':s==='Abandonné'?'var(--red)':'var(--t3)'}"></span> ${s}
+      <span style="width:8px;height:8px;border-radius:50%;background:${s==='En cours'?'var(--green)':s==='Terminé'?'var(--acc2)':s==='Abandonné'?'var(--red)':s==='À jour'?'#00d4ff':'var(--t3)'}"></span> ${s}
     </button>`).join('');
 
   const physCollData=S.collection[w.mal_id]||{};
@@ -3575,21 +3574,42 @@ async function fetchMissingScores(){
 }
 
 // ─── SUIVI ───
+// Genres sélectionnés (multi)
+let _safGenres=new Set();
+
 function populateSuiviGenreFilter(){
-  const sel=document.getElementById('suivi-genre-filter');
-  if(!sel) return;
+  const wrap=document.getElementById('suivi-genre-pills');
+  if(!wrap) return;
   const genres=new Set();
-  Object.values(S.tracking).forEach(t=>{ (t._genres||[]).forEach(g=>genres.add(g)); });
+  Object.values(S.tracking).forEach(t=>{
+    (t._genres||[]).forEach(g=>genres.add(g));
+    (t._themes||[]).forEach(g=>genres.add(g));
+  });
   const sorted=[...genres].sort();
-  const cur=sel.value;
-  sel.innerHTML='<option value="">Tous les genres</option>'+sorted.map(g=>`<option value="${g}"${g===cur?' selected':''}>${g}</option>`).join('');
+  if(wrap.children.length === sorted.length+1) return; // already populated
+  wrap.innerHTML='<button class="saf-pill on" data-g="" onclick="toggleSAFGenreMulti('',this)">Tous</button>'
+    +sorted.map(g=>`<button class="saf-pill${_safGenres.has(g)?' on':''}" data-g="${g}" onclick="toggleSAFGenreMulti('${g}',this)">${g}</button>`).join('');
+}
+
+function toggleSAFGenreMulti(val, btn){
+  if(!val){
+    _safGenres.clear();
+    document.querySelectorAll('#suivi-genre-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.g===''));
+  } else {
+    if(_safGenres.has(val)) _safGenres.delete(val);
+    else _safGenres.add(val);
+    const allBtn=document.querySelector('#suivi-genre-pills [data-g=""]');
+    if(allBtn) allBtn.classList.toggle('on',_safGenres.size===0);
+    document.querySelectorAll('#suivi-genre-pills [data-g="'+val+'"]').forEach(b=>b.classList.toggle('on',_safGenres.has(val)));
+  }
+  renderSuivi();
 }
 
 function renderSuivi(){
   populateSuiviGenreFilter();
   const query=(document.getElementById('suivi-search')?.value||'').toLowerCase().trim();
   const sort=document.getElementById('suivi-sort')?.value||'my-rating-desc';
-  const genreFilter=document.getElementById('suivi-genre-filter')?.value||'';
+  // genreFilter géré par _safGenres (multi-select)
   const ratingMin = parseFloat(document.getElementById('saf-rating-min')?.value||'0');
   const tomesMin = parseInt(document.getElementById('saf-tomes-min')?.value||'0');
   const all=Object.values(S.tracking);
@@ -3650,7 +3670,7 @@ function renderSuivi(){
     const items=all.filter(t=>
       t.type===type &&
       (!query||t.title.toLowerCase().includes(query)) &&
-      (!genreFilter||(t._genres||[]).includes(genreFilter)) &&
+      (_safGenres.size===0||[..._safGenres].every(g=>(t._genres||[]).concat(t._themes||[]).includes(g))) &&
       (!_safDemo||(t._demographics||[]).some(d=>d===_safDemo)) &&
       (!_safStatus||t._pubStatus===_safStatus) &&
       (!_safGenre||(t._genres||[]).includes(_safGenre)) &&
@@ -5402,7 +5422,7 @@ function resetSAF(){
   document.getElementById('saf-tomes-min').value = 0;
   document.getElementById('saf-tomes-val').textContent = 'Tous';
   document.getElementById('saf-tomes-row').style.display = 'none';
-  document.getElementById('suivi-genre-filter').value = '';
+  _safGenres.clear(); document.querySelectorAll('#suivi-genre-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.g==='')); populateSuiviGenreFilter();
   document.querySelectorAll('#suivi-adv-filters [data-demo]').forEach(b=>b.classList.toggle('on',b.dataset.demo===''));
   document.querySelectorAll('#saf-status-pills [data-st]').forEach(b=>b.classList.toggle('on',b.dataset.st===''));
   document.querySelectorAll('#saf-extra-genres [data-g]').forEach(b=>b.classList.toggle('on',b.dataset.g===''));
