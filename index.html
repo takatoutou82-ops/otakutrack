@@ -1701,15 +1701,20 @@ textarea.fi{resize:vertical;min-height:72px}
 
 <!-- MODAL : Écrire une critique de catégorie -->
 <div class="modal-bg" id="m-scat-review">
-  <div class="modal" style="max-width:460px">
+  <div class="modal" style="max-width:500px">
     <div class="modal-title"><span id="scat-review-title">Critique</span><span class="modal-close" onclick="closeM('m-scat-review')">✕</span></div>
-    <div style="margin-bottom:12px">
-      <label style="font-size:12px;color:var(--t3);display:block;margin-bottom:6px">Note de la critique</label>
-      <div style="display:flex;gap:6px;flex-wrap:wrap" id="scat-rv-stars">
-        ${[1,2,3,4,5].map(n=>`<button onclick="setScatRvRating(${n})" id="scat-rv-star-${n}" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--yellow);font-size:15px;cursor:pointer">★ ${n}</button>`).join('')}
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Note</div>
+      <div style="display:flex;gap:8px" id="scat-rv-stars">
+        <button id="scat-rv-star-1" onclick="setScatRvRating(1)" style="flex:1;padding:8px 0;background:none;border:1px solid var(--border);border-radius:8px;color:var(--yellow);font-size:16px;cursor:pointer;transition:all .15s">★ 1</button>
+        <button id="scat-rv-star-2" onclick="setScatRvRating(2)" style="flex:1;padding:8px 0;background:none;border:1px solid var(--border);border-radius:8px;color:var(--yellow);font-size:16px;cursor:pointer;transition:all .15s">★ 2</button>
+        <button id="scat-rv-star-3" onclick="setScatRvRating(3)" style="flex:1;padding:8px 0;background:none;border:1px solid var(--border);border-radius:8px;color:var(--yellow);font-size:16px;cursor:pointer;transition:all .15s">★ 3</button>
+        <button id="scat-rv-star-4" onclick="setScatRvRating(4)" style="flex:1;padding:8px 0;background:none;border:1px solid var(--border);border-radius:8px;color:var(--yellow);font-size:16px;cursor:pointer;transition:all .15s">★ 4</button>
+        <button id="scat-rv-star-5" onclick="setScatRvRating(5)" style="flex:1;padding:8px 0;background:none;border:1px solid var(--border);border-radius:8px;color:var(--yellow);font-size:16px;cursor:pointer;transition:all .15s">★ 5</button>
       </div>
     </div>
-    <textarea id="scat-rv-text" class="inp" placeholder="Écris ta critique…" style="height:110px;resize:vertical;margin-bottom:14px"></textarea>
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Critique</div>
+    <textarea id="scat-rv-text" class="inp" placeholder="Écris ta critique, tes impressions, ce que tu as aimé ou non…" style="height:160px;resize:vertical;margin-bottom:16px;font-size:14px;line-height:1.6"></textarea>
     <div style="display:flex;gap:8px">
       <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-scat-review')">Annuler</button>
       <button class="btn btn-primary" style="flex:1" onclick="saveScatReview()">Enregistrer</button>
@@ -4551,8 +4556,11 @@ function renderTierList(){
     const order=orders[i]||[];
     if(order.length){
       g.sort((a,b)=>{
-        const ia=order.indexOf(a.mal_id+'_'+(a.type||''));
-        const ib=order.indexOf(b.mal_id+'_'+(b.type||''));
+        // clé cohérente avec dragKey : pour cat → mal_id, pour œuvre → mal_id+'_'+type
+        const keyA = a._isCat ? String(a.mal_id) : String(a.mal_id)+'_'+(a.type||'');
+        const keyB = b._isCat ? String(b.mal_id) : String(b.mal_id)+'_'+(b.type||'');
+        const ia=order.indexOf(keyA);
+        const ib=order.indexOf(keyB);
         return (ia===-1?9999:ia)-(ib===-1?9999:ib);
       });
     }
@@ -4625,6 +4633,8 @@ function tierDragEnd(e){
   document.querySelectorAll('.tier-drag-over,.tier-item-drop-target').forEach(el=>el.classList.remove('tier-drag-over','tier-item-drop-target'));
   _tierDragEl=null;
   _tierLinkHandled=false;
+  // Reset APRÈS un court délai pour que tierItemClick puisse encore l'ignorer si besoin
+  setTimeout(()=>{ _tierDragging={malId:null,type:null,fromTier:null}; }, 50);
 }
 let _tierDragEl=null;
 function tierDrop(e,newTierIdx){
@@ -4681,7 +4691,9 @@ function tierDrop(e,newTierIdx){
   }
   const newOrder=[];
   for(const item of allItems){
-    const k=item.dataset.malid+'_'+item.dataset.type;
+    // Pour les catégories, la clé est juste data-malid (ex: 'cat_scat_123')
+    // Pour les œuvres, la clé est data-malid+'_'+data-type
+    const k=item.dataset.type==='cat' ? item.dataset.malid : item.dataset.malid+'_'+item.dataset.type;
     if(k===dragKey) continue;
     if(insertBefore===item) newOrder.push(dragKey);
     newOrder.push(k);
@@ -5566,17 +5578,20 @@ function renderScatReviews(id){
     return;
   }
   el.innerHTML=revs.map((r,i)=>`
-    <div class="review-card" style="position:relative">
-      <div class="rv-head">
-        <div class="rv-user"><div class="rv-avatar">${(S.profile.name||'?')[0]}</div>${esc(S.profile.name||'Moi')}</div>
+    <div class="review-card" style="position:relative;margin-bottom:12px">
+      <div class="rv-head" style="margin-bottom:6px">
+        <div class="rv-user">
+          <div class="rv-avatar">${(S.profile.name||'?')[0].toUpperCase()}</div>
+          <span style="font-weight:700;font-size:13px">${esc(S.profile.name||'Moi')}</span>
+          ${r.date?`<span style="font-size:11px;color:var(--t4);margin-left:6px">${r.date}</span>`:''}
+        </div>
         <div style="display:flex;gap:6px">
-          <button onclick="editScatReview(${i})" style="background:rgba(139,124,248,.15);border:none;border-radius:6px;padding:3px 8px;color:var(--acc);font-size:11px;cursor:pointer;font-weight:700">✏ Modifier</button>
-          <button onclick="deleteScatReview(${i})" style="background:rgba(248,113,113,.15);border:none;border-radius:6px;padding:3px 8px;color:#f87171;font-size:11px;cursor:pointer;font-weight:700">🗑 Supprimer</button>
+          <button onclick="editScatReview(${i})" style="background:rgba(139,124,248,.15);border:none;border-radius:6px;padding:3px 10px;color:var(--acc);font-size:11px;cursor:pointer;font-weight:700">✏</button>
+          <button onclick="deleteScatReview(${i})" style="background:rgba(248,113,113,.15);border:none;border-radius:6px;padding:3px 10px;color:#f87171;font-size:11px;cursor:pointer;font-weight:700">🗑</button>
         </div>
       </div>
-      <div class="rv-stars">${'★'.repeat(r.rating||0)}${'☆'.repeat(5-(r.rating||0))}</div>
-      <div class="rv-text" style="margin-top:6px">${esc(r.text||'')}</div>
-      ${r.date?`<div style="font-size:10px;color:var(--t4);margin-top:6px">${r.date}</div>`:''}
+      <div style="color:var(--yellow);font-size:16px;letter-spacing:2px;margin-bottom:8px">${'★'.repeat(r.rating||0)}${'☆'.repeat(5-(r.rating||0))}</div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.7;white-space:pre-wrap">${esc(r.text||'')}</div>
     </div>`).join('');
 }
 
