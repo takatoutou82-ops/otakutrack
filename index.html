@@ -677,7 +677,12 @@ textarea.fi{resize:vertical;min-height:72px}
   border-radius:4px;font-size:7px;font-weight:800;padding:1px 4px;
   font-family:'Syne',sans-serif;
 }
-.tier-empty{color:var(--t4);font-size:12px;padding:4px 8px;font-style:italic}
+@keyframes tierDrop{
+  0%{transform:translateY(-18px) scale(.88);opacity:0}
+  60%{transform:translateY(4px) scale(1.04);opacity:1}
+  100%{transform:translateY(0) scale(1);opacity:1}
+}
+.tier-item-anim{animation:tierDrop .32s cubic-bezier(.34,1.4,.64,1) both}
 
 /* ── SUIVI CATÉGORIE BTN ── */
 .suivi-cat-btn{
@@ -1757,15 +1762,37 @@ textarea.fi{resize:vertical;min-height:72px}
   <div class="wrap pt32 pb40">
     <div class="sh"><h1 class="sh-title" style="font-size:22px">Mes Statistiques</h1></div>
     <div class="stats-grid" id="stats-grid"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:8px">
+
+    <!-- Row 1: Genres + Donut statuts -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px">
       <div>
         <div class="sh"><h2 class="sh-title">Genres préférés</h2></div>
         <div id="genre-bars"></div>
       </div>
       <div>
-        <div class="sh"><h2 class="sh-title">Activité par mois</h2></div>
+        <div class="sh"><h2 class="sh-title">Répartition statuts</h2></div>
         <div id="annual-chart"></div>
       </div>
+    </div>
+
+    <!-- Row 2: Radar genres + Courbe notes -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px">
+      <div>
+        <div class="sh"><h2 class="sh-title">Radar de goûts</h2></div>
+        <div style="display:flex;justify-content:center">
+          <canvas id="radar-chart" width="280" height="280"></canvas>
+        </div>
+      </div>
+      <div>
+        <div class="sh"><h2 class="sh-title">Distribution des notes</h2></div>
+        <canvas id="rating-curve" width="100%" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Row 3: Top auteurs/studios -->
+    <div style="margin-top:32px">
+      <div class="sh"><h2 class="sh-title">Top auteurs / studios</h2></div>
+      <div id="top-authors" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div>
     </div>
   </div>
 </div>
@@ -2065,14 +2092,35 @@ function togglePhysCat(id){
 
 // ─── NAVIGATION ───
 function nav(page, pushState=true){
-  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
-  const pg=document.getElementById('pg-'+page);
-  if(!pg) return;
-  pg.classList.add('on');
+  const current=document.querySelector('.pg.on');
+  const next=document.getElementById('pg-'+page);
+  if(!next||next===current) return;
+
+  // Cinematic crossfade transition
+  if(current){
+    current.style.transition='opacity .18s ease, transform .18s ease';
+    current.style.opacity='0';
+    current.style.transform='translateY(-6px)';
+    setTimeout(()=>{
+      current.classList.remove('on');
+      current.style.cssText='';
+      next.classList.add('on');
+      next.style.cssText='opacity:0;transform:translateY(10px)';
+      requestAnimationFrame(()=>{
+        requestAnimationFrame(()=>{
+          next.style.transition='opacity .25s ease, transform .25s ease';
+          next.style.opacity='1';
+          next.style.transform='translateY(0)';
+          setTimeout(()=>{ next.style.cssText=''; },260);
+        });
+      });
+    },180);
+  } else {
+    next.classList.add('on');
+  }
+
   window.scrollTo(0,0);
-  // Mettre à jour l'URL sans recharger
   if(pushState) history.pushState({page}, '', '#'+page);
-  // Activer le bon lien nav
   const navEl=document.querySelector(`[data-page="${page}"]`);
   if(navEl) activate(navEl);
   if(page==='home')renderHome();
@@ -3396,68 +3444,265 @@ function renderStats(){
     if(!c||typeof c!=='object')return s;
     return s+Object.keys(c.volumes||{}).length;
   },0);
-  const readTimeH=Math.round(totalCh*0.08+totalEp*0.37); // ~5min/chap, ~22min/ep
+  const readTimeH=Math.round(totalCh*0.08+totalEp*0.37);
 
   document.getElementById('stats-grid').innerHTML=`
-    <div class="stat-card"><div class="stat-n" style="color:var(--manga)">${mangas.length}</div><div class="stat-l">Mangas suivis</div></div>
-    <div class="stat-card"><div class="stat-n" style="color:var(--anime)">${animes.length}</div><div class="stat-l">Animés suivis</div></div>
-    <div class="stat-card"><div class="stat-n" style="color:var(--acc2)">${totalCh}</div><div class="stat-l">Chapitres lus</div></div>
-    <div class="stat-card"><div class="stat-n" style="color:var(--green)">${totalEp}</div><div class="stat-l">Épisodes vus</div></div>
-    <div class="stat-card"><div class="stat-n" style="color:var(--yellow)">${avgR}</div><div class="stat-l">Note moyenne</div></div>
-    <div class="stat-card"><div class="stat-n" style="color:var(--orange)">${totalVols}</div><div class="stat-l">Tomes possédés</div></div>
-    <div class="stat-card"><div class="stat-n" style="color:var(--t2)">${all.filter(t=>t.status==='Terminé').length}</div><div class="stat-l">Terminés</div></div>
-    <div class="stat-card"><div class="stat-n" style="color:var(--acc);font-size:18px">${readTimeH}h</div><div class="stat-l">Temps estimé</div></div>
+    <div class="stat-card"><div class="stat-n" style="background:linear-gradient(135deg,var(--manga),#f9a8d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${mangas.length}</div><div class="stat-l">Mangas suivis</div></div>
+    <div class="stat-card"><div class="stat-n" style="background:linear-gradient(135deg,var(--anime),#7dd3fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${animes.length}</div><div class="stat-l">Animés suivis</div></div>
+    <div class="stat-card"><div class="stat-n">${totalCh}</div><div class="stat-l">Chapitres lus</div></div>
+    <div class="stat-card"><div class="stat-n" style="background:linear-gradient(135deg,var(--green),#86efac);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${totalEp}</div><div class="stat-l">Épisodes vus</div></div>
+    <div class="stat-card"><div class="stat-n" style="background:linear-gradient(135deg,var(--yellow),#fde68a);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${avgR}</div><div class="stat-l">Note moyenne</div></div>
+    <div class="stat-card"><div class="stat-n" style="background:linear-gradient(135deg,var(--orange),#fed7aa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${totalVols}</div><div class="stat-l">Tomes possédés</div></div>
+    <div class="stat-card"><div class="stat-n">${all.filter(t=>t.status==='Terminé').length}</div><div class="stat-l">Terminés</div></div>
+    <div class="stat-card"><div class="stat-n">${readTimeH}h</div><div class="stat-l">Temps estimé</div></div>
   `;
 
-  // ── Genres préférés depuis les données de tracking enrichies ──
+  // ── Genres ──
   const genreCount={};
   all.forEach(t=>{ (t._genres||[]).forEach(g=>{ genreCount[g]=(genreCount[g]||0)+1; }); });
   const genreEl=document.getElementById('genre-bars');
   if(!Object.keys(genreCount).length){
-    genreEl.innerHTML='<p style="color:var(--t3);font-size:13px">Ajoutez des œuvres à votre suivi pour voir vos genres préférés.</p>';
+    genreEl.innerHTML='<p style="color:var(--t3);font-size:13px">Ajoutez des œuvres pour voir vos genres préférés.</p>';
   } else {
     const top=Object.entries(genreCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
     const maxG=top[0][1];
-    genreEl.innerHTML=top.map(([g,n])=>`
-      <div style="margin-bottom:9px">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-          <span style="color:var(--t2);font-weight:600">${g}</span>
-          <span style="color:var(--t3)">${n}</span>
+    genreEl.innerHTML=top.map(([g,n],i)=>{
+      const pct=Math.round((n/maxG)*100);
+      const colors=['var(--acc)','var(--manga)','var(--anime)','var(--green)','var(--orange)','var(--yellow)','var(--acc2)','var(--red)','#a78bfa','#34d399'];
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span style="color:var(--t2);font-weight:700">${g}</span>
+          <span style="color:var(--t3);font-weight:600">${n}</span>
         </div>
-        <div style="height:6px;border-radius:3px;background:var(--bg4)">
-          <div style="height:100%;border-radius:3px;background:var(--acc);width:${Math.round((n/maxG)*100)}%;transition:width .4s"></div>
+        <div style="height:6px;border-radius:6px;background:var(--bg4);overflow:hidden">
+          <div style="height:100%;border-radius:6px;background:${colors[i%colors.length]};width:0;transition:width .6s cubic-bezier(.4,0,.2,1) ${i*0.05}s" data-w="${pct}"></div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
+    // Animate bars
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        genreEl.querySelectorAll('[data-w]').forEach(el=>{ el.style.width=el.dataset.w+'%'; });
+      });
+    });
   }
 
-  // ── Répartition statuts ──
+  // ── Donut statuts ──
   const statuses=['Planifié','En cours','Terminé','Abandonné','À jour'];
-  const statusColors=['#8b7cf8','#4ade80','#60a5fa','#f87171'];
+  const statusColors=['#8b7cf8','#4ade80','#60a5fa','#f87171','#00d4ff'];
   const statusCounts=statuses.map(s=>all.filter(t=>t.status===s).length);
   const total=all.length||1;
   let offset=0;
+  const C=238.76;
   const arcs=statusCounts.map((c,i)=>{
     const pct=(c/total)*100;
-    const arc=`<circle cx="50" cy="50" r="38" fill="none" stroke="${statusColors[i]}" stroke-width="10"
-      stroke-dasharray="${(pct/100)*238.76} ${238.76}" stroke-dashoffset="${-offset/100*238.76}"
-      transform="rotate(-90 50 50)" style="transition:all .4s"/>`;
+    const arc=`<circle cx="50" cy="50" r="38" fill="none" stroke="${statusColors[i]}" stroke-width="9"
+      stroke-dasharray="${(pct/100)*C} ${C}" stroke-dashoffset="${-(offset/100)*C}"
+      transform="rotate(-90 50 50)" style="transition:stroke-dasharray .6s ease"/>`;
     offset+=pct;
     return arc;
   });
-
   document.getElementById('annual-chart').innerHTML=`
     <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
-      <svg width="100" height="100" viewBox="0 0 100 100">${arcs.join('')}<text x="50" y="54" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="700">${all.length}</text></svg>
-      <div>${statuses.map((s,i)=>`
-        <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
-          <div style="width:10px;height:10px;border-radius:50%;background:${statusColors[i]};flex-shrink:0"></div>
-          <span style="font-size:12px;color:var(--t2)">${s}</span>
-          <span style="font-size:12px;color:var(--t3);margin-left:auto">${statusCounts[i]}</span>
+      <svg width="100" height="100" viewBox="0 0 100 100" style="flex-shrink:0">
+        <circle cx="50" cy="50" r="38" fill="none" stroke="var(--bg4)" stroke-width="9"/>
+        ${arcs.join('')}
+        <text x="50" y="46" text-anchor="middle" fill="var(--text)" font-size="13" font-weight="800" font-family="Syne,sans-serif">${all.length}</text>
+        <text x="50" y="59" text-anchor="middle" fill="var(--t3)" font-size="7">œuvres</text>
+      </svg>
+      <div style="flex:1;min-width:120px">${statuses.map((s,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+          <div style="width:8px;height:8px;border-radius:50%;background:${statusColors[i]};flex-shrink:0;box-shadow:0 0 6px ${statusColors[i]}"></div>
+          <span style="font-size:12px;color:var(--t2);flex:1">${s}</span>
+          <span style="font-size:12px;font-weight:700;color:var(--text)">${statusCounts[i]}</span>
         </div>`).join('')}
       </div>
-    </div>
-    <p style="margin-top:14px;font-size:11px;color:var(--t4)">* Temps estimé : ~5 min/chapitre, ~22 min/épisode</p>
-  `;
+    </div>`;
+
+  // ── Radar chart des genres ──
+  setTimeout(()=>renderRadarChart(genreCount), 50);
+
+  // ── Distribution des notes ──
+  setTimeout(()=>renderRatingCurve(rated), 80);
+
+  // ── Top auteurs / studios ──
+  renderTopAuthors(all);
+}
+
+function renderRadarChart(genreCount){
+  const canvas=document.getElementById('radar-chart');
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  const cx=W/2, cy=H/2, r=Math.min(W,H)/2-32;
+  ctx.clearRect(0,0,W,H);
+
+  const top8=Object.entries(genreCount).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  if(top8.length<3){
+    ctx.fillStyle='rgba(255,255,255,.15)';
+    ctx.font='13px Instrument Sans';
+    ctx.textAlign='center';
+    ctx.fillText('Pas assez de données',cx,cy);
+    return;
+  }
+  const n=top8.length;
+  const maxVal=top8[0][1];
+  const angle=(i)=>(Math.PI*2/n)*i - Math.PI/2;
+
+  // Grid circles
+  [0.25,0.5,0.75,1].forEach(frac=>{
+    ctx.beginPath();
+    for(let i=0;i<n;i++){
+      const a=angle(i), x=cx+Math.cos(a)*r*frac, y=cy+Math.sin(a)*r*frac;
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle=`rgba(255,255,255,${frac===1?0.1:0.05})`;
+    ctx.lineWidth=1;
+    ctx.stroke();
+  });
+
+  // Axis lines
+  top8.forEach((_,i)=>{
+    const a=angle(i);
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r);
+    ctx.strokeStyle='rgba(255,255,255,.08)';
+    ctx.lineWidth=1;
+    ctx.stroke();
+  });
+
+  // Data polygon
+  ctx.beginPath();
+  top8.forEach(([,v],i)=>{
+    const a=angle(i), frac=v/maxVal;
+    const x=cx+Math.cos(a)*r*frac, y=cy+Math.sin(a)*r*frac;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.closePath();
+  const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+  grad.addColorStop(0,'rgba(184,172,255,.35)');
+  grad.addColorStop(1,'rgba(95,77,224,.12)');
+  ctx.fillStyle=grad;
+  ctx.fill();
+  ctx.strokeStyle='rgba(139,124,248,.8)';
+  ctx.lineWidth=2;
+  ctx.stroke();
+
+  // Dots
+  top8.forEach(([,v],i)=>{
+    const a=angle(i), frac=v/maxVal;
+    const x=cx+Math.cos(a)*r*frac, y=cy+Math.sin(a)*r*frac;
+    ctx.beginPath();
+    ctx.arc(x,y,4,0,Math.PI*2);
+    ctx.fillStyle='#b8acff';
+    ctx.fill();
+    ctx.strokeStyle='var(--bg4)';
+    ctx.lineWidth=1.5;
+    ctx.stroke();
+  });
+
+  // Labels
+  ctx.fillStyle='rgba(255,255,255,.7)';
+  ctx.font='bold 10px Syne, sans-serif';
+  ctx.textAlign='center';
+  top8.forEach(([g],i)=>{
+    const a=angle(i);
+    const lx=cx+Math.cos(a)*(r+18), ly=cy+Math.sin(a)*(r+18);
+    const label=g.length>10 ? g.slice(0,9)+'…' : g;
+    ctx.fillText(label, lx, ly+3);
+  });
+}
+
+function renderRatingCurve(rated){
+  const canvas=document.getElementById('rating-curve');
+  if(!canvas) return;
+  canvas.width=canvas.parentElement.offsetWidth||400;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height||200;
+  ctx.clearRect(0,0,W,H);
+
+  // Buckets 0.5→10
+  const buckets={};
+  for(let v=0.5;v<=10;v+=0.5) buckets[v]=0;
+  rated.forEach(t=>{ if(buckets[t.rating]!==undefined) buckets[t.rating]++; });
+  const vals=Object.values(buckets);
+  const maxV=Math.max(...vals,1);
+  const keys=Object.keys(buckets).map(Number);
+  const pad={l:30,r:16,t:16,b:30};
+  const bW=(W-pad.l-pad.r)/keys.length;
+
+  // Bars
+  keys.forEach((k,i)=>{
+    const h=((buckets[k]/maxV)*(H-pad.t-pad.b));
+    const x=pad.l+i*bW;
+    const y=H-pad.b-h;
+    const alpha=0.3+0.7*(buckets[k]/maxV);
+    const grad=ctx.createLinearGradient(0,y,0,H-pad.b);
+    grad.addColorStop(0,`rgba(184,172,255,${alpha})`);
+    grad.addColorStop(1,`rgba(95,77,224,${alpha*0.3})`);
+    ctx.fillStyle=grad;
+    ctx.beginPath();
+    ctx.roundRect(x+2, y, bW-4, h, [4,4,0,0]);
+    ctx.fill();
+    // Count label
+    if(buckets[k]>0){
+      ctx.fillStyle='rgba(255,255,255,.55)';
+      ctx.font='9px Syne, sans-serif';
+      ctx.textAlign='center';
+      ctx.fillText(buckets[k], x+bW/2, y-4);
+    }
+  });
+
+  // X axis labels (every 1 step)
+  ctx.fillStyle='rgba(255,255,255,.25)';
+  ctx.font='9px Instrument Sans, sans-serif';
+  ctx.textAlign='center';
+  keys.forEach((k,i)=>{
+    if(k%1===0){
+      ctx.fillText(k, pad.l+i*bW+bW/2, H-pad.b+12);
+    }
+  });
+
+  // Baseline
+  ctx.beginPath();
+  ctx.moveTo(pad.l, H-pad.b);
+  ctx.lineTo(W-pad.r, H-pad.b);
+  ctx.strokeStyle='rgba(255,255,255,.08)';
+  ctx.lineWidth=1;
+  ctx.stroke();
+}
+
+function renderTopAuthors(all){
+  const el=document.getElementById('top-authors');
+  if(!el) return;
+  const authorCount={};
+  all.forEach(t=>{
+    (t._authors||[]).forEach(a=>{
+      const key=a.name||a;
+      if(!key) return;
+      if(!authorCount[key]) authorCount[key]={count:0,works:[],role:a.role||''};
+      authorCount[key].count++;
+      if(t.cover&&authorCount[key].works.length<3) authorCount[key].works.push(t.cover);
+    });
+  });
+  const top=Object.entries(authorCount).sort((a,b)=>b[1].count-a[1].count).slice(0,8);
+  if(!top.length){
+    el.innerHTML='<p style="color:var(--t3);font-size:13px">Pas encore de données auteurs.</p>';
+    return;
+  }
+  el.innerHTML=top.map(([name,{count,works,role}])=>`
+    <div style="background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;gap:2px;flex-shrink:0">
+        ${works.slice(0,2).map(c=>`<img src="${c}" style="width:28px;height:40px;object-fit:cover;border-radius:4px">`).join('')}
+      </div>
+      <div style="min-width:0">
+        <div style="font-size:13px;font-weight:800;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">${count} œuvre${count>1?'s':''}</div>
+      </div>
+      <div style="margin-left:auto;font-size:18px;font-weight:900;font-family:'Syne',sans-serif;color:var(--acc2);flex-shrink:0">${count}</div>
+    </div>`).join('');
 }
 
 // ─── COLLECTION ───
@@ -4777,9 +5022,11 @@ function renderTierList(){
         ondragleave="this.classList.remove('tier-drag-over')"
         ondrop="tierDrop(event,${i})">
         ${groups[i].length
-          ? groups[i].map(t=>{
+          ? groups[i].map((t,idx)=>{
+              const anim=`animation-delay:${idx*0.04}s`;
               if(t._isCat){
-                return `<div class="tier-item tier-item-cat" draggable="true"
+                return `<div class="tier-item tier-item-cat tier-item-anim" draggable="true"
+                  style="${anim}"
                   data-malid="${t.id}" data-type="cat" data-tier="${i}"
                   ondragstart="tierDragStart(event,'cat_${t.id}','cat',${i})"
                   ondragend="tierDragEnd(event)"
@@ -4797,7 +5044,8 @@ function renderTierList(){
                 : '';
               const linked = (S.profile.tierLinks||{})[String(t.mal_id)+'_'+t.type]||[];
               const linkBadge = linked.length ? `<div class="tier-link-badge">+${linked.length}</div>` : '';
-              return `<div class="tier-item" draggable="true"
+              return `<div class="tier-item tier-item-anim" draggable="true"
+                style="${anim}"
                 data-malid="${t.mal_id}" data-type="${t.type}" data-tier="${i}"
                 ondragstart="tierDragStart(event,${t.mal_id},'${t.type}',${i})"
                 ondragend="tierDragEnd(event)"
