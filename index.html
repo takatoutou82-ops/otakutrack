@@ -6903,6 +6903,9 @@ async function loadFromFirebase(){
     if(remote.bannerPos!==undefined) S.bannerPos=remote.bannerPos;
     if(remote.physCategories) S.physCategories=remote.physCategories;
     if(remote.suiviCategories) S.suiviCategories=remote.suiviCategories;
+    if(remote.customCovers) S.customCovers=remote.customCovers;
+    if(remote.tierImg!==undefined) S.tierImg=remote.tierImg;
+    if(remote.arcsImgs) S.arcsImgs=remote.arcsImgs;
     try{ localStorage.setItem('ot_v3',JSON.stringify({
       tracking:S.tracking,lists:S.lists,collection:S.collection,
       collectionMeta:S.collectionMeta,profile:S.profile,
