@@ -2089,40 +2089,61 @@ function load(){
 }
 
 // ─── JIKAN API ───
+// ─── JIKAN API ───
 const JIKAN = 'https://api.jikan.moe/v4';
-const cache = {}; // { path: { data, ts } }
-const CACHE_TTL = 60 * 60 * 1000; // 1h
+const cache = {};
+const CACHE_TTL = 60 * 60 * 1000;
 
-// File de requêtes pour éviter le rate limit Jikan (max 3 req/s)
-let _jikanQueue = Promise.resolve();
-function jikanQueued(path, retry=4){
-  const result = _jikanQueue.then(() => _jikanFetch(path, retry));
-  _jikanQueue = result.catch(() => {});
-  return result;
+// File séquentielle stricte — une seule requête à la fois
+let _jikanBusy = false;
+const _jikanPending = [];
+
+function jikan(path, retry=3){
+  return new Promise((resolve, reject)=>{
+    _jikanPending.push({path, retry, resolve, reject});
+    _jikanRun();
+  });
 }
-async function _jikanFetch(path, retry=4){
+function jikanQueued(path, retry=3){ return jikan(path, retry); }
+
+async function _jikanRun(){
+  if(_jikanBusy || !_jikanPending.length) return;
+  _jikanBusy = true;
+  const {path, retry, resolve, reject} = _jikanPending.shift();
+  try{
+    const result = await _jikanFetch(path, retry);
+    resolve(result);
+  }catch(e){
+    reject(e);
+  }finally{
+    _jikanBusy = false;
+    if(_jikanPending.length) setTimeout(_jikanRun, 400);
+  }
+}
+
+async function _jikanFetch(path, retry=3){
   const now=Date.now();
-  if(cache[path]&&(now-cache[path].ts)<CACHE_TTL)return cache[path].data;
-  await delay(600);
+  if(cache[path]&&(now-cache[path].ts)<CACHE_TTL) return cache[path].data;
   for(let i=0;i<retry;i++){
     try{
+      await delay(350);
       const controller = new AbortController();
-      const tid = setTimeout(()=>controller.abort(), 8000);
+      const tid = setTimeout(()=>controller.abort(), 10000);
       const r = await fetch(JIKAN+path, {signal:controller.signal});
       clearTimeout(tid);
-      if(r.status===429){ await delay(2000*(i+1)); continue; }
+      if(r.status===429){
+        await delay(3000*(i+1));
+        continue;
+      }
       if(!r.ok) throw new Error(r.status);
       const d = await r.json();
       cache[path] = {data:d, ts:now};
       return d;
     }catch(e){
       if(i===retry-1) throw e;
-      await delay(1000*(i+1));
+      await delay(1500*(i+1));
     }
   }
-}
-async function jikan(path, retry=4){
-  return jikanQueued(path, retry);
 }
 
 function delay(ms){return new Promise(r=>setTimeout(r,ms))}
