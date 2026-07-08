@@ -1572,8 +1572,11 @@ textarea.fi{resize:vertical;min-height:72px}
         <button class="tab on" onclick="switchTab(this,'tp-progress')">Progression</button>
         <button class="tab" onclick="switchTab(this,'tp-reviews')">Critiques</button>
         <button class="tab" onclick="switchTab(this,'tp-chars');loadCharacters()">Personnages</button>
+        <button class="tab" id="tab-saisons" style="display:none" onclick="switchTab(this,'tp-saisons');loadSaisons()">Saisons</button>
         <button class="tab" onclick="switchTab(this,'tp-similar')">Similaires</button>
         <button class="tab" onclick="switchTab(this,'tp-relations')">Relations</button>
+        <button class="tab" id="tab-tomes" style="display:none" onclick="switchTab(this,'tp-tomes');loadTomes()">Tomes</button>
+        <button class="tab" onclick="switchTab(this,'tp-arcs');loadArcsImg()">Arcs</button>
       </div>
       <div class="tp on" id="tp-progress"><div id="progress-section"></div></div>
       <div class="tp" id="tp-reviews">
@@ -1581,8 +1584,24 @@ textarea.fi{resize:vertical;min-height:72px}
         <button class="btn btn-ghost" onclick="openM('m-review')" style="margin-top:10px">+ Écrire une critique</button>
       </div>
       <div class="tp" id="tp-chars"><div id="chars-section"></div></div>
+      <div class="tp" id="tp-saisons"><div id="saisons-section"></div></div>
       <div class="tp" id="tp-similar"><div class="cg" id="similar-section"></div></div>
       <div class="tp" id="tp-relations"><div id="relations-section"></div></div>
+      <div class="tp" id="tp-tomes"><div id="tomes-section"></div></div>
+      <div class="tp" id="tp-arcs">
+        <div id="arcs-img-wrap" style="margin-top:8px">
+          <div id="arcs-img-display" style="display:none;border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-bottom:12px">
+            <img id="arcs-img-el" style="width:100%;display:block;object-fit:contain;background:var(--bg3)">
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--t2);font-size:13px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">
+              🖼 Importer une image d'arcs
+              <input type="file" accept="image/*" style="display:none" onchange="importArcsImg(this)">
+            </label>
+            <button id="arcs-img-clear" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:8px 14px;color:var(--red);font-size:13px;cursor:pointer" onclick="clearArcsImg()">✕ Retirer</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="work-sidebar"></div>
   </div>
@@ -1754,7 +1773,15 @@ textarea.fi{resize:vertical;min-height:72px}
             <button class="btn btn-ghost" id="tl-filter-manga" onclick="setTierFilter('manga')" style="font-size:11px;padding:4px 10px;color:var(--manga)">Manga</button>
             <button class="btn btn-ghost" id="tl-filter-anime" onclick="setTierFilter('anime')" style="font-size:11px;padding:4px 10px;color:var(--anime)">Animé</button>
             <button class="btn btn-ghost" style="font-size:11px" onclick="renderTierList()">↺</button>
+            <label title="Importer une image de tier list" style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid var(--border);color:var(--t2);transition:border-color .15s" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">
+              🖼 Image
+              <input type="file" accept="image/*" style="display:none" onchange="importTierImg(this)">
+            </label>
+            <button class="btn btn-ghost" id="tl-img-clear" style="font-size:11px;display:none;color:var(--red)" onclick="clearTierImg()">✕ Retirer</button>
           </div>
+        </div>
+        <div id="tier-img-preview" style="display:none;margin-bottom:14px;border-radius:10px;overflow:hidden;border:1px solid var(--border)">
+          <img id="tier-img-el" style="width:100%;display:block;max-height:600px;object-fit:contain;background:var(--bg3)">
         </div>
         <div id="tier-list-wrap"></div>
       </div>
@@ -1971,26 +1998,11 @@ textarea.fi{resize:vertical;min-height:72px}
   </div>
 </div>
 
-<!-- Modal : confirmation lien œuvre → catégorie tierlist -->
-<div class="modal-bg" id="m-tier-link-confirm">
-  <div class="modal" style="max-width:380px;text-align:center">
-    <div style="font-size:32px;margin-bottom:12px">🔗</div>
-    <div class="modal-title" style="justify-content:center;font-size:16px" id="tlc-title">Lier à la catégorie ?</div>
-    <p id="tlc-body" style="color:var(--t2);font-size:13.5px;line-height:1.6;margin-bottom:20px"></p>
-    <div style="background:rgba(139,124,248,.08);border:1px solid rgba(139,124,248,.2);border-radius:10px;padding:12px 16px;margin-bottom:20px;text-align:left">
-      <div style="font-size:11px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Ce que ça fait</div>
-      <div style="font-size:12.5px;color:var(--t2);line-height:1.6">L'œuvre sera cachée de la tierlist et visible uniquement depuis la fiche de la catégorie, dans une section "Liées".</div>
-    </div>
-    <div style="display:flex;gap:10px">
-      <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-tier-link-confirm')">Annuler</button>
-      <button class="btn btn-primary" style="flex:1" id="tlc-confirm-btn" onclick="confirmTierLink()">Lier</button>
-    </div>
-  </div>
-</div>
-<div class="cover-lightbox" id="cover-lightbox" onclick="closeCoverLightbox(event)">
   <button class="clb-close" onclick="document.getElementById('cover-lightbox').classList.remove('on')">✕</button>
   <img class="cover-lightbox-img" id="cover-lightbox-img" src="" alt="">
   <div class="cover-lightbox-btns">
+    <input type="file" id="cover-change-input" accept="image/*" style="display:none" onchange="handleCoverChange(this.files[0], document.getElementById('cover-lightbox').dataset.malid)">
+    <button class="btn btn-secondary" onclick="event.stopPropagation();document.getElementById('cover-change-input').click()">🖼 Changer la couverture</button>
     <button class="btn btn-ghost" onclick="document.getElementById('cover-lightbox').classList.remove('on')">Fermer</button>
   </div>
 </div>
@@ -2797,6 +2809,8 @@ function renderWorkPage(w){
   document.getElementById('work-layout').innerHTML=`
     <div class="work-cover-box">
       <img src="${coverSrc}" alt="${esc(displayTitle)}" id="work-cover-img">
+      <input type="file" id="cover-change-input-${w.mal_id}" accept="image/*" style="display:none" onchange="handleCoverChange(this.files[0],${w.mal_id})">
+      <button class="cover-change-btn" onclick="document.getElementById('cover-change-input-${w.mal_id}').click()">🖼 Changer la couverture</button>
     </div>
     <div>
       <div class="work-type-pill wtp-${type}">${type==='manga'?'📖 MANGA':'🎬 ANIMÉ'}</div>
@@ -2976,6 +2990,7 @@ function renderWorkSidebar(w, t){
     <div class="sidebar-box" id="sb-buy-section">
       <div class="sb-title">🛒 Où acheter ?</div>
       <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="checkFrenchEditions(${w.mal_id},'${esc(w.title)}')">📖 Éditions FR</button>
         <button class="btn btn-ghost btn-sm" style="flex:1" onclick="searchVinted('${esc(w.title)}')">🏷 Vinted</button>
       </div>
       <div id="sb-buy-results"></div>
@@ -5186,6 +5201,7 @@ function tierDrop(e,newTierIdx){
   const isCatDrag = type==='cat';
 
   // Détecter si on drop pile sur une vignette existante (zone centrale 50%) → LIER
+  // Bloquer : on ne peut pas lier une catégorie à autre chose ni lier autre chose à une catégorie
   if(!isCatDrag){
     const items=[...e.currentTarget.querySelectorAll('.tier-item')];
     for(const item of items){
@@ -5193,23 +5209,13 @@ function tierDrop(e,newTierIdx){
       const dx=Math.abs(e.clientX-(rect.left+rect.width/2));
       const dy=Math.abs(e.clientY-(rect.top+rect.height/2));
       if(dx<rect.width*0.45 && dy<rect.height*0.45){
-        const targetType=item.dataset.type;
-        const srcKey=String(malId)+'_'+type;
-
-        if(targetType==='cat'){
-          // Drop sur une catégorie → confirmation
-          const catId=item.dataset.malid; // ex: 'cat_scat_123' — on extrait l'id réel
-          const realCatId=catId.replace(/^cat_/,'');
-          const cat=(S.suiviCategories||[]).find(c=>c.id===realCatId);
-          const work=S.tracking[malId];
-          if(!cat||!work) break;
-          openTierLinkConfirm(srcKey, catId, work.title, cat.name);
-          return;
-        }
-
+        // Bloquer si la cible est une catégorie
+        if(item.dataset.type==='cat') break;
         const targetMalId=parseInt(item.dataset.malid);
+        const targetType=item.dataset.type;
         if(malId===targetMalId && type===targetType) break;
         const targetKey=String(targetMalId)+'_'+targetType;
+        const srcKey=String(malId)+'_'+type;
         if(!S.profile.tierLinks) S.profile.tierLinks={};
         if(!S.profile.tierLinks[targetKey]) S.profile.tierLinks[targetKey]=[];
         if(!S.profile.tierLinks[targetKey].includes(srcKey)){
@@ -6107,70 +6113,7 @@ function openSuiviCategory(id){
   document.getElementById('m-scat-view').dataset.catId=id;
   renderScatViewItems();
   renderScatReviews(id);
-
-  // Œuvres liées depuis la tierlist
-  renderScatLinkedWorks(id);
-
   openM('m-scat-view');
-}
-
-function renderScatLinkedWorks(catId){
-  const catKey='cat_scat_'+catId.replace(/^scat_/,'');
-  // La clé dans tierLinks est le mal_id de la catégorie dans la tierlist = 'cat_'+catId
-  const realKey='cat_'+catId;
-  const linked=(S.profile.tierLinks||{})[realKey]||[];
-
-  // Trouver ou créer le conteneur
-  let wrap=document.getElementById('scat-linked-wrap');
-  if(!wrap){
-    // L'injecter à la fin du modal avant la section critiques
-    const modal=document.querySelector('#m-scat-view .modal');
-    wrap=document.createElement('div');
-    wrap.id='scat-linked-wrap';
-    // Insérer avant la section critiques (border-top)
-    const reviewSection=modal.querySelector('[style*="border-top"]');
-    if(reviewSection) modal.insertBefore(wrap,reviewSection);
-    else modal.appendChild(wrap);
-  }
-
-  if(!linked.length){ wrap.style.display='none'; return; }
-
-  const entries=linked.map(k=>{
-    const [mid,t]=k.split('_');
-    const tr=S.tracking[parseInt(mid)]||S.tracking[mid];
-    if(!tr) return '';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-      <img src="${tr.cover||''}" style="width:32px;height:46px;border-radius:5px;object-fit:cover;flex-shrink:0;background:var(--bg4)">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(tr.title||'')}</div>
-        <div style="font-size:11px;color:var(--t3)">★ ${tr.rating||'—'} · ${tr.type}</div>
-      </div>
-      <button onclick="unlinkFromCategory('${realKey}','${k}')"
-        style="background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.2);border-radius:7px;padding:4px 10px;color:var(--red);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0">
-        Délier
-      </button>
-    </div>`;
-  }).join('');
-
-  wrap.style.display='';
-  wrap.innerHTML=`
-    <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:14px">
-      <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
-        🔗 Œuvres liées <span style="color:var(--acc2)">(${linked.length})</span>
-      </div>
-      ${entries}
-    </div>`;
-}
-
-function unlinkFromCategory(catKey, srcKey){
-  if(!S.profile.tierLinks) return;
-  S.profile.tierLinks[catKey]=(S.profile.tierLinks[catKey]||[]).filter(k=>k!==srcKey);
-  if(!S.profile.tierLinks[catKey].length) delete S.profile.tierLinks[catKey];
-  save();
-  renderTierList();
-  const catId=document.getElementById('m-scat-view').dataset.catId;
-  renderScatLinkedWorks(catId);
-  toast('Lien retiré ✓','ok');
 }
 
 function scatViewEdit(){
@@ -6299,31 +6242,6 @@ function saveScatReview(){
   closeM('m-scat-review');
   renderScatReviews(id);
   toast('Critique enregistrée ✓','ok');
-}
-
-// ─── TIER LINK CONFIRM (œuvre → catégorie) ───
-let _tlcPending = {srcKey:null, catKey:null};
-
-function openTierLinkConfirm(srcKey, catKey, workTitle, catName){
-  _tlcPending = {srcKey, catKey};
-  document.getElementById('tlc-body').innerHTML =
-    `Veux-tu lier <strong style="color:var(--text)">${esc(workTitle)}</strong> à la catégorie <strong style="color:var(--acc2)">${esc(catName)}</strong> ?`;
-  openM('m-tier-link-confirm');
-}
-
-function confirmTierLink(){
-  const {srcKey, catKey} = _tlcPending;
-  if(!srcKey||!catKey){ closeM('m-tier-link-confirm'); return; }
-  if(!S.profile.tierLinks) S.profile.tierLinks={};
-  if(!S.profile.tierLinks[catKey]) S.profile.tierLinks[catKey]=[];
-  if(!S.profile.tierLinks[catKey].includes(srcKey)){
-    S.profile.tierLinks[catKey].push(srcKey);
-  }
-  save();
-  closeM('m-tier-link-confirm');
-  renderTierList();
-  toast('Œuvre liée à la catégorie ✓','ok');
-  _tlcPending={srcKey:null,catKey:null};
 }
 
 function openM(id){document.getElementById(id).classList.add('on')}
