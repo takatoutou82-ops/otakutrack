@@ -2091,12 +2091,9 @@ function load(){
 // ─── JIKAN API ───
 // ─── JIKAN API ───
 const JIKAN = 'https://api.jikan.moe/v4';
-const MAL_CLIENT_ID = 'e86e9913cb7232f827a24acd553bc96b';
-const MAL_API = 'https://api.myanimelist.net/v2';
 const cache = {};
 const CACHE_TTL = 60 * 60 * 1000;
 
-// File séquentielle stricte — une seule requête à la fois
 let _jikanBusy = false;
 const _jikanPending = [];
 
@@ -2116,16 +2113,10 @@ async function _jikanRun(){
     const result = await _jikanFetch(path, retry);
     resolve(result);
   }catch(e){
-    // Jikan a échoué → essayer MAL officiel en fallback
-    try{
-      const result = await _malFallback(path);
-      resolve(result);
-    }catch(e2){
-      reject(e);
-    }
+    reject(e);
   }finally{
     _jikanBusy = false;
-    if(_jikanPending.length) setTimeout(_jikanRun, 400);
+    if(_jikanPending.length) setTimeout(_jikanRun, 350);
   }
 }
 
@@ -2134,25 +2125,26 @@ async function _jikanFetch(path, retry=3){
   if(cache[path]&&(now-cache[path].ts)<CACHE_TTL) return cache[path].data;
   for(let i=0;i<retry;i++){
     try{
-      await delay(350);
+      await delay(400);
       const controller = new AbortController();
-      const tid = setTimeout(()=>controller.abort(), 10000);
+      const tid = setTimeout(()=>controller.abort(), 12000);
       const r = await fetch(JIKAN+path, {signal:controller.signal});
       clearTimeout(tid);
-      if(r.status===429){
-        await delay(3000*(i+1));
-        continue;
-      }
+      if(r.status===429){ await delay(4000*(i+1)); continue; }
       if(!r.ok) throw new Error(r.status);
       const d = await r.json();
       cache[path] = {data:d, ts:now};
       return d;
     }catch(e){
       if(i===retry-1) throw e;
-      await delay(1500*(i+1));
+      await delay(2000*(i+1));
     }
   }
 }
+
+// Stub MAL fallback — désactivé (CORS bloqué sur GitHub Pages)
+async function _malFallback(path){ throw new Error('MAL non disponible'); }
+function _normalizeMalWork(d,type){ return d; }
 
 const MAL_PROXY = 'https://corsproxy.io/?url=';
 
@@ -2513,17 +2505,10 @@ async function loadHomePopular(){
   const el=document.getElementById('home-popular-wrap');
   if(!el) return;
   try{
-    let data;
-    try{
-      const d = await _malFallback('/manga?order_by=members&sort=desc&limit=8&page=1&sfw');
-      data = d.data;
-    }catch(e){
-      const d = await jikanQueued('/manga?order_by=members&sort=desc&limit=8&page=1&sfw');
-      data = d.data;
-    }
-    el.innerHTML=`<div class="cg">${data.map(m=>{m._type='manga';return coverCard(m,true)}).join('')}</div>`;
+    const d = await jikanQueued('/manga?order_by=members&sort=desc&limit=8&page=1&sfw');
+    el.innerHTML=`<div class="cg">${d.data.map(m=>{m._type='manga';return coverCard(m,true)}).join('')}</div>`;
   }catch(e){
-    el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:20px 0">Impossible de charger (API indisponible). <button class="btn btn-ghost btn-sm" onclick="loadHomePopular()">Réessayer</button></p>';
+    el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:20px 0">Impossible de charger. <button class="btn btn-ghost btn-sm" onclick="loadHomePopular()">Réessayer</button></p>';
   }
 }
 
@@ -2531,18 +2516,14 @@ async function loadHomeTop(){
   const mEl=document.getElementById('home-manga-wrap');
   const aEl=document.getElementById('home-anime-wrap');
   try{
-    let data;
-    try{ const d=await _malFallback('/top/manga?limit=6&page=1'); data=d.data; }
-    catch(e){ const d=await jikanQueued('/top/manga?limit=6&page=1'); data=d.data; }
-    if(mEl) mEl.innerHTML=`<div class="cg">${data.map(m=>{m._type='manga';return coverCard(m)}).join('')}</div>`;
+    const md = await jikanQueued('/top/manga?limit=6&page=1');
+    if(mEl) mEl.innerHTML=`<div class="cg">${md.data.map(m=>{m._type='manga';return coverCard(m)}).join('')}</div>`;
   }catch(e){
     if(mEl) mEl.innerHTML='<p style="color:var(--t3);font-size:13px">Erreur API.</p>';
   }
   try{
-    let data;
-    try{ const d=await _malFallback('/top/anime?limit=6&page=1'); data=d.data; }
-    catch(e){ const d=await jikanQueued('/top/anime?limit=6&page=1'); data=d.data; }
-    if(aEl) aEl.innerHTML=`<div class="cg">${data.map(a=>{a._type='anime';return coverCard(a)}).join('')}</div>`;
+    const ad = await jikanQueued('/top/anime?limit=6&page=1');
+    if(aEl) aEl.innerHTML=`<div class="cg">${ad.data.map(a=>{a._type='anime';return coverCard(a)}).join('')}</div>`;
   }catch(e){
     if(aEl) aEl.innerHTML='<p style="color:var(--t3);font-size:13px">Erreur API.</p>';
   }
@@ -2644,8 +2625,7 @@ async function renderCatalog(type){
       path=`/${type}?${params}`;
     }
     let data;
-    try{ data = await _malFallback(path); }
-    catch(e){ data = await jikan(path); }
+    data = await jikan(path);
     const items=data.data||[];
     if(!items.length){
       el.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">Aucun résultat</div></div>';
@@ -2744,9 +2724,7 @@ function onCatalogSearch(type, val){
     el.style.display='block';
     el.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div></div>';
     try{
-      let d;
-      try{ d = await _malFallback(`/${type}?q=${encodeURIComponent(val)}&limit=8&sfw`); }
-      catch(e){ d = await jikan(`/${type}?q=${encodeURIComponent(val)}&limit=8&sfw`); }
+      const d=await jikan(`/${type}?q=${encodeURIComponent(val)}&limit=8&sfw`);
       if(!d.data||!d.data.length){el.innerHTML='<div style="padding:14px;color:var(--t3);font-size:13px">Aucun résultat</div>';return}
       el.innerHTML=d.data.map(item=>{
         const frT=(item.titles||[]).find(t=>t.type==='French')?.title;
@@ -2815,11 +2793,10 @@ function navSearch(val){
   dd.style.display='block';
   navSearchTimer=setTimeout(async()=>{
     try{
-      const fetchMAL = async(type) => {
-        try{ return await _malFallback(`/${type}?q=${encodeURIComponent(val)}&limit=4&sfw`); }
-        catch(e){ return await jikan(`/${type}?q=${encodeURIComponent(val)}&limit=4&sfw`); }
-      };
-      const [md,ad]=await Promise.allSettled([fetchMAL('manga'), fetchMAL('anime')]);
+      const [md,ad]=await Promise.allSettled([
+        jikan(`/manga?q=${encodeURIComponent(val)}&limit=4&sfw`),
+        jikan(`/anime?q=${encodeURIComponent(val)}&limit=4&sfw`)
+      ]);
       const malEl=document.getElementById('nav-sr-mal');
       const loadEl=document.getElementById('nav-sr-loading');
       if(loadEl) loadEl.textContent='';
@@ -2850,16 +2827,8 @@ async function openWork(malId, type='manga'){
   document.getElementById('work-bg').style.backgroundImage='';
 
   try{
-    let w;
-    try{
-      // MAL en priorité
-      const d = await _malFallback(`/${type}/${malId}/full`);
-      w = d.data;
-    }catch(e){
-      // Jikan en fallback
-      const d = await jikan(`/${type}/${malId}/full`);
-      w = d.data;
-    }
+    const d=await jikan(`/${type}/${malId}/full`);
+    const w=d.data;
     w._type=type;
     w.mal_id=malId;
     S.currentWork=w;
@@ -2879,7 +2848,7 @@ async function openWork(malId, type='manga'){
     }
     renderWorkPage(w);
   }catch(e){
-    document.getElementById('work-layout').innerHTML='<p style="color:var(--t3);grid-column:1/-1">Erreur de chargement. Réessayez.</p>';
+    document.getElementById('work-layout').innerHTML='<p style="color:var(--t3);grid-column:1/-1">Erreur de chargement. <button class="btn btn-ghost btn-sm" onclick="openWork('+malId+',\''+type+'\')">Réessayer</button></p>';
   }
 }
 
