@@ -2110,15 +2110,7 @@ async function _jikanRun(){
   _jikanBusy = true;
   const {path, retry, resolve, reject} = _jikanPending.shift();
   try{
-    // Watchdog global : même si _jikanFetch() reste bloqué indéfiniment (fetch()
-    // jamais résolu à cause d'un blocage réseau/extension qui ignore l'AbortController),
-    // ce Promise.race garantit que le "finally" ci-dessous s'exécute quand même,
-    // ce qui évite que TOUTE la file d'attente Jikan (accueil, manga, animé, fiches
-    // œuvre) reste bloquée en boucle de chargement infinie derrière lui.
-    const result = await Promise.race([
-      _jikanFetch(path, retry),
-      _timeoutReject(45000, 'Délai de chargement dépassé (Jikan)')
-    ]);
+    const result = await _jikanFetch(path, retry);
     resolve(result);
   }catch(e){
     reject(e);
@@ -2258,12 +2250,6 @@ function _normalizeMalWork(d, type){
 }
 
 function delay(ms){return new Promise(r=>setTimeout(r,ms))}
-// Watchdog générique : force le rejet d'une Promise bloquée après ms millisecondes,
-// pour éviter qu'un appel réseau qui ne répond jamais (fetch/Firestore bloqué par un
-// bloqueur de pub, un réseau capricieux, etc.) ne gèle indéfiniment l'app.
-function _timeoutReject(ms, msg){
-  return new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg||'timeout')), ms));
-}
 
 function togglePhysCat(id){
   const el = document.getElementById('phys-cat-body-'+id);
@@ -7085,14 +7071,7 @@ function initFirebase(){
 
 async function loadFromFirebase(){
   try{
-    // Watchdog : si Firestore ne répond pas (réseau bloqué, bloqueur de pub qui
-    // filtre firestore.googleapis.com, etc.), on abandonne après 6s et on affiche
-    // quand même l'app avec les données locales (localStorage) au lieu de rester
-    // bloqué indéfiniment sur un écran vide (initRouting() n'était jamais appelé).
-    const doc=await Promise.race([
-      fbDb.collection('users').doc(getDeviceId()).get(),
-      _timeoutReject(6000, 'Délai de chargement dépassé (Firebase)')
-    ]);
+    const doc=await fbDb.collection('users').doc(getDeviceId()).get();
     if(!doc.exists){
       fbSave();
       initRouting();
