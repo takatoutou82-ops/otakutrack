@@ -2100,6 +2100,67 @@ function load(){
   }catch(e){}
 }
 
+// ─── MYANIMELIST API (fiches) ───
+// ⚠️ À remplacer par ton URL Vercel une fois le proxy déployé (voir mal-proxy/README.md)
+const MAL_PROXY = 'https://TON-PROJET.vercel.app/api/mal';
+
+const MAL_STATUS_MAP = {
+  finished_airing:'Finished', currently_airing:'Publishing', not_yet_aired:'Not yet aired',
+  finished:'Finished', currently_publishing:'Publishing', on_hiatus:'On Hiatus', discontinued:'Discontinued'
+};
+function malDateStr(d){
+  if(!d) return null;
+  const [y,m,day]=d.split('-');
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return day&&m ? `${months[parseInt(m,10)-1]} ${day}, ${y}` : (m?`${months[parseInt(m,10)-1]} ${y}`:y);
+}
+// Transforme une réponse de l'API officielle MAL en objet compatible avec renderWorkPage
+// (qui a été écrit pour le format Jikan). Ça évite de toucher au reste du code.
+function malToWorkShape(mal, type){
+  const w={};
+  w.mal_id=mal.id;
+  w.title=mal.title;
+  w.title_english=mal.alternative_titles?.en||null;
+  w.title_japanese=mal.alternative_titles?.ja||null;
+  w.titles=[];
+  w.images={jpg:{image_url:mal.main_picture?.medium||'', large_image_url:mal.main_picture?.large||mal.main_picture?.medium||''}};
+  w.genres=(mal.genres||[]).map(g=>({name:g.name}));
+  w.themes=[]; w.demographics=[];
+  w.synopsis=mal.synopsis||'';
+  w.score=mal.mean||null;
+  w.scored_by=mal.num_scoring_users||null;
+  w.status=MAL_STATUS_MAP[mal.status]||mal.status||'';
+  if(type==='manga'){
+    w.volumes=mal.num_volumes||null;
+    w.chapters=mal.num_chapters||null;
+    w.authors=(mal.authors||[]).map(a=>({name:[a.node?.last_name,a.node?.first_name].filter(Boolean).join(', ')}));
+    w.published={string: mal.start_date? `${malDateStr(mal.start_date)} to ${mal.end_date?malDateStr(mal.end_date):'?'}`:'—'};
+  }else{
+    w.episodes=mal.num_episodes||null;
+    w.duration=mal.average_episode_duration?`${Math.round(mal.average_episode_duration/60)} min per ep`:'—';
+    w.studios=(mal.studios||[]).map(s=>({name:s.name}));
+    w.aired={string: mal.start_date? `${malDateStr(mal.start_date)} to ${mal.end_date?malDateStr(mal.end_date):'?'}`:'—'};
+  }
+  return w;
+}
+// Charge la fiche via l'API MAL officielle (rapide, fiable), avec repli sur Jikan/full si le proxy est indisponible
+async function fetchWorkMain(type, malId){
+  if(MAL_PROXY && !MAL_PROXY.includes('TON-PROJET')){
+    try{
+      const controller=new AbortController();
+      const tid=setTimeout(()=>controller.abort(), 10000);
+      const r=await fetch(`${MAL_PROXY}?type=${type}&id=${malId}`, {signal:controller.signal});
+      clearTimeout(tid);
+      if(r.ok){
+        const mal=await r.json();
+        if(mal && mal.id) return malToWorkShape(mal, type);
+      }
+    }catch(e){ /* on retombe sur Jikan ci-dessous */ }
+  }
+  const d=await jikan(`/${type}/${malId}/full`);
+  return d.data;
+}
+
 // ─── JIKAN API ───
 const JIKAN = 'https://api.jikan.moe/v4';
 const cache = {}; // { path: { data, ts } }
@@ -2342,6 +2403,22 @@ function coverCard(item, showTypePill=false){
           <div class="cc-ov-btn" onclick="event.stopPropagation();openListModal(${item.mal_id})" title="Liste">☰</div>
         </div>
       </div>
+    </div>
+    <div class="cc-title">${esc(item.title)}</div>
+    <div class="cc-meta">${item.year||item.published?.prop?.from?.year||item.aired?.prop?.from?.year||''}</div>
+  </div>`;
+}
+
+// Variante de coverCard qui renvoie vers la fiche MyAnimeList officielle (nouvel onglet)
+// au lieu de la fiche interne. Utilisée pour les recommandations.
+function coverCardExternalMAL(item){
+  const type=item._type||'manga';
+  return `<div class="cc" onclick="window.open('https://myanimelist.net/${type}/${item.mal_id}','_blank','noopener')">
+    <div class="cc-wrap">
+      <img class="cc-img" src="${item.images?.jpg?.image_url||item.images?.jpg?.large_image_url||''}" alt="${esc(item.title)}" loading="lazy">
+      <div class="cc-overlay"><div class="cc-ov-btns">
+        <div class="cc-ov-btn" onclick="event.stopPropagation();quickTrack(${item.mal_id},'${type}','${esc(item.title)}','${esc(item.images?.jpg?.image_url||'')}')" title="Suivre">+</div>
+      </div></div>
     </div>
     <div class="cc-title">${esc(item.title)}</div>
     <div class="cc-meta">${item.year||item.published?.prop?.from?.year||item.aired?.prop?.from?.year||''}</div>
@@ -2780,8 +2857,7 @@ async function openWork(malId, type='manga'){
   document.getElementById('work-bg').style.backgroundImage='';
 
   try{
-    const d=await jikan(`/${type}/${malId}/full`);
-    const w=d.data;
+    const w=await fetchWorkMain(type, malId);
     w._type=type;
     w.mal_id=malId;
     S.currentWork=w;
@@ -3007,7 +3083,7 @@ async function loadSimilar(w){
     if(!recs.length){el.innerHTML='<p style="color:var(--t3);font-size:13px">Aucune recommandation disponible.</p>';return}
     el.innerHTML=recs.map(r=>{
       const item=r.entry;item._type=w._type;
-      return coverCard(item);
+      return coverCardExternalMAL(item);
     }).join('');
   }catch(e){el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de charger.</p>'}
 }
@@ -4295,7 +4371,7 @@ async function loadRelations(w){
           +'</div>'
           +'<div class="cc-title">'+esc(name)+'</div>'
           +'<div class="cc-meta">'+label+' · '+(mt==='manga'?'Manga':'Animé')+'</div>';
-        if(malId) card.addEventListener('click',()=>openWork(malId,mt));
+        if(malId) card.addEventListener('click',()=>window.open(`https://myanimelist.net/${mt}/${malId}`,'_blank','noopener'));
         grid.appendChild(card);
       }
 
