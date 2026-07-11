@@ -355,7 +355,7 @@ body::after{
 .synopsis{color:var(--t2);line-height:1.8;font-size:13.5px;max-width:580px;margin-bottom:22px}
 .work-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
 
-/* ── RATING /10 ── */
+/* ── RATING /20 ── */
 .rating-box{display:flex;align-items:center;gap:10px}
 .rating-select{
   background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:9px;
@@ -946,6 +946,7 @@ textarea.fi{resize:vertical;min-height:72px}
 .tier-item img{width:100%;height:100%;object-fit:cover}
 .tier-item-title{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.78);font-size:7px;font-weight:700;text-align:center;padding:2px;color:#fff;line-height:1.2}
 .tier-empty{font-size:11px;color:var(--t4);font-style:italic;padding:4px}
+.tier-divider{width:2px;align-self:stretch;min-height:50px;background:rgba(255,255,255,.28);border-radius:2px;flex-shrink:0;margin:0 2px}
 .tier-drag-over{background:var(--bg4)!important;border-color:var(--acc)!important;outline:2px dashed var(--acc)}
 .tier-item-drop-target{outline:2px solid var(--acc2)!important;transform:scale(1.08)!important;z-index:2}
 /* Linked works badge */
@@ -1649,7 +1650,7 @@ textarea.fi{resize:vertical;min-height:72px}
       <div class="saf-row">
         <span class="saf-label">Ma note</span>
         <div class="saf-range">
-          <input type="range" id="saf-rating-min" min="0" max="10" step="0.5" value="0" oninput="document.getElementById('saf-rating-val').textContent=this.value>0?'≥'+this.value:'Toutes';renderSuivi()">
+          <input type="range" id="saf-rating-min" min="0" max="20" step="0.5" value="0" oninput="document.getElementById('saf-rating-val').textContent=this.value>0?'≥'+this.value:'Toutes';renderSuivi()">
           <span id="saf-rating-val">Toutes</span>
         </div>
       </div>
@@ -1911,13 +1912,20 @@ textarea.fi{resize:vertical;min-height:72px}
       <label style="font-size:12px;color:var(--t3);white-space:nowrap">Note globale</label>
       <select id="scat-rating-input" class="status-sel" style="margin-top:0;width:auto;flex:1">
         <option value="0">— Non notée</option>
-        <option value="0.5">0.5 / 10</option><option value="1">1 / 10</option><option value="1.5">1.5 / 10</option>
-        <option value="2">2 / 10</option><option value="2.5">2.5 / 10</option><option value="3">3 / 10</option>
-        <option value="3.5">3.5 / 10</option><option value="4">4 / 10</option><option value="4.5">4.5 / 10</option>
-        <option value="5">5 / 10</option><option value="5.5">5.5 / 10</option><option value="6">6 / 10</option>
-        <option value="6.5">6.5 / 10</option><option value="7">7 / 10</option><option value="7.5">7.5 / 10</option>
-        <option value="8">8 / 10</option><option value="8.5">8.5 / 10</option><option value="9">9 / 10</option>
-        <option value="9.5">9.5 / 10</option><option value="10">10 / 10</option>
+        <option value="0.5">0.5 / 20</option><option value="1">1 / 20</option><option value="1.5">1.5 / 20</option>
+        <option value="2">2 / 20</option><option value="2.5">2.5 / 20</option><option value="3">3 / 20</option>
+        <option value="3.5">3.5 / 20</option><option value="4">4 / 20</option><option value="4.5">4.5 / 20</option>
+        <option value="5">5 / 20</option><option value="5.5">5.5 / 20</option><option value="6">6 / 20</option>
+        <option value="6.5">6.5 / 20</option><option value="7">7 / 20</option><option value="7.5">7.5 / 20</option>
+        <option value="8">8 / 20</option><option value="8.5">8.5 / 20</option><option value="9">9 / 20</option>
+        <option value="9.5">9.5 / 20</option><option value="10">10 / 20</option>
+        <option value="10.5">10.5 / 20</option><option value="11">11 / 20</option><option value="11.5">11.5 / 20</option>
+        <option value="12">12 / 20</option><option value="12.5">12.5 / 20</option><option value="13">13 / 20</option>
+        <option value="13.5">13.5 / 20</option><option value="14">14 / 20</option><option value="14.5">14.5 / 20</option>
+        <option value="15">15 / 20</option><option value="15.5">15.5 / 20</option><option value="16">16 / 20</option>
+        <option value="16.5">16.5 / 20</option><option value="17">17 / 20</option><option value="17.5">17.5 / 20</option>
+        <option value="18">18 / 20</option><option value="18.5">18.5 / 20</option><option value="19">19 / 20</option>
+        <option value="19.5">19.5 / 20</option><option value="20">20 / 20</option>
       </select>
     </div>
     <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Ajouter des œuvres</div>
@@ -2443,7 +2451,7 @@ function switchCollTab(btn,id){
 function coverCard(item, showTypePill=false){
   const t=S.tracking[item.mal_id];
   const statusDot=t?`<div class="status-dot ${statusClass(t.status)}"></div>`:'';
-  const ratingBadge=t&&t.rating?`<div class="cc-rating">★ ${t.rating}/10</div>`:''
+  const ratingBadge=t&&t.rating?`<div class="cc-rating">★ ${t.rating}/20</div>`:''
   const type=item._type||'manga';
   const typePill=showTypePill?`<div class="type-pill tp-${type}">${type==='manga'?'MANGA':'ANIMÉ'}</div>`:'';
 
@@ -2506,15 +2514,15 @@ async function loadRecommendations(force=false){
   const wrap=document.getElementById('home-reco-wrap');
   if(!sec||!wrap) return;
 
-  // Seulement les œuvres notées 7.5 ou plus
+  // Seulement les œuvres notées 15 ou plus (/20)
   const seeds=tracked
-    .filter(t=>t.rating>=7.5)
+    .filter(t=>t.rating>=15)
     .sort((a,b)=>(b.rating||0)-(a.rating||0))
     .slice(0,2);
 
   if(!seeds.length){
     sec.style.display='block';
-    wrap.innerHTML='<p style="color:var(--t3);font-size:13px">Note des œuvres 7.5/10 ou plus pour recevoir des recommandations personnalisées ✦</p>';
+    wrap.innerHTML='<p style="color:var(--t3);font-size:13px">Note des œuvres 15/20 ou plus pour recevoir des recommandations personnalisées ✦</p>';
     return;
   }
 
@@ -2947,14 +2955,14 @@ function renderWorkPage(w){
   // Backdrop
   document.getElementById('work-bg').style.backgroundImage=`url(${w.images?.jpg?.large_image_url||w.images?.jpg?.image_url||''})`;
 
-  // Rating 0-10 by 0.5
+  // Rating 0-20 by 0.5
   const myRating=t.rating||0;
   const isPlanifie=(t.status||'')==='Planifié';
   const ratingOptions=[];
-  for(let v=0;v<=20;v++){const val=v/2;ratingOptions.push('<option value="'+val+'"'+(myRating===val?' selected':'')+'>'+( val===0?'— Non noté':val+' / 10')+'</option>');}
+  for(let v=0;v<=40;v++){const val=v/2;ratingOptions.push('<option value="'+val+'"'+(myRating===val?' selected':'')+'>'+( val===0?'— Non noté':val+' / 20')+'</option>');}
   const ratingHtml=isPlanifie
     ? '<div style="font-size:12px;color:var(--t3);font-style:italic">Note disponible après lecture</div>'
-    : '<div class="rating-box"><select class="rating-select" onchange="rateWork('+w.mal_id+',\''+type+'\',parseFloat(this.value))">'+ratingOptions.join('')+'</select>'+(myRating>0?'<span class="rating-display">★ '+myRating+'<span style="color:var(--t3);font-size:12px"> /10</span></span>':'')+'</div>';
+    : '<div class="rating-box"><select class="rating-select" onchange="rateWork('+w.mal_id+',\''+type+'\',parseFloat(this.value))">'+ratingOptions.join('')+'</select>'+(myRating>0?'<span class="rating-display">★ '+myRating+'<span style="color:var(--t3);font-size:12px"> /20</span></span>':'')+'</div>';
 
   // Genres
   const genres=(w.genres||[]).concat(w.themes||[]).map(g=>`<span class="gtag">${g.name}</span>`).join('');
@@ -3298,7 +3306,7 @@ function rateWork(malId, type, rating){
   if(!S.tracking[malId]) S.tracking[malId]={mal_id:malId,type,title:'',cover:'',status:'',chapter:0,volume:0,episode:0,rating:0,reviews:[]};
   S.tracking[malId].rating=rating;
   save();
-  if(rating>0) toast('Note sauvegardée : '+rating+'/10','ok');
+  if(rating>0) toast('Note sauvegardée : '+rating+'/20','ok');
 }
 
 function updateTrackProg(malId, type, val, max){
@@ -3428,27 +3436,30 @@ function renderListDetail(){
       const r=list.ratings[item.id]||0;
       if(!r) return;
       const idx=getTierIndex(r);
-      if(idx>=0) groups[idx].push(item);
+      if(idx>=0) groups[idx].push({...item, rating:r});
     });
     const hasAny=groups.some(g=>g.length>0);
     if(hasAny){
       tierHtml=`<div style="margin-bottom:28px">
         <div class="sh" style="margin-bottom:10px"><h2 class="sh-title">Tier List de la liste</h2></div>
-        ${TIERS.map((tier,i)=>`
+        ${TIERS.map((tier,i)=>{
+          const {low,high}=splitTierHalf(groups[i], i);
+          const renderItem=item=>`
+                    <div class="tier-item" title="${esc(list.itemNames[item.id]||item.title)} ★${list.ratings[item.id]}">
+                      <img src="${item.cover||''}" loading="lazy">
+                      <div class="tier-item-title">${esc((list.itemNames[item.id]||item.title||'').slice(0,12))}</div>
+                    </div>`;
+          return `
           <div class="tier-row">
             <div class="tier-label" style="background:${tier.bg};color:${tier.color};cursor:pointer"
               onclick="renameListTier('${list.id}',${i},this)"
               title="Cliquer pour renommer">${list.tierLabels[i]||tier.label}</div>
             <div class="tier-items">
               ${groups[i].length
-                ? groups[i].map(item=>`
-                    <div class="tier-item" title="${esc(list.itemNames[item.id]||item.title)} ★${list.ratings[item.id]}">
-                      <img src="${item.cover||''}" loading="lazy">
-                      <div class="tier-item-title">${esc((list.itemNames[item.id]||item.title||'').slice(0,12))}</div>
-                    </div>`).join('')
+                ? low.map(renderItem).join('') + (low.length&&high.length?'<div class="tier-divider"></div>':'') + high.map(renderItem).join('')
                 : '<span class="tier-empty">—</span>'}
             </div>
-          </div>`).join('')}
+          </div>`;}).join('')}
       </div>`;
     }
   }
@@ -3458,7 +3469,7 @@ function renderListDetail(){
     const myRating=isRated?(list.ratings[item.id]||0):0;
     const displayName=list.itemNames[item.id]||item.title;
     const ratingOptions=[];
-    for(let v=0;v<=20;v++){const val=v/2;ratingOptions.push(`<option value="${val}"${myRating===val?' selected':''}>${val===0?'—':val}</option>`);}
+    for(let v=0;v<=40;v++){const val=v/2;ratingOptions.push(`<option value="${val}"${myRating===val?' selected':''}>${val===0?'—':val}</option>`);}
     return `<div class="cc list-drag-item" draggable="true"
       data-idx="${i}"
       ondragstart="listDragStart(event,${i})"
@@ -3912,9 +3923,9 @@ function renderRatingCurve(rated){
   const W=canvas.width, H=canvas.height||200;
   ctx.clearRect(0,0,W,H);
 
-  // Buckets 0.5→10
+  // Buckets 0.5→20
   const buckets={};
-  for(let v=0.5;v<=10;v+=0.5) buckets[v]=0;
+  for(let v=0.5;v<=20;v+=0.5) buckets[v]=0;
   rated.forEach(t=>{ if(buckets[t.rating]!==undefined) buckets[t.rating]++; });
   const vals=Object.values(buckets);
   const maxV=Math.max(...vals,1);
@@ -4932,26 +4943,30 @@ function renderSaisonsSection(seasons, rootMalId){
     const tierGroups=TIERS.map(()=>[]);
     ratedSeasons.forEach(s=>{
       const idx=getTierIndex(seasonRatings[s.mal_id]);
-      if(idx>=0) tierGroups[idx].push(s);
+      if(idx>=0) tierGroups[idx].push({...s, rating:seasonRatings[s.mal_id]});
     });
     tierHtml=`<div class="saisons-tierlist">
       <div class="saisons-tierlist-title">Tier List de tes saisons</div>
-      ${TIERS.map((tier,i)=>tierGroups[i].length?`
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-          <div style="width:80px;font-size:10px;font-weight:700;color:${tier.color};background:${tier.bg};border-radius:4px;padding:3px 6px;text-align:center;flex-shrink:0">${tier.label}</div>
-          <div style="display:flex;gap:4px;flex-wrap:wrap">${tierGroups[i].map(s=>`
+      ${TIERS.map((tier,i)=>{
+        if(!tierGroups[i].length) return '';
+        const {low,high}=splitTierHalf(tierGroups[i], i);
+        const renderS=s=>`
             <div style="width:32px;height:46px;border-radius:4px;overflow:hidden;flex-shrink:0" title="${esc(s.title)}">
               <img src="${s.cover}" style="width:100%;height:100%;object-fit:cover">
-            </div>`).join('')}
+            </div>`;
+        return `
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <div style="width:80px;font-size:10px;font-weight:700;color:${tier.color};background:${tier.bg};border-radius:4px;padding:3px 6px;text-align:center;flex-shrink:0">${tier.label}</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">${low.map(renderS).join('')}${low.length&&high.length?'<div class="tier-divider" style="height:46px"></div>':''}${high.map(renderS).join('')}
           </div>
-        </div>`:'').join('')}
+        </div>`;}).join('')}
     </div>`;
   }
 
   el.innerHTML=tierHtml+seasons.map(s=>{
     const myRating=seasonRatings[s.mal_id]||0;
     const ratingOpts=[];
-    for(let v=0;v<=20;v++){const val=v/2;ratingOpts.push(`<option value="${val}"${myRating===val?' selected':''}>${val===0?'—':val}</option>`);}
+    for(let v=0;v<=40;v++){const val=v/2;ratingOpts.push(`<option value="${val}"${myRating===val?' selected':''}>${val===0?'—':val}</option>`);}
     return `<div class="saison-card" id="saison-${s.mal_id}">
       <div class="saison-header" onclick="toggleSaison(${s.mal_id},${rootMalId})">
         <img class="saison-cover" src="${s.cover}" loading="lazy">
@@ -5202,26 +5217,38 @@ function saveCombat(){
 }
 
 // ─── TIER LIST ───
+// Échelle /20. Chaque tier regroupe 2 valeurs (base et base+0.5), sauf la tier 10
+// qui ne contient que 20 (il n'existe pas de "20.5"). Un trait sépare visuellement
+// les deux sous-groupes à l'intérieur de chaque tier.
 const TIERS=[
-  {label:"Chef d'œuvre absolu", min:10,  color:'#ff4d4d',bg:'rgba(255,77,77,.22)'},
-  {label:'INCROYABLE',          min:9.5, color:'#ff7f00',bg:'rgba(255,127,0,.22)'},
-  {label:'MASTERCLASS',         min:9,   color:'#ffd700',bg:'rgba(255,215,0,.22)'},
-  {label:'TROPPPP BIENN',       min:8.5, color:'#adff2f',bg:'rgba(173,255,47,.22)'},
-  {label:'TROPP COOL',          min:8,   color:'#00e5ff',bg:'rgba(0,229,255,.22)'},
-  {label:'Pas mal',             min:7.5, color:'#7c4dff',bg:'rgba(124,77,255,.22)'},
-  {label:'A lire',              min:7,   color:'#ff80ab',bg:'rgba(255,128,171,.22)'},
+  {label:"Chef d'œuvre absolu", min:20,  base:20,  high:null, color:'#ff4d4d',bg:'rgba(255,77,77,.22)'},
+  {label:'INCROYABLE',          min:19,  base:19,  high:19.5, color:'#ff7f00',bg:'rgba(255,127,0,.22)'},
+  {label:'MASTERCLASS',         min:18,  base:18,  high:18.5, color:'#ffd700',bg:'rgba(255,215,0,.22)'},
+  {label:'TROPPPP BIENN',       min:17,  base:17,  high:17.5, color:'#adff2f',bg:'rgba(173,255,47,.22)'},
+  {label:'TROPP COOL',          min:16,  base:16,  high:16.5, color:'#00e5ff',bg:'rgba(0,229,255,.22)'},
+  {label:'Pas mal',             min:15,  base:15,  high:15.5, color:'#7c4dff',bg:'rgba(124,77,255,.22)'},
+  {label:'A lire',              min:14,  base:14,  high:14.5, color:'#ff80ab',bg:'rgba(255,128,171,.22)'},
   // Dernière ligne supprimée (Je relirais pas)
 ];
 
 function getTierIndex(rating){
-  if(rating>=10) return 0;
-  if(rating>=9.5) return 1;
-  if(rating>=9)   return 2;
-  if(rating>=8.5) return 3;
-  if(rating>=8)   return 4;
-  if(rating>=7.5) return 5;
-  if(rating>=7)   return 6;
-  return -1; // note < 7 → pas dans la tierlist
+  if(rating>=20) return 0;
+  if(rating>=19) return 1;
+  if(rating>=18) return 2;
+  if(rating>=17) return 3;
+  if(rating>=16) return 4;
+  if(rating>=15) return 5;
+  if(rating>=14) return 6;
+  return -1; // note < 14 (/20) → pas dans la tierlist
+}
+// Découpe les items d'une tier en deux sous-groupes (valeur basse / valeur haute, ex: 16 et 16.5)
+// pour permettre d'afficher un trait séparateur bien visible entre les deux.
+function splitTierHalf(items, tierIdx){
+  const tier=TIERS[tierIdx];
+  if(!tier||tier.high==null) return {low:items, high:[]};
+  const high=items.filter(x=>x.rating===tier.high);
+  const low=items.filter(x=>x.rating!==tier.high);
+  return {low, high};
 }
 
 let _tierFilter='all';
@@ -5319,7 +5346,9 @@ function renderTierList(){
         ondragleave="this.classList.remove('tier-drag-over')"
         ondrop="tierDrop(event,${i})">
         ${groups[i].length
-          ? groups[i].map((t,idx)=>{
+          ? (()=>{
+              const {low,high}=splitTierHalf(groups[i], i);
+              const renderItem=(t,idx)=>{
               const anim=`animation-delay:${idx*0.04}s`;
               if(t._isCat){
                 return `<div class="tier-item tier-item-cat tier-item-anim" draggable="true"
@@ -5353,7 +5382,11 @@ function renderTierList(){
                 <img src="${t.cover||''}" loading="lazy">
                 <div class="tier-item-title" ondblclick="renameTierItem(event,${t.mal_id},'${t.type}')">${esc(displayName.slice(0,12))}</div>
               </div>`;
-            }).join('')
+              };
+              return low.map(renderItem).join('')
+                + (low.length&&high.length?'<div class="tier-divider"></div>':'')
+                + high.map(renderItem).join('');
+            })()
           : '<span class="tier-empty">—</span>'}
       </div>
     </div>`;
@@ -5473,7 +5506,7 @@ function tierItemClick(e, malId, type, el){
       <img class="tier-link-cover" src="${tr.cover||''}" loading="lazy">
       <div class="tier-link-info">
         <div class="tier-link-name">${esc(tr.title||'')}</div>
-        <div class="tier-link-note">★ ${tr.rating}/10 · ${tr.type}</div>
+        <div class="tier-link-note">★ ${tr.rating}/20 · ${tr.type}</div>
       </div>
       <button class="tier-link-remove" onclick="unlinkTierItem('${key}','${k}',event)" title="Délier">✕</button>
     </div>`;
@@ -6227,7 +6260,7 @@ function renderScatItems(){
       <select onchange="scatSetItemRating(${item.mal_id},'${item.type}',this.value)"
         style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 5px;color:var(--text);font-size:11px;outline:none;flex-shrink:0">
         <option value="0">—</option>
-        ${Array.from({length:21},(_,i)=>i/2).filter(v=>v>0).map(v=>`<option value="${v}"${item.rating===v?' selected':''}>${v}</option>`).join('')}
+        ${Array.from({length:41},(_,i)=>i/2).filter(v=>v>0).map(v=>`<option value="${v}"${item.rating===v?' selected':''}>${v}</option>`).join('')}
       </select>
       <button onclick="scatRemoveItem(${item.mal_id},'${item.type}')"
         style="background:rgba(248,113,113,.15);border:none;border-radius:5px;padding:2px 7px;color:var(--red);font-size:11px;cursor:pointer;flex-shrink:0">✕</button>
@@ -6287,7 +6320,7 @@ function openSuiviCategory(id){
   document.getElementById('scat-view-title').textContent=cat.name;
   document.getElementById('scat-view-cover').src=cat.cover||'';
   document.getElementById('scat-view-meta').textContent=(cat.items||[]).length+' œuvre(s) · '+(cat.type==='manga'?'📖 Manga':'🎬 Animé');
-  document.getElementById('scat-view-rating').textContent=cat.rating?'★ '+cat.rating+' / 10':'Non notée';
+  document.getElementById('scat-view-rating').textContent=cat.rating?'★ '+cat.rating+' / 20':'Non notée';
   document.getElementById('scat-view-sort').value='manual';
   // Description
   const descWrap=document.getElementById('scat-view-desc-wrap');
