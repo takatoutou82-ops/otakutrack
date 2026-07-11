@@ -3340,6 +3340,7 @@ function rateWork(malId, type, rating){
     });
   }
   save();
+  renderTierList(); // rafraîchit immédiatement si la tier list est déjà à l'écran
   if(rating>0) toast('Note sauvegardée : '+rating+'/20','ok');
 }
 
@@ -5390,12 +5391,6 @@ function renderTierList(){
         ${groups[i].length
           ? (()=>{
               const tier=TIERS[i];
-              // Position du trait = nombre d'items "valeur basse", dans l'ordre actuel
-              // (qui respecte le glisser-déposer manuel). Ça permet de déplacer librement
-              // un item d'un côté à l'autre du trait, même sans changer sa note.
-              const highCount = tier&&tier.high!=null ? groups[i].filter(x=>x.rating===tier.high).length : 0;
-              const lowCount = groups[i].length - highCount;
-              const dividerAt = (highCount>0 && lowCount>0) ? lowCount : -1;
               const renderItem=(t,idx)=>{
               const anim=`animation-delay:${idx*0.04}s`;
               if(t._isCat){
@@ -5431,7 +5426,19 @@ function renderTierList(){
                 <div class="tier-item-title" ondblclick="renameTierItem(event,${t.mal_id},'${t.type}')">${esc(displayName.slice(0,12))}</div>
               </div>`;
               };
-              return groups[i].map((t,idx)=>(dividerAt===idx?'<div class="tier-divider"></div>':'')+renderItem(t,idx)).join('');
+              // Trait séparateur = placé uniquement là où la note change réellement d'un item
+              // au suivant (ex: 16 → 16.5). Ne dépend jamais d'un comptage global, donc un
+              // glisser-déposer ne fait jamais "sauter" un autre item de l'autre côté du trait.
+              let html='';
+              groups[i].forEach((t,idx)=>{
+                if(idx>0 && tier && tier.high!=null){
+                  const prevIsHigh=groups[i][idx-1].rating===tier.high;
+                  const curIsHigh=t.rating===tier.high;
+                  if(prevIsHigh!==curIsHigh) html+='<div class="tier-divider"></div>';
+                }
+                html+=renderItem(t,idx);
+              });
+              return html;
             })()
           : '<span class="tier-empty">—</span>'}
       </div>
