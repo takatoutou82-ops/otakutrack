@@ -2161,6 +2161,62 @@ async function fetchWorkMain(type, malId){
   return d.data;
 }
 
+// Adapte un item de LISTE MAL (recherche/ranking, champs réduits) vers le format Jikan
+function malListItemToShape(item, type){
+  const w={};
+  w.mal_id=item.id;
+  w.title=item.title;
+  w.title_english=item.alternative_titles?.en||null;
+  w.titles=[];
+  w.images={jpg:{image_url:item.main_picture?.medium||'', large_image_url:item.main_picture?.large||item.main_picture?.medium||''}};
+  w.score=item.mean||null;
+  w.status=MAL_STATUS_MAP[item.status]||item.status||'';
+  if(type==='manga'){
+    w.authors=(item.authors||[]).map(a=>({name:[a.node?.last_name,a.node?.first_name].filter(Boolean).join(', ')}));
+  }else{
+    w.studios=(item.studios||[]).map(s=>({name:s.name}));
+  }
+  w._type=type;
+  return w;
+}
+// Recherche texte via MAL officiel (fallback Jikan si proxy indispo). Retourne un tableau format Jikan.
+async function malSearch(type, q, limit=8){
+  if(MAL_PROXY && !MAL_PROXY.includes('TON-PROJET')){
+    try{
+      const controller=new AbortController();
+      const tid=setTimeout(()=>controller.abort(), 9000);
+      const r=await fetch(`${MAL_PROXY}?type=${type}&q=${encodeURIComponent(q)}&limit=${limit}`, {signal:controller.signal});
+      clearTimeout(tid);
+      if(r.ok){
+        const d=await r.json();
+        if(d && Array.isArray(d.data)) return d.data.map(x=>malListItemToShape(x.node||x, type));
+      }
+    }catch(e){ /* repli Jikan ci-dessous */ }
+  }
+  const d=await jikan(`/${type}?q=${encodeURIComponent(q)}&limit=${limit}&sfw`);
+  return (d.data||[]).map(x=>{x._type=type;return x});
+}
+// Classement (top/popularité) via MAL officiel (fallback Jikan). rankingType: 'all'|'bypopularity'|...
+async function malRanking(type, rankingType, limit=8){
+  if(MAL_PROXY && !MAL_PROXY.includes('TON-PROJET')){
+    try{
+      const controller=new AbortController();
+      const tid=setTimeout(()=>controller.abort(), 9000);
+      const r=await fetch(`${MAL_PROXY}?type=${type}&ranking=${rankingType}&limit=${limit}`, {signal:controller.signal});
+      clearTimeout(tid);
+      if(r.ok){
+        const d=await r.json();
+        if(d && Array.isArray(d.data)) return d.data.map(x=>malListItemToShape(x.node||x, type));
+      }
+    }catch(e){ /* repli Jikan ci-dessous */ }
+  }
+  const path = rankingType==='bypopularity'
+    ? `/${type}?order_by=members&sort=desc&limit=${limit}&page=1&sfw`
+    : `/top/${type}?limit=${limit}&page=1`;
+  const d=await jikan(path);
+  return (d.data||[]).map(x=>{x._type=type;return x});
+}
+
 // ─── JIKAN API ───
 const JIKAN = 'https://api.jikan.moe/v4';
 const cache = {}; // { path: { data, ts } }
@@ -2530,10 +2586,8 @@ async function loadHomePopular(){
   const el=document.getElementById('home-popular-wrap');
   if(!el) return;
   try{
-    const r = await fetchWithTimeout(JIKAN+'/manga?order_by=members&sort=desc&limit=8&page=1&sfw');
-    if(!r.ok) throw new Error(r.status);
-    const d = await r.json();
-    el.innerHTML=`<div class="cg">${d.data.map(m=>{m._type='manga';return coverCard(m,true)}).join('')}</div>`;
+    const items=await malRanking('manga','bypopularity',8);
+    el.innerHTML=`<div class="cg">${items.map(m=>coverCard(m,true)).join('')}</div>`;
   }catch(e){
     el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:20px 0">Impossible de charger (API indisponible). <button class="btn btn-ghost btn-sm" onclick="loadHomePopular()">Réessayer</button></p>';
   }
@@ -2543,18 +2597,14 @@ async function loadHomeTop(){
   const mEl=document.getElementById('home-manga-wrap');
   const aEl=document.getElementById('home-anime-wrap');
   try{
-    const r = await fetchWithTimeout(JIKAN+'/top/manga?limit=6&page=1');
-    if(!r.ok) throw new Error(r.status);
-    const md = await r.json();
-    if(mEl) mEl.innerHTML=`<div class="cg">${md.data.map(m=>{m._type='manga';return coverCard(m)}).join('')}</div>`;
+    const items=await malRanking('manga','all',6);
+    if(mEl) mEl.innerHTML=`<div class="cg">${items.map(m=>coverCard(m)).join('')}</div>`;
   }catch(e){
     if(mEl) mEl.innerHTML='<p style="color:var(--t3);font-size:13px">Erreur API.</p>';
   }
   try{
-    const r = await fetchWithTimeout(JIKAN+'/top/anime?limit=6&page=1');
-    if(!r.ok) throw new Error(r.status);
-    const ad = await r.json();
-    if(aEl) aEl.innerHTML=`<div class="cg">${ad.data.map(a=>{a._type='anime';return coverCard(a)}).join('')}</div>`;
+    const items=await malRanking('anime','all',6);
+    if(aEl) aEl.innerHTML=`<div class="cg">${items.map(a=>coverCard(a)).join('')}</div>`;
   }catch(e){
     if(aEl) aEl.innerHTML='<p style="color:var(--t3);font-size:13px">Erreur API.</p>';
   }
@@ -2646,17 +2696,24 @@ async function renderCatalog(type){
   el.innerHTML='<div class="loading"><div class="spin"></div> Chargement…</div>';
 
   try{
-    let path;
-    if(query){
-      path=`/${type}?q=${encodeURIComponent(query)}&page=${page}&limit=20&sfw`;
+    const allIds=[...genres,...themes];
+    let items, pagination=null;
+    if(query && page===1){
+      // Recherche texte, 1ère page : MAL officiel (fallback Jikan)
+      items = await malSearch(type, query, 20);
+    } else if(allIds.length===0 && page===1){
+      // Tri par popularité, 1ère page, sans filtre : MAL officiel (fallback Jikan)
+      items = await malRanking(type, 'bypopularity', 20);
     } else {
-      let params=`page=${page}&limit=20&order_by=members&sort=desc`;
-      const allIds=[...genres,...themes];
-      if(allIds.length) params+=`&genres=${allIds.join(',')}`;
-      path=`/${type}?${params}`;
+      // Pages suivantes ou filtre par genre : MAL ne le permet pas (pas de pagination fiable
+      // ni de filtre genre côté API officielle), on reste sur Jikan dans ces cas précis
+      let params = query
+        ? `q=${encodeURIComponent(query)}&page=${page}&limit=20&sfw`
+        : `page=${page}&limit=20&order_by=members&sort=desc${allIds.length?`&genres=${allIds.join(',')}`:''}`;
+      const data=await jikan(`/${type}?${params}`);
+      items = data.data||[];
+      pagination = data.pagination;
     }
-    const data=await jikan(path);
-    const items=data.data||[];
     if(!items.length){
       el.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">Aucun résultat</div></div>';
       document.getElementById(`${type}-pager`).innerHTML='';
@@ -2664,9 +2721,9 @@ async function renderCatalog(type){
     }
     items.forEach(i=>i._type=type);
     el.innerHTML=`<div class="cg-lg">${items.map(i=>coverCard(i)).join('')}</div>`;
-    renderPager(type, page, data.pagination);
+    renderPager(type, page, pagination);
   }catch(e){
-    el.innerHTML=`<p style="color:var(--t3);padding:20px 0;font-size:13px">⚠ Erreur de chargement. L'API Jikan a une limite de requêtes — attendez quelques secondes et réessayez.<br><br><button class="btn btn-ghost btn-sm" onclick="renderCatalog('${type}')">Réessayer</button></p>`;
+    el.innerHTML=`<p style="color:var(--t3);padding:20px 0;font-size:13px">⚠ Erreur de chargement. Réessaie dans quelques secondes.<br><br><button class="btn btn-ghost btn-sm" onclick="renderCatalog('${type}')">Réessayer</button></p>`;
   }
 }
 
@@ -2754,9 +2811,9 @@ function onCatalogSearch(type, val){
     el.style.display='block';
     el.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div></div>';
     try{
-      const d=await jikan(`/${type}?q=${encodeURIComponent(val)}&limit=8&sfw`);
-      if(!d.data||!d.data.length){el.innerHTML='<div style="padding:14px;color:var(--t3);font-size:13px">Aucun résultat</div>';return}
-      el.innerHTML=d.data.map(item=>{
+      const items=await malSearch(type, val, 8);
+      if(!items.length){el.innerHTML='<div style="padding:14px;color:var(--t3);font-size:13px">Aucun résultat</div>';return}
+      el.innerHTML=items.map(item=>{
         const frT=(item.titles||[]).find(t=>t.type==='French')?.title;
         const dispT=frT||item.title_english||item.title;
         const origT=(item.title&&item.title!==dispT)?item.title:'';
@@ -2823,16 +2880,14 @@ function navSearch(val){
   dd.style.display='block';
   navSearchTimer=setTimeout(async()=>{
     try{
-      const [md,ad]=await Promise.allSettled([
-        jikan(`/manga?q=${encodeURIComponent(val)}&limit=4&sfw`),
-        jikan(`/anime?q=${encodeURIComponent(val)}&limit=4&sfw`)
-      ]);
+      const [mangas,animes]=await Promise.allSettled([
+        malSearch('manga', val, 4),
+        malSearch('anime', val, 4)
+      ]).then(rs=>rs.map(r=>r.status==='fulfilled'?r.value:[]));
       const malEl=document.getElementById('nav-sr-mal');
       const loadEl=document.getElementById('nav-sr-loading');
       if(loadEl) loadEl.textContent='';
       if(!malEl) return;
-      const mangas=(md.status==='fulfilled'?md.value.data||[]:[]).map(m=>({...m,_type:'manga'}));
-      const animes=(ad.status==='fulfilled'?ad.value.data||[]:[]).map(a=>({...a,_type:'anime'}));
       const results=[...mangas,...animes].filter(r=>!S.tracking[r.mal_id]);
       if(!results.length){ malEl.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 12px">Aucun résultat</p>'; return; }
       malEl.innerHTML=results.slice(0,6).map(r=>`
@@ -3083,7 +3138,7 @@ async function loadSimilar(w){
     if(!recs.length){el.innerHTML='<p style="color:var(--t3);font-size:13px">Aucune recommandation disponible.</p>';return}
     el.innerHTML=recs.map(r=>{
       const item=r.entry;item._type=w._type;
-      return coverCardExternalMAL(item);
+      return coverCard(item);
     }).join('');
   }catch(e){el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de charger.</p>'}
 }
@@ -4371,7 +4426,7 @@ async function loadRelations(w){
           +'</div>'
           +'<div class="cc-title">'+esc(name)+'</div>'
           +'<div class="cc-meta">'+label+' · '+(mt==='manga'?'Manga':'Animé')+'</div>';
-        if(malId) card.addEventListener('click',()=>window.open(`https://myanimelist.net/${mt}/${malId}`,'_blank','noopener'));
+        if(malId) card.addEventListener('click',()=>openWork(malId,mt));
         grid.appendChild(card);
       }
 
