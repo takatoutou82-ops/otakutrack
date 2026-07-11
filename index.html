@@ -5358,18 +5358,18 @@ function renderTierList(){
       // clé cohérente avec dragKey : pour cat → mal_id, pour œuvre → mal_id+'_'+type
       const keyA = a._isCat ? String(a.mal_id) : String(a.mal_id)+'_'+(a.type||'');
       const keyB = b._isCat ? String(b.mal_id) : String(b.mal_id)+'_'+(b.type||'');
-      const ia=order.indexOf(keyA);
-      const ib=order.indexOf(keyB);
-      // Priorité à l'ordre manuel (glisser-déposer) : ça permet de déplacer librement
-      // un item d'un côté à l'autre du trait séparateur, même s'il garde sa note d'origine
-      if(ia!==-1||ib!==-1) return (ia===-1?9999:ia)-(ib===-1?9999:ib);
-      // Sinon, groupement par défaut : valeur basse avant valeur haute (ex: 16 avant 16.5)
+      // Priorité absolue : valeur basse toujours avant valeur haute (ex: 16 avant 16.5),
+      // quoi qu'il arrive. Le glisser-déposer ne peut réordonner qu'À L'INTÉRIEUR d'un
+      // même sous-groupe, jamais le faire passer de l'autre côté du trait.
       if(tier&&tier.high!=null){
         const ra=a.rating===tier.high?1:0;
         const rb=b.rating===tier.high?1:0;
         if(ra!==rb) return ra-rb;
       }
-      return 0;
+      // Ordre manuel (glisser-déposer) comme départage à l'intérieur du même sous-groupe
+      const ia=order.indexOf(keyA);
+      const ib=order.indexOf(keyB);
+      return (ia===-1?9999:ia)-(ib===-1?9999:ib);
     });
   });
 
@@ -5426,9 +5426,8 @@ function renderTierList(){
                 <div class="tier-item-title" ondblclick="renameTierItem(event,${t.mal_id},'${t.type}')">${esc(displayName.slice(0,12))}</div>
               </div>`;
               };
-              // Trait séparateur = placé uniquement là où la note change réellement d'un item
-              // au suivant (ex: 16 → 16.5). Ne dépend jamais d'un comptage global, donc un
-              // glisser-déposer ne fait jamais "sauter" un autre item de l'autre côté du trait.
+              // Trait séparateur = juste après le dernier item "valeur basse" (le tri ci-dessus
+              // garantit que tous les items bas sont toujours groupés avant les items hauts)
               let html='';
               groups[i].forEach((t,idx)=>{
                 if(idx>0 && tier && tier.high!=null){
