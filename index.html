@@ -3491,7 +3491,7 @@ function renderListDetail(){
               title="Cliquer pour renommer">${list.tierLabels[i]||tier.label}</div>
             <div class="tier-items">
               ${groups[i].length
-                ? low.map(renderItem).join('') + (low.length&&high.length?'<div class="tier-divider"></div>':'') + high.map(renderItem).join('')
+                ? high.map(renderItem).join('') + (low.length&&high.length?'<div class="tier-divider"></div>':'') + low.map(renderItem).join('')
                 : '<span class="tier-empty">—</span>'}
             </div>
           </div>`;}).join('')}
@@ -4992,7 +4992,7 @@ function renderSaisonsSection(seasons, rootMalId){
         return `
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
           <div style="width:80px;font-size:10px;font-weight:700;color:${tier.color};background:${tier.bg};border-radius:4px;padding:3px 6px;text-align:center;flex-shrink:0">${tier.label}</div>
-          <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">${low.map(renderS).join('')}${low.length&&high.length?'<div class="tier-divider" style="height:46px"></div>':''}${high.map(renderS).join('')}
+          <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">${high.map(renderS).join('')}${low.length&&high.length?'<div class="tier-divider" style="height:46px"></div>':''}${low.map(renderS).join('')}
           </div>
         </div>`;}).join('')}
     </div>`;
@@ -5358,12 +5358,12 @@ function renderTierList(){
       // clé cohérente avec dragKey : pour cat → mal_id, pour œuvre → mal_id+'_'+type
       const keyA = a._isCat ? String(a.mal_id) : String(a.mal_id)+'_'+(a.type||'');
       const keyB = b._isCat ? String(b.mal_id) : String(b.mal_id)+'_'+(b.type||'');
-      // Priorité absolue : valeur basse toujours avant valeur haute (ex: 16 avant 16.5),
+      // Priorité absolue : valeur haute toujours avant valeur basse (ex: 16.5 avant 16),
       // quoi qu'il arrive. Le glisser-déposer ne peut réordonner qu'À L'INTÉRIEUR d'un
       // même sous-groupe, jamais le faire passer de l'autre côté du trait.
       if(tier&&tier.high!=null){
-        const ra=a.rating===tier.high?1:0;
-        const rb=b.rating===tier.high?1:0;
+        const ra=a.rating===tier.high?0:1;
+        const rb=b.rating===tier.high?0:1;
         if(ra!==rb) return ra-rb;
       }
       // Ordre manuel (glisser-déposer) comme départage à l'intérieur du même sous-groupe
