@@ -2103,33 +2103,90 @@ function load(){
 // ─── JIKAN API ───
 const JIKAN = 'https://api.jikan.moe/v4';
 const cache = {}; // { path: { data, ts } }
-const CACHE_TTL = 60 * 60 * 1000; // 1h
+const CACHE_TTL = 60 * 60 * 1000; // 1h fraîcheur "normale"
+const CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7j : au-delà on ne s'en sert même plus en secours
 
-// File de requêtes pour éviter le rate limit Jikan (max 3 req/s)
+// ── Cache persistant (localStorage) : survit aux rechargements de page ──
+const JIKAN_LS_KEY = 'ot_jikan_cache_v1';
+(function loadJikanCache(){
+  try{
+    const raw = localStorage.getItem(JIKAN_LS_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      const now = Date.now();
+      Object.entries(parsed).forEach(([path,entry])=>{
+        if(entry && (now-entry.ts) < CACHE_MAX_AGE) cache[path]=entry;
+      });
+    }
+  }catch(e){}
+})();
+let _jikanPersistTimer=null;
+function persistJikanCache(){
+  clearTimeout(_jikanPersistTimer);
+  _jikanPersistTimer=setTimeout(()=>{
+    try{ localStorage.setItem(JIKAN_LS_KEY, JSON.stringify(cache)); }
+    catch(e){ /* quota plein etc, tant pis */ }
+  }, 500);
+}
+
+// ── Rate limiter réel : Jikan tolère 3 req/s ET 60 req/min. On reste sous les deux. ──
+const JIKAN_MIN_GAP = 400;      // >= 3 req/s max (marge)
+const JIKAN_WINDOW = 60_000;    // fenêtre glissante 1 min
+const JIKAN_MAX_PER_WINDOW = 55; // on reste sous 60/min avec marge de sécurité
+let _jikanTimestamps = []; // timestamps des requêtes envoyées dans la dernière minute
+let _jikanLastSent = 0;
+
 let _jikanQueue = Promise.resolve();
 function jikanQueued(path, retry=4){
   const result = _jikanQueue.then(() => _jikanFetch(path, retry));
   _jikanQueue = result.catch(() => {});
   return result;
 }
+
+async function _waitForSlot(){
+  while(true){
+    const now = Date.now();
+    _jikanTimestamps = _jikanTimestamps.filter(t => now - t < JIKAN_WINDOW);
+    const sinceLast = now - _jikanLastSent;
+    const overWindowLimit = _jikanTimestamps.length >= JIKAN_MAX_PER_WINDOW;
+    const overGap = sinceLast < JIKAN_MIN_GAP;
+    if(!overWindowLimit && !overGap) break;
+    let wait = 0;
+    if(overGap) wait = Math.max(wait, JIKAN_MIN_GAP - sinceLast);
+    if(overWindowLimit){
+      const oldest = _jikanTimestamps[0];
+      wait = Math.max(wait, JIKAN_WINDOW - (now - oldest) + 50);
+    }
+    await delay(wait);
+  }
+  const now = Date.now();
+  _jikanTimestamps.push(now);
+  _jikanLastSent = now;
+}
+
 async function _jikanFetch(path, retry=4){
   const now=Date.now();
   if(cache[path]&&(now-cache[path].ts)<CACHE_TTL)return cache[path].data;
-  await delay(400);
   for(let i=0;i<retry;i++){
     try{
+      await _waitForSlot();
       const controller = new AbortController();
-      const tid = setTimeout(()=>controller.abort(), 8000);
+      const tid = setTimeout(()=>controller.abort(), 12000);
       const r = await fetch(JIKAN+path, {signal:controller.signal});
       clearTimeout(tid);
-      if(r.status===429){ await delay(2000*(i+1)); continue; }
+      if(r.status===429){ await delay(2500*(i+1)); continue; }
       if(!r.ok) throw new Error(r.status);
       const d = await r.json();
       cache[path] = {data:d, ts:now};
+      persistJikanCache();
       return d;
     }catch(e){
-      if(i===retry-1) throw e;
-      await delay(1000*(i+1));
+      if(i===retry-1){
+        // Dernier recours : on ressert une vieille valeur en cache plutôt que de planter l'affichage
+        if(cache[path]) return cache[path].data;
+        throw e;
+      }
+      await delay(1200*(i+1));
     }
   }
 }
