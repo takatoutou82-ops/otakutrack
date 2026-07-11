@@ -2106,6 +2106,28 @@ function load(){
       if(emptyEl)emptyEl.style.display='none';
     }
   }catch(e){}
+  migrateTierLabelsTo20();
+}
+
+// Migration /10 → /20 : si l'utilisateur avait renommé ses tiers avec des chiffres
+// (ex: "7", "8.5", "9.5"...) correspondant à l'ancienne échelle /10, on les convertit
+// automatiquement vers les nouveaux seuils /20 (doublés). Ne touche à rien d'autre
+// (les labels textuels du type "TROPP COOL" ne matchent jamais et restent inchangés).
+// Ne s'exécute qu'une seule fois grâce au flag de version.
+function migrateTierLabelsTo20(){
+  if(S.profile._tierLabelsMigratedV20) return;
+  const OLD_TO_NEW = {'10':'20','9.5':'19','9':'18','8.5':'17','8':'16','7.5':'15','7':'14'};
+  const migrateObj=(labels)=>{
+    if(!labels) return;
+    Object.keys(labels).forEach(k=>{
+      const v=String(labels[k]).trim();
+      if(OLD_TO_NEW[v]!==undefined) labels[k]=OLD_TO_NEW[v];
+    });
+  };
+  if(S.profile) migrateObj(S.profile.tierLabels);
+  (S.lists||[]).forEach(l=>migrateObj(l.tierLabels));
+  if(S.profile) S.profile._tierLabelsMigratedV20=true;
+  save();
 }
 
 // ─── MYANIMELIST API (fiches) ───
@@ -3305,6 +3327,18 @@ function quickTrack(malId, type, title, cover){
 function rateWork(malId, type, rating){
   if(!S.tracking[malId]) S.tracking[malId]={mal_id:malId,type,title:'',cover:'',status:'',chapter:0,volume:0,episode:0,rating:0,reviews:[]};
   S.tracking[malId].rating=rating;
+  // Un changement de note doit toujours refléter la vraie tier list : on retire le
+  // placement manuel (override) éventuel, sinon l'item reste figé dans son ancienne
+  // tier même après avoir changé de note. Sa position (bas/haut du trait) redevient
+  // celle par défaut correspondant à la nouvelle note.
+  const key=malId+'_'+type;
+  if(S.profile?.tierOverrides && S.profile.tierOverrides[key]!==undefined) delete S.profile.tierOverrides[key];
+  if(S.profile?.tierOrders){
+    Object.values(S.profile.tierOrders).forEach(order=>{
+      const idx=order.indexOf(key);
+      if(idx!==-1) order.splice(idx,1);
+    });
+  }
   save();
   if(rating>0) toast('Note sauvegardée : '+rating+'/20','ok');
 }
@@ -5318,16 +5352,24 @@ function renderTierList(){
 
   groups.forEach((g,i)=>{
     const order=orders[i]||[];
-    if(order.length){
-      g.sort((a,b)=>{
-        // clé cohérente avec dragKey : pour cat → mal_id, pour œuvre → mal_id+'_'+type
-        const keyA = a._isCat ? String(a.mal_id) : String(a.mal_id)+'_'+(a.type||'');
-        const keyB = b._isCat ? String(b.mal_id) : String(b.mal_id)+'_'+(b.type||'');
-        const ia=order.indexOf(keyA);
-        const ib=order.indexOf(keyB);
-        return (ia===-1?9999:ia)-(ib===-1?9999:ib);
-      });
-    }
+    const tier=TIERS[i];
+    g.sort((a,b)=>{
+      // clé cohérente avec dragKey : pour cat → mal_id, pour œuvre → mal_id+'_'+type
+      const keyA = a._isCat ? String(a.mal_id) : String(a.mal_id)+'_'+(a.type||'');
+      const keyB = b._isCat ? String(b.mal_id) : String(b.mal_id)+'_'+(b.type||'');
+      const ia=order.indexOf(keyA);
+      const ib=order.indexOf(keyB);
+      // Priorité à l'ordre manuel (glisser-déposer) : ça permet de déplacer librement
+      // un item d'un côté à l'autre du trait séparateur, même s'il garde sa note d'origine
+      if(ia!==-1||ib!==-1) return (ia===-1?9999:ia)-(ib===-1?9999:ib);
+      // Sinon, groupement par défaut : valeur basse avant valeur haute (ex: 16 avant 16.5)
+      if(tier&&tier.high!=null){
+        const ra=a.rating===tier.high?1:0;
+        const rb=b.rating===tier.high?1:0;
+        if(ra!==rb) return ra-rb;
+      }
+      return 0;
+    });
   });
 
   if(!all.length&&!cats.length){
@@ -5347,7 +5389,13 @@ function renderTierList(){
         ondrop="tierDrop(event,${i})">
         ${groups[i].length
           ? (()=>{
-              const {low,high}=splitTierHalf(groups[i], i);
+              const tier=TIERS[i];
+              // Position du trait = nombre d'items "valeur basse", dans l'ordre actuel
+              // (qui respecte le glisser-déposer manuel). Ça permet de déplacer librement
+              // un item d'un côté à l'autre du trait, même sans changer sa note.
+              const highCount = tier&&tier.high!=null ? groups[i].filter(x=>x.rating===tier.high).length : 0;
+              const lowCount = groups[i].length - highCount;
+              const dividerAt = (highCount>0 && lowCount>0) ? lowCount : -1;
               const renderItem=(t,idx)=>{
               const anim=`animation-delay:${idx*0.04}s`;
               if(t._isCat){
@@ -5383,9 +5431,7 @@ function renderTierList(){
                 <div class="tier-item-title" ondblclick="renameTierItem(event,${t.mal_id},'${t.type}')">${esc(displayName.slice(0,12))}</div>
               </div>`;
               };
-              return low.map(renderItem).join('')
-                + (low.length&&high.length?'<div class="tier-divider"></div>':'')
-                + high.map(renderItem).join('');
+              return groups[i].map((t,idx)=>(dividerAt===idx?'<div class="tier-divider"></div>':'')+renderItem(t,idx)).join('');
             })()
           : '<span class="tier-empty">—</span>'}
       </div>
@@ -6287,6 +6333,18 @@ function saveSuiviCategory(){
   if(_scatEditing){
     const idx=S.suiviCategories.findIndex(c=>c.id===_scatEditing);
     if(idx!==-1){
+      // Si la note change, on retire l'override de tier manuel (même logique que rateWork) :
+      // sinon la catégorie reste figée dans son ancienne tier après un changement de note.
+      if(S.suiviCategories[idx].rating!==rating){
+        const key='cat_'+_scatEditing;
+        if(S.profile?.tierOverrides && S.profile.tierOverrides[key]!==undefined) delete S.profile.tierOverrides[key];
+        if(S.profile?.tierOrders){
+          Object.values(S.profile.tierOrders).forEach(order=>{
+            const oidx=order.indexOf(key);
+            if(oidx!==-1) order.splice(oidx,1);
+          });
+        }
+      }
       S.suiviCategories[idx]={...S.suiviCategories[idx],name,rating,description,cover,items:_scatItems.map((i,o)=>({...i,order:o}))};
     }
   } else {
