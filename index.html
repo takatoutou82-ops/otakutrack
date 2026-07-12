@@ -1910,23 +1910,7 @@ textarea.fi{resize:vertical;min-height:72px}
     <textarea id="scat-desc-input" class="inp" placeholder="Description (optionnelle)…" style="height:70px;resize:vertical;margin-bottom:12px"></textarea>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <label style="font-size:12px;color:var(--t3);white-space:nowrap">Note globale</label>
-      <select id="scat-rating-input" class="status-sel" style="margin-top:0;width:auto;flex:1">
-        <option value="0">— Non notée</option>
-        <option value="0.5">0.5 / 20</option><option value="1">1 / 20</option><option value="1.5">1.5 / 20</option>
-        <option value="2">2 / 20</option><option value="2.5">2.5 / 20</option><option value="3">3 / 20</option>
-        <option value="3.5">3.5 / 20</option><option value="4">4 / 20</option><option value="4.5">4.5 / 20</option>
-        <option value="5">5 / 20</option><option value="5.5">5.5 / 20</option><option value="6">6 / 20</option>
-        <option value="6.5">6.5 / 20</option><option value="7">7 / 20</option><option value="7.5">7.5 / 20</option>
-        <option value="8">8 / 20</option><option value="8.5">8.5 / 20</option><option value="9">9 / 20</option>
-        <option value="9.5">9.5 / 20</option><option value="10">10 / 20</option>
-        <option value="10.5">10.5 / 20</option><option value="11">11 / 20</option><option value="11.5">11.5 / 20</option>
-        <option value="12">12 / 20</option><option value="12.5">12.5 / 20</option><option value="13">13 / 20</option>
-        <option value="13.5">13.5 / 20</option><option value="14">14 / 20</option><option value="14.5">14.5 / 20</option>
-        <option value="15">15 / 20</option><option value="15.5">15.5 / 20</option><option value="16">16 / 20</option>
-        <option value="16.5">16.5 / 20</option><option value="17">17 / 20</option><option value="17.5">17.5 / 20</option>
-        <option value="18">18 / 20</option><option value="18.5">18.5 / 20</option><option value="19">19 / 20</option>
-        <option value="19.5">19.5 / 20</option><option value="20">20 / 20</option>
-      </select>
+      <select id="scat-rating-input" class="status-sel" style="margin-top:0;width:auto;flex:1"></select>
     </div>
     <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Ajouter des œuvres</div>
     <input id="scat-search-input" class="inp" placeholder="Rechercher dans mon suivi…" oninput="filterScatSearch()" style="margin-bottom:8px">
@@ -2521,6 +2505,58 @@ function statusClass(s){
 }
 function esc(s){return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
 
+// ─── Échelle de notation /20 avec commentaires ───
+// De 20 à 14 : paliers de 0.5 (correspond aux 7 tiers de la tier list)
+// De 13 à 0 : paliers d'un point entier
+const RATING_COMMENTS={
+  20:"Chef-d'œuvre absolu. Une œuvre qui me marque profondément et frôle la perfection.",
+  19.5:"Presque parfait. Il ne lui manque qu'un détail.",
+  19:"Exceptionnel. Une œuvre qui me marque durablement.",
+  18.5:"Entre incroyable et exceptionnel.",
+  18:"Incroyable. Une expérience mémorable.",
+  17.5:"Excellent+. Très proche de me fasciner.",
+  17:"Excellent. Très grande œuvre avec peu de défauts.",
+  16.5:"Excellent, mais il lui manque un petit plus.",
+  16:"Très grand manga. De très haute qualité.",
+  15.5:"Très bon manga. Excellente œuvre, mais sans véritable fascination.",
+  15:"Très bon manga. Je recommande sans hésiter.",
+  14.5:"Bon à très bon. Beaucoup de qualités, mais des défauts notables.",
+  14:"Bon manga. Une expérience solide.",
+  13:"Sympa.",
+  12:"Correct.",
+  11:"Moyen+.",
+  10:"Moyen.",
+  9:"Médiocre.",
+  8:"Mauvais.",
+  7:"Très mauvais.",
+  6:"Vraiment mauvais.",
+  5:"Catastrophique.",
+  4:"Presque rien ne fonctionne.",
+  3:"Navet.",
+  2:"Désastre.",
+  1:"L'une des pires œuvres que j'ai vues.",
+  0:"Inregardable."
+};
+// Valeurs valides, de la plus haute à la plus basse : 0.5 en 0.5 de 20 à 14, puis 1 en 1 de 13 à 0
+const RATING_VALUES=(()=>{
+  const vals=[];
+  for(let v=40;v>=28;v--) vals.push(v/2); // 20 → 14, pas de 0.5
+  for(let v=13;v>=0;v--) vals.push(v);     // 13 → 0, pas de 1
+  return vals;
+})();
+// Génère les <option> d'un sélecteur de note, avec le commentaire entre parenthèses.
+// includeEmpty: ajoute une option "— Non noté(e)" en tête si aucune note n'est encore choisie.
+function buildRatingOptions(selected, includeEmptyLabel){
+  let html='';
+  if(includeEmptyLabel) html+=`<option value="0"${(!selected||selected===0)?' selected':''}>${includeEmptyLabel}</option>`;
+  RATING_VALUES.forEach(v=>{
+    if(v===0 && includeEmptyLabel) return; // déjà couvert par l'option vide ci-dessus
+    const comment=RATING_COMMENTS[v]||'';
+    html+=`<option value="${v}"${selected===v?' selected':''}>${v} (${comment})</option>`;
+  });
+  return html;
+}
+
 // ─── HOME ───
 async function renderHome(){
   renderHomeInProgress();
@@ -2977,14 +3013,12 @@ function renderWorkPage(w){
   // Backdrop
   document.getElementById('work-bg').style.backgroundImage=`url(${w.images?.jpg?.large_image_url||w.images?.jpg?.image_url||''})`;
 
-  // Rating 0-20 by 0.5
+  // Rating 0-20 (paliers 0.5 de 14 à 20, paliers 1 de 0 à 13), avec commentaire
   const myRating=t.rating||0;
   const isPlanifie=(t.status||'')==='Planifié';
-  const ratingOptions=[];
-  for(let v=0;v<=40;v++){const val=v/2;ratingOptions.push('<option value="'+val+'"'+(myRating===val?' selected':'')+'>'+( val===0?'— Non noté':val+' / 20')+'</option>');}
   const ratingHtml=isPlanifie
     ? '<div style="font-size:12px;color:var(--t3);font-style:italic">Note disponible après lecture</div>'
-    : '<div class="rating-box"><select class="rating-select" onchange="rateWork('+w.mal_id+',\''+type+'\',parseFloat(this.value))">'+ratingOptions.join('')+'</select>'+(myRating>0?'<span class="rating-display">★ '+myRating+'<span style="color:var(--t3);font-size:12px"> /20</span></span>':'')+'</div>';
+    : '<div class="rating-box"><select class="rating-select" onchange="rateWork('+w.mal_id+',\''+type+'\',parseFloat(this.value))">'+buildRatingOptions(myRating,'— Non noté')+'</select>'+(myRating>0?'<span class="rating-display">★ '+myRating+'<span style="color:var(--t3);font-size:12px"> /20</span></span>':'')+'</div>';
 
   // Genres
   const genres=(w.genres||[]).concat(w.themes||[]).map(g=>`<span class="gtag">${g.name}</span>`).join('');
@@ -3503,8 +3537,7 @@ function renderListDetail(){
   const itemsHtml=list.items.length?`<div class="cg-lg" id="list-drag-grid">${list.items.map((item,i)=>{
     const myRating=isRated?(list.ratings[item.id]||0):0;
     const displayName=list.itemNames[item.id]||item.title;
-    const ratingOptions=[];
-    for(let v=0;v<=40;v++){const val=v/2;ratingOptions.push(`<option value="${val}"${myRating===val?' selected':''}>${val===0?'—':val}</option>`);}
+    const ratingOptions=buildRatingOptions(myRating,'—');
     return `<div class="cc list-drag-item" draggable="true"
       data-idx="${i}"
       ondragstart="listDragStart(event,${i})"
@@ -3525,7 +3558,7 @@ function renderListDetail(){
       ${isRated?`<div onclick="event.stopPropagation()">
         <select onchange="rateListItem('${list.id}',${item.id},parseFloat(this.value))"
           style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:2px 5px;color:var(--text);font-size:11px;width:100%;margin-top:2px;outline:none">
-          ${ratingOptions.join('')}
+          ${ratingOptions}
         </select>
       </div>`:''}
     </div>`;
@@ -5000,8 +5033,7 @@ function renderSaisonsSection(seasons, rootMalId){
 
   el.innerHTML=tierHtml+seasons.map(s=>{
     const myRating=seasonRatings[s.mal_id]||0;
-    const ratingOpts=[];
-    for(let v=0;v<=40;v++){const val=v/2;ratingOpts.push(`<option value="${val}"${myRating===val?' selected':''}>${val===0?'—':val}</option>`);}
+    const ratingOpts=buildRatingOptions(myRating,'—');
     return `<div class="saison-card" id="saison-${s.mal_id}">
       <div class="saison-header" onclick="toggleSaison(${s.mal_id},${rootMalId})">
         <img class="saison-cover" src="${s.cover}" loading="lazy">
@@ -5012,7 +5044,7 @@ function renderSaisonsSection(seasons, rootMalId){
         <div class="saison-note" onclick="event.stopPropagation()">
           <select onchange="rateSaison(${s.mal_id},${rootMalId},parseFloat(this.value))"
             style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 7px;color:var(--text);font-size:11px;outline:none">
-            ${ratingOpts.join('')}
+            ${ratingOpts}
           </select>
           ${myRating?`<span style="color:var(--yellow);font-size:12px;font-weight:700">★${myRating}</span>`:''}
         </div>
@@ -6219,7 +6251,7 @@ function openCreateSuiviCategory(type,tab){
   document.getElementById('scat-modal-title').textContent='Nouvelle catégorie';
   document.getElementById('scat-name-input').value='';
   document.getElementById('scat-desc-input').value='';
-  document.getElementById('scat-rating-input').value='0';
+  document.getElementById('scat-rating-input').innerHTML=buildRatingOptions(0,'— Non notée');
   document.getElementById('scat-search-input').value='';
   renderScatSearch('');
   renderScatItems();
@@ -6236,7 +6268,7 @@ function editSuiviCategory(id){
   document.getElementById('scat-modal-title').textContent='Modifier la catégorie';
   document.getElementById('scat-name-input').value=cat.name||'';
   document.getElementById('scat-desc-input').value=cat.description||'';
-  document.getElementById('scat-rating-input').value=cat.rating||0;
+  document.getElementById('scat-rating-input').innerHTML=buildRatingOptions(cat.rating||0,'— Non notée');
   document.getElementById('scat-search-input').value='';
   renderScatSearch('');
   renderScatItems();
@@ -6311,8 +6343,7 @@ function renderScatItems(){
       <div class="scat-item-title">${esc(item.title)}</div>
       <select onchange="scatSetItemRating(${item.mal_id},'${item.type}',this.value)"
         style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 5px;color:var(--text);font-size:11px;outline:none;flex-shrink:0">
-        <option value="0">—</option>
-        ${Array.from({length:41},(_,i)=>i/2).filter(v=>v>0).map(v=>`<option value="${v}"${item.rating===v?' selected':''}>${v}</option>`).join('')}
+        ${buildRatingOptions(item.rating||0,'—')}
       </select>
       <button onclick="scatRemoveItem(${item.mal_id},'${item.type}')"
         style="background:rgba(248,113,113,.15);border:none;border-radius:5px;padding:2px 7px;color:var(--red);font-size:11px;cursor:pointer;flex-shrink:0">✕</button>
