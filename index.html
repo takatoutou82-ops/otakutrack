@@ -1576,8 +1576,6 @@ textarea.fi{resize:vertical;min-height:72px}
         <button class="tab" id="tab-saisons" style="display:none" onclick="switchTab(this,'tp-saisons');loadSaisons()">Saisons</button>
         <button class="tab" onclick="switchTab(this,'tp-similar')">Similaires</button>
         <button class="tab" onclick="switchTab(this,'tp-relations')">Relations</button>
-        <button class="tab" id="tab-tomes" style="display:none" onclick="switchTab(this,'tp-tomes');loadTomes()">Tomes</button>
-        <button class="tab" onclick="switchTab(this,'tp-arcs');loadArcsImg()">Arcs</button>
       </div>
       <div class="tp on" id="tp-progress"><div id="progress-section"></div></div>
       <div class="tp" id="tp-reviews">
@@ -1588,21 +1586,6 @@ textarea.fi{resize:vertical;min-height:72px}
       <div class="tp" id="tp-saisons"><div id="saisons-section"></div></div>
       <div class="tp" id="tp-similar"><div class="cg" id="similar-section"></div></div>
       <div class="tp" id="tp-relations"><div id="relations-section"></div></div>
-      <div class="tp" id="tp-tomes"><div id="tomes-section"></div></div>
-      <div class="tp" id="tp-arcs">
-        <div id="arcs-img-wrap" style="margin-top:8px">
-          <div id="arcs-img-display" style="display:none;border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-bottom:12px">
-            <img id="arcs-img-el" style="width:100%;display:block;object-fit:contain;background:var(--bg3)">
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--t2);font-size:13px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">
-              🖼 Importer une image d'arcs
-              <input type="file" accept="image/*" style="display:none" onchange="importArcsImg(this)">
-            </label>
-            <button id="arcs-img-clear" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:8px 14px;color:var(--red);font-size:13px;cursor:pointer" onclick="clearArcsImg()">✕ Retirer</button>
-          </div>
-        </div>
-      </div>
     </div>
     <div id="work-sidebar"></div>
   </div>
@@ -2544,15 +2527,14 @@ const RATING_VALUES=(()=>{
   for(let v=13;v>=0;v--) vals.push(v);     // 13 → 0, pas de 1
   return vals;
 })();
-// Génère les <option> d'un sélecteur de note, avec le commentaire entre parenthèses.
-// includeEmpty: ajoute une option "— Non noté(e)" en tête si aucune note n'est encore choisie.
+// Génère les <option> d'un sélecteur de note (affichage simple, sans commentaire :
+// le commentaire alourdissait l'affichage de la case fermée du select).
 function buildRatingOptions(selected, includeEmptyLabel){
   let html='';
   if(includeEmptyLabel) html+=`<option value="0"${(!selected||selected===0)?' selected':''}>${includeEmptyLabel}</option>`;
   RATING_VALUES.forEach(v=>{
     if(v===0 && includeEmptyLabel) return; // déjà couvert par l'option vide ci-dessus
-    const comment=RATING_COMMENTS[v]||'';
-    html+=`<option value="${v}"${selected===v?' selected':''}>${v} (${comment})</option>`;
+    html+=`<option value="${v}"${selected===v?' selected':''}>${v} / 20</option>`;
   });
   return html;
 }
@@ -3100,18 +3082,12 @@ function renderWorkPage(w){
   loadRelations(w);
   renderWorkSidebar(w, t);
 
-  // Show tomes tab only for manga
-  const tabTomes = document.getElementById('tab-tomes');
-  if(tabTomes) tabTomes.style.display = type==='manga' ? '' : 'none';
   // Show saisons tab only for anime
   const tabSaisons = document.getElementById('tab-saisons');
   if(tabSaisons) tabSaisons.style.display = type==='anime' ? '' : 'none';
   // Reset sections
-  const tomesEl = document.getElementById('tomes-section');
-  if(tomesEl) tomesEl.innerHTML = '';
   const saisonsEl = document.getElementById('saisons-section');
   if(saisonsEl){ saisonsEl.innerHTML=''; saisonsEl.dataset.loaded=''; }
-  window._tomesLoaded = false;
   window._currentMalId = w.mal_id;
 }
 
@@ -4293,132 +4269,6 @@ function removeOnlineEntry(malId, idx){
 
 
 // ─── TOMES via MangaDex ───
-async function loadTomes(){
-  if(window._tomesLoaded) return;
-  window._tomesLoaded = true;
-
-  const el = document.getElementById('tomes-section');
-  if(!el) return;
-  el.innerHTML = '<div class="loading"><div class="spin"></div></div>';
-
-  const titleEl = document.querySelector('.work-title');
-  const searchTitle = titleEl ? titleEl.textContent.trim() : '';
-  if(!searchTitle){ el.innerHTML='<p style="color:var(--t3)">Titre introuvable.</p>'; return; }
-
-  try {
-    const proxy = 'https://corsproxy.io/?url=';
-    const searchRes = await fetch(proxy + encodeURIComponent(`https://api.mangadex.org/manga?title=${encodeURIComponent(searchTitle)}&limit=10&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica`));
-    const searchJson = await searchRes.json();
-    const results = searchJson.data || [];
-    if(!results.length){ el.innerHTML='<p style="color:var(--t3);padding:12px 0">Manga introuvable sur MangaDex.</p>'; return; }
-
-    // Meilleur match
-    let manga = results.find(m=>Object.values(m.attributes.title||{}).some(t=>t.toLowerCase()===searchTitle.toLowerCase())) || results[0];
-    const mangaId = manga.id;
-
-    // Récupérer TOUTES les couvertures sans filtre de langue
-    let covers = [], offset = 0;
-    while(true){
-      const covRes = await fetch(proxy + encodeURIComponent(`https://api.mangadex.org/cover?manga[]=${mangaId}&limit=100&offset=${offset}&order[volume]=asc`));
-      const covJson = await covRes.json();
-      const batch = covJson.data || [];
-      covers = covers.concat(batch);
-      if(batch.length < 100) break;
-      offset += 100;
-    }
-
-    if(!covers.length){ el.innerHTML='<p style="color:var(--t3);padding:12px 0">Aucune couverture trouvée.</p>'; return; }
-
-    // Grouper par volume — garder une couverture par tome (préférence fr > en > ja > autre)
-    const byVol = {};
-    for(const c of covers){
-      const vol = c.attributes.volume;
-      if(!vol) continue; // ignorer les covers sans numéro de tome
-      if(!byVol[vol]) byVol[vol] = [];
-      byVol[vol].push({locale: c.attributes.locale||'', fileName: c.attributes.fileName, mangaId});
-    }
-
-    const pickCover = arr =>
-      arr.find(c=>c.locale==='fr') ||
-      arr.find(c=>c.locale==='en') ||
-      arr.find(c=>c.locale==='ja'||c.locale==='ja-ro') ||
-      arr[0];
-
-    const volKeys = Object.keys(byVol).sort((a,b)=>{
-      const na=parseFloat(a), nb=parseFloat(b);
-      if(isNaN(na)&&isNaN(nb)) return 0;
-      if(isNaN(na)) return 1;
-      if(isNaN(nb)) return -1;
-      return na-nb;
-    });
-
-    const volumes = volKeys.map(vol=>{
-      const c = pickCover(byVol[vol]);
-      return { number:vol, cover:`https://uploads.mangadex.org/covers/${c.mangaId}/${c.fileName}.256.jpg`, isFr:c.locale==='fr' };
-    });
-
-    renderTomesGrid(el, volumes, 'mangadex');
-
-  } catch(e) {
-    console.error('[Tomes]', e);
-    el.innerHTML = '<p style="color:var(--t3);padding:12px 0">Impossible de charger les tomes.</p>';
-  }
-}
-
-function renderTomesGrid(el, volumes, source){
-  const sourceLabel = source==='nautiljon'
-    ? '<span style="background:#16a34a;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;font-family:Syne,sans-serif">✓ Nautiljon</span>'
-    : '<span style="background:var(--bg4);color:var(--t3);font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;font-family:Syne,sans-serif">MangaDex</span>';
-
-  const grid = document.createElement('div');
-  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:14px;padding:16px 0';
-
-  for(const vol of volumes){
-    const card = document.createElement('div');
-    card.style.cssText = 'text-align:center;cursor:'+(source==='nautiljon'?'pointer':'default');
-    if(source==='nautiljon') card.onclick = () => openTomeModal(vol);
-    card.innerHTML = `
-      <div style="position:relative;border-radius:8px;overflow:hidden;background:var(--bg3);aspect-ratio:2/3;margin-bottom:6px;box-shadow:0 4px 12px rgba(0,0,0,.4)">
-        ${vol.cover
-          ? `<img src="${vol.cover}" alt="Tome ${vol.number}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px\\'>📖</div>'">`
-          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px">📖</div>`}
-        ${source==='nautiljon'?'<div style="position:absolute;top:5px;right:5px;background:#2563eb;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;font-family:Syne,sans-serif">VF</div>':''}
-        ${vol.score?`<div style="position:absolute;bottom:5px;left:5px;background:rgba(0,0,0,.75);color:#fbbf24;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">★ ${vol.score}</div>`:''}
-      </div>
-      <div style="font-size:11px;font-weight:700;font-family:'Syne',sans-serif;color:var(--t2)">Tome ${vol.number}</div>
-      ${vol.date_fr?`<div style="font-size:10px;color:var(--t4)">${vol.date_fr}</div>`:''}
-    `;
-    grid.appendChild(card);
-  }
-
-  el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">${sourceLabel}<span style="font-size:12px;color:var(--t3)">${volumes.length} tome${volumes.length>1?'s':''}</span></div>`;
-  el.appendChild(grid);
-}
-
-function openTomeModal(vol){
-  const existing = document.getElementById('tome-modal-overlay');
-  if(existing) existing.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'tome-modal-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)';
-  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
-  overlay.innerHTML = `
-    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:28px;max-width:380px;width:90%;position:relative">
-      <button onclick="document.getElementById('tome-modal-overlay').remove()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer">✕</button>
-      <div style="display:flex;gap:16px;align-items:flex-start">
-        ${vol.cover?`<img src="${vol.cover}" style="width:80px;border-radius:8px;flex-shrink:0;box-shadow:0 4px 16px rgba(0,0,0,.5)">`:''}
-        <div>
-          <div style="font-size:16px;font-weight:800;font-family:'Syne',sans-serif;margin-bottom:8px">Tome ${vol.number}${vol.title?' — '+vol.title:''}</div>
-          ${vol.score?`<div style="color:#fbbf24;font-weight:700;margin-bottom:6px">★ ${vol.score} / 10</div>`:''}
-          ${vol.date_jp?`<div style="font-size:12px;color:var(--t3);margin-bottom:3px">🇯🇵 Sortie JP : ${vol.date_jp}</div>`:''}
-          ${vol.date_fr?`<div style="font-size:12px;color:var(--t3);margin-bottom:3px">🇫🇷 Sortie FR : ${vol.date_fr}</div>`:''}
-          ${vol.pages?`<div style="font-size:12px;color:var(--t3)">📄 ${vol.pages} pages</div>`:''}
-        </div>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-}
 async function loadRelations(w){
   const el=document.getElementById('relations-section');
   if(!el)return;
@@ -6826,67 +6676,6 @@ function clearTierImg(){
   if(preview) preview.style.display = 'none';
   if(clearBtn) clearBtn.style.display = 'none';
   toast('Image retirée','ok');
-}
-
-function importArcsImg(input){
-  const file = input.files[0];
-  if(!file) return;
-  const malId = S.currentWork?.mal_id;
-  if(!malId) return;
-  toast('Upload en cours…','ok');
-  uploadToCloudinary(file, 'arcs').then(url=>{
-    if(!S.arcsImgs) S.arcsImgs = {};
-    S.arcsImgs[malId] = url;
-    save();
-    showArcsImg(url);
-    toast('Image importée ✓', 'ok');
-  }).catch(()=>{
-    // Fallback base64
-    const reader = new FileReader();
-    reader.onload = e => {
-      if(!S.arcsImgs) S.arcsImgs = {};
-      S.arcsImgs[malId] = e.target.result;
-      save();
-      showArcsImg(e.target.result);
-      toast('Image importée ✓', 'ok');
-    };
-    reader.readAsDataURL(file);
-  });
-  input.value = '';
-}
-
-function showArcsImg(url){
-  const wrap = document.getElementById('arcs-img-display');
-  const img = document.getElementById('arcs-img-el');
-  const clearBtn = document.getElementById('arcs-img-clear');
-  if(wrap) wrap.style.display = 'block';
-  if(img) img.src = url;
-  if(clearBtn) clearBtn.style.display = '';
-}
-
-function clearArcsImg(){
-  const malId = S.currentWork?.mal_id;
-  if(!malId) return;
-  if(S.arcsImgs) delete S.arcsImgs[malId];
-  save();
-  const wrap = document.getElementById('arcs-img-display');
-  const clearBtn = document.getElementById('arcs-img-clear');
-  if(wrap) wrap.style.display = 'none';
-  if(clearBtn) clearBtn.style.display = 'none';
-  toast('Image retirée', 'ok');
-}
-
-function loadArcsImg(){
-  const malId = S.currentWork?.mal_id;
-  if(!malId) return;
-  const url = S.arcsImgs?.[malId];
-  if(url) showArcsImg(url);
-  else {
-    const wrap = document.getElementById('arcs-img-display');
-    const clearBtn = document.getElementById('arcs-img-clear');
-    if(wrap) wrap.style.display = 'none';
-    if(clearBtn) clearBtn.style.display = 'none';
-  }
 }
 
 // ─── FILTRES AVANCÉS SUIVI ───
