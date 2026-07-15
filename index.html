@@ -226,6 +226,39 @@ body::after{
   color:var(--yellow);width:fit-content;
   border:1px solid rgba(251,191,36,.2);
 }
+/* Badges de priorité des listes d'images */
+.prio-badge{
+  position:absolute;top:8px;left:8px;z-index:2;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-weight:900;
+  backdrop-filter:blur(4px);
+}
+.prio-badge-num{
+  width:26px;height:26px;border-radius:50%;font-size:13px;
+  box-shadow:0 3px 10px rgba(0,0,0,.4);
+  border:1.5px solid rgba(255,255,255,.35);
+}
+.prio-badge-1{background:linear-gradient(135deg,#ffe27a,#f5b942);color:#3a2a00;box-shadow:0 3px 12px rgba(245,185,66,.55),0 3px 10px rgba(0,0,0,.4)}
+.prio-badge-2{background:linear-gradient(135deg,#e5eaf0,#a8b4c2);color:#20242c;box-shadow:0 3px 12px rgba(168,180,194,.4),0 3px 10px rgba(0,0,0,.4)}
+.prio-badge-3{background:linear-gradient(135deg,#e0a15f,#a3672f);color:#2a1600;box-shadow:0 3px 12px rgba(163,103,47,.45),0 3px 10px rgba(0,0,0,.4)}
+.prio-badge-special{
+  border-radius:7px;padding:3px 9px;font-size:9.5px;letter-spacing:.4px;
+  background:linear-gradient(135deg,#c084fc,#f472b6);color:#fff;
+  box-shadow:0 3px 12px rgba(192,132,252,.5),0 3px 10px rgba(0,0,0,.4);
+  border:1.5px solid rgba(255,255,255,.35);
+}
+/* Sélecteur d'ordre d'importance dans la modale */
+.prio-opt{
+  flex:1;padding:9px 4px;border-radius:9px;cursor:pointer;text-align:center;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:13px;
+  border:1.5px solid var(--border2);background:var(--bg3);color:var(--t3);
+  transition:all .15s;
+}
+.prio-opt-special{font-size:10.5px;letter-spacing:.3px}
+.prio-opt.active[data-p="1"]{background:linear-gradient(135deg,#ffe27a,#f5b942);color:#3a2a00;border-color:transparent;box-shadow:0 3px 12px rgba(245,185,66,.4)}
+.prio-opt.active[data-p="2"]{background:linear-gradient(135deg,#e5eaf0,#a8b4c2);color:#20242c;border-color:transparent;box-shadow:0 3px 12px rgba(168,180,194,.35)}
+.prio-opt.active[data-p="3"]{background:linear-gradient(135deg,#e0a15f,#a3672f);color:#2a1600;border-color:transparent;box-shadow:0 3px 12px rgba(163,103,47,.4)}
+.prio-opt.active[data-p="special"]{background:linear-gradient(135deg,#c084fc,#f472b6);color:#fff;border-color:transparent;box-shadow:0 3px 12px rgba(192,132,252,.4)}
 .type-pill{
   position:absolute;top:8px;right:8px;
   font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;
@@ -1196,8 +1229,18 @@ textarea.fi{resize:vertical;min-height:72px}
 <!-- Modal : ajouter un élément image dans une liste -->
 <div class="modal-bg" id="m-add-img-item">
   <div class="modal" style="max-width:440px">
-    <div class="modal-title">Ajouter un élément <span class="modal-close" onclick="closeM('m-add-img-item')">✕</span></div>
+    <div class="modal-title"><span id="img-item-modal-title">Ajouter un élément</span> <span class="modal-close" onclick="closeM('m-add-img-item')">✕</span></div>
     <div class="fg"><label class="fl">Nom</label><input class="fi" id="img-item-name" placeholder="Ex: Figurine Gojo Satoru"></div>
+
+    <div class="fg">
+      <label class="fl">Ordre d'importance</label>
+      <div style="display:flex;gap:6px" id="img-item-priority-group">
+        <button type="button" class="prio-opt" data-p="1" onclick="selectImgPriority(1)">1</button>
+        <button type="button" class="prio-opt" data-p="2" onclick="selectImgPriority(2)">2</button>
+        <button type="button" class="prio-opt" data-p="3" onclick="selectImgPriority(3)">3</button>
+        <button type="button" class="prio-opt prio-opt-special" data-p="special" onclick="selectImgPriority('special')">★ Spécial</button>
+      </div>
+    </div>
 
     <div class="fg">
       <label class="fl">Image</label>
@@ -1232,7 +1275,7 @@ textarea.fi{resize:vertical;min-height:72px}
     </div>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-add-img-item')">Annuler</button>
-      <button class="btn btn-primary" style="flex:1" id="img-item-save-btn" onclick="saveImgItem()">Ajouter</button>
+      <button class="btn btn-primary" style="flex:1" id="img-item-save-btn" onclick="saveImgItem()"><span id="img-item-save-label">Ajouter</span></button>
     </div>
   </div>
 </div>
@@ -3440,15 +3483,22 @@ function renderListDetail(){
 
   // ── IMAGE LIST ──
   if(list.type==='image'){
-    const items = list.imageItems||[];
+    const prioRank={1:0,2:1,3:2,special:3};
+    const items = (list.imageItems||[]).slice().sort((a,b)=>(prioRank[a.priority||1]??0)-(prioRank[b.priority||1]??0));
+    const prioBadgeHtml=p=>{
+      if(p==='special') return `<div class="prio-badge prio-badge-special">★ SPÉCIAL</div>`;
+      const n=p||1;
+      return `<div class="prio-badge prio-badge-num prio-badge-${n}">${n}</div>`;
+    };
     const itemsHtml = items.length
       ? `<div class="cg-lg">${items.map(item=>`
           <div class="cc">
             <div class="cc-wrap">
               ${item.imgUrl?`<img class="cc-img" src="${item.imgUrl}" loading="lazy">`:'<div style="width:100%;height:100%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:36px">🖼</div>'}
+              ${prioBadgeHtml(item.priority)}
               <div class="cc-overlay">
                 <div class="cc-ov-btns">
-                  ${item.link?`<div class="cc-ov-btn" onclick="event.stopPropagation();window.open('${item.link}','_blank')" title="Voir le produit" style="font-size:13px">🛒</div>`:''}
+                  <div class="cc-ov-btn" onclick="event.stopPropagation();openEditImgItem('${item.id}')" title="Modifier" style="font-size:12px">✎</div>
                   <div class="cc-ov-btn" onclick="event.stopPropagation();removeImgItem('${item.id}')" title="Supprimer" style="font-size:11px">✕</div>
                 </div>
               </div>
@@ -6870,6 +6920,17 @@ async function migrateAllImagesToCloudinary(){
 // ─── IMAGE LIST ───
 let _imgItemFile = null;
 let _imgItemUrlValue = '';
+let _imgItemPriority = 1;
+let _imgItemEditingId = null; // null = ajout, sinon id de l'élément en cours d'édition
+let _imgItemEditingImgUrl = ''; // conserve l'image existante si non changée en édition
+
+function selectImgPriority(p){
+  _imgItemPriority = p;
+  document.querySelectorAll('#img-item-priority-group .prio-opt').forEach(btn=>{
+    const isActive = String(btn.dataset.p)===String(p);
+    btn.classList.toggle('active', isActive);
+  });
+}
 
 function switchImgSrcTab(tab){
   document.getElementById('img-src-file-section').style.display = tab==='file' ? '' : 'none';
@@ -6907,13 +6968,48 @@ function previewImgUrl(val){
 function openAddImgItem(){
   _imgItemFile = null;
   _imgItemUrlValue = '';
+  _imgItemEditingId = null;
+  _imgItemEditingImgUrl = '';
+  document.getElementById('img-item-modal-title').textContent = 'Ajouter un élément';
+  document.getElementById('img-item-save-label').textContent = 'Ajouter';
   document.getElementById('img-item-name').value = '';
   document.getElementById('img-item-link').value = '';
   document.getElementById('img-item-url') && (document.getElementById('img-item-url').value = '');
   document.getElementById('img-item-preview').style.display = 'none';
   document.getElementById('img-item-upload-label').textContent = '📁 Choisir une image';
   document.getElementById('img-item-uploading').style.display = 'none';
+  selectImgPriority(1);
   switchImgSrcTab('file');
+  openM('m-add-img-item');
+}
+
+function openEditImgItem(itemId){
+  const list = S.lists.find(l=>l.id===S.currentListId);
+  if(!list||!list.imageItems) return;
+  const item = list.imageItems.find(i=>i.id===itemId);
+  if(!item) return;
+
+  _imgItemFile = null;
+  _imgItemUrlValue = '';
+  _imgItemEditingId = itemId;
+  _imgItemEditingImgUrl = item.imgUrl||'';
+
+  document.getElementById('img-item-modal-title').textContent = 'Modifier l\'élément';
+  document.getElementById('img-item-save-label').textContent = 'Enregistrer';
+  document.getElementById('img-item-name').value = item.name||'';
+  document.getElementById('img-item-link').value = item.link||'';
+  document.getElementById('img-item-url') && (document.getElementById('img-item-url').value = '');
+  document.getElementById('img-item-uploading').style.display = 'none';
+  selectImgPriority(item.priority||1);
+  switchImgSrcTab('file');
+  // Aperçu de l'image existante
+  if(item.imgUrl){
+    document.getElementById('img-item-preview-el').src = item.imgUrl;
+    document.getElementById('img-item-preview').style.display = 'block';
+  } else {
+    document.getElementById('img-item-preview').style.display = 'none';
+  }
+  document.getElementById('img-item-upload-label').textContent = '📁 Changer l\'image (optionnel)';
   openM('m-add-img-item');
 }
 
@@ -6921,13 +7017,15 @@ async function saveImgItem(){
   const name = document.getElementById('img-item-name').value.trim();
   if(!name){ toast('Donne un nom à cet élément','err'); return; }
   const link = document.getElementById('img-item-link').value.trim();
+  const priority = _imgItemPriority;
   const list = S.lists.find(l=>l.id===S.currentListId);
   if(!list) return;
 
   const saveBtn = document.getElementById('img-item-save-btn');
   const uploadingEl = document.getElementById('img-item-uploading');
 
-  let imgUrl = '';
+  // En édition, si aucune nouvelle image n'est fournie, on garde l'ancienne
+  let imgUrl = _imgItemEditingId ? _imgItemEditingImgUrl : '';
 
   if(_imgItemFile){
     // Upload fichier local
@@ -6968,15 +7066,27 @@ async function saveImgItem(){
   saveBtn.disabled = false;
 
   if(!list.imageItems) list.imageItems = [];
-  list.imageItems.push({
-    id: 'ii_'+Date.now(),
-    name, imgUrl, link,
-    addedAt: Date.now()
-  });
-  save();
-  closeM('m-add-img-item');
-  renderListDetail();
-  toast('"'+name+'" ajouté ✓','ok');
+
+  if(_imgItemEditingId){
+    const idx = list.imageItems.findIndex(i=>i.id===_imgItemEditingId);
+    if(idx!==-1){
+      list.imageItems[idx] = {...list.imageItems[idx], name, imgUrl, link, priority};
+    }
+    save();
+    closeM('m-add-img-item');
+    renderListDetail();
+    toast('"'+name+'" mis à jour ✓','ok');
+  } else {
+    list.imageItems.push({
+      id: 'ii_'+Date.now(),
+      name, imgUrl, link, priority,
+      addedAt: Date.now()
+    });
+    save();
+    closeM('m-add-img-item');
+    renderListDetail();
+    toast('"'+name+'" ajouté ✓','ok');
+  }
 }
 
 function removeImgItem(itemId){
