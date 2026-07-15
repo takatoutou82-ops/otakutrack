@@ -994,6 +994,20 @@ textarea.fi{resize:vertical;min-height:72px}
 .tier-link-name{font-size:12px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tier-link-note{font-size:11px;color:var(--acc2);margin-top:2px}
 .tier-link-remove{width:18px;height:18px;border-radius:4px;background:rgba(248,113,113,.15);color:var(--red);font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;border:none;line-height:1}
+/* Groupes de priorité des listes d'images */
+.imglist-group{margin-bottom:26px}
+.imglist-group-title{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.imglist-pill{font-family:'Syne',sans-serif;font-weight:900;font-size:12px;border-radius:7px;padding:4px 11px;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+.imglist-pill-1{background:linear-gradient(135deg,#ffe27a,#f5b942);color:#3a2a00}
+.imglist-pill-2{background:linear-gradient(135deg,#e5eaf0,#a8b4c2);color:#20242c}
+.imglist-pill-3{background:linear-gradient(135deg,#e0a15f,#a3672f);color:#2a1600}
+.imglist-pill-special{background:linear-gradient(135deg,#c084fc,#f472b6);color:#fff}
+.imglist-group-count{font-size:11.5px;color:var(--t3)}
+.imglist-dropzone{min-height:60px;border-radius:12px;transition:background .15s,box-shadow .15s}
+.imglist-dropzone.drag-over{background:rgba(139,124,248,.06);box-shadow:inset 0 0 0 2px var(--acc)}
+.imglist-empty-drop{font-size:11.5px;color:var(--t4);font-style:italic;padding:10px 2px}
+.cc-img-wrap-draggable{cursor:grab}
+.cc-img-wrap-draggable:active{cursor:grabbing}
 /* SAISONS */
 .saison-card{background:var(--bg3);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
 .saison-header{display:flex;align-items:center;gap:12px;padding:12px;cursor:pointer;transition:background .15s}
@@ -3484,18 +3498,32 @@ function renderListDetail(){
   // ── IMAGE LIST ──
   if(list.type==='image'){
     const prioRank={1:0,2:1,3:2,special:3};
-    const items = (list.imageItems||[]).slice().sort((a,b)=>(prioRank[a.priority||1]??0)-(prioRank[b.priority||1]??0));
+    const orders=list.imgOrders||{};
+    const items = (list.imageItems||[]).slice().sort((a,b)=>{
+      const pa=a.priority||1, pb=b.priority||1;
+      if(pa!==pb) return (prioRank[pa]??0)-(prioRank[pb]??0);
+      const order=orders[pa]||[];
+      const ia=order.indexOf(a.id), ib=order.indexOf(b.id);
+      return (ia===-1?9999:ia)-(ib===-1?9999:ib);
+    });
     const prioBadgeHtml=p=>{
       if(p==='special') return `<div class="prio-badge prio-badge-special">★ SPÉCIAL</div>`;
       const n=p||1;
       return `<div class="prio-badge prio-badge-num prio-badge-${n}">${n}</div>`;
     };
-    const itemsHtml = items.length
-      ? `<div class="cg-lg">${items.map(item=>`
-          <div class="cc">
-            <div class="cc-wrap">
+    const links=list.imageLinks||{};
+
+    const renderCard=item=>{
+      const linked=links[item.id]||[];
+      const linkBadge=linked.length?`<div class="tier-link-badge">+${linked.length}</div>`:'';
+      return `<div class="cc" draggable="true"
+          data-item-id="${item.id}" data-priority="${item.priority||1}"
+          ondragstart="imgItemDragStart(event,'${item.id}')"
+          ondragend="imgItemDragEnd(event)">
+            <div class="cc-wrap cc-img-wrap-draggable" onclick="imgItemClick(event,'${item.id}',this)">
               ${item.imgUrl?`<img class="cc-img" src="${item.imgUrl}" loading="lazy">`:'<div style="width:100%;height:100%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:36px">🖼</div>'}
               ${prioBadgeHtml(item.priority)}
+              ${linkBadge}
               <div class="cc-overlay">
                 <div class="cc-ov-btns">
                   <div class="cc-ov-btn" onclick="event.stopPropagation();openEditImgItem('${item.id}')" title="Modifier" style="font-size:12px">✎</div>
@@ -3504,8 +3532,16 @@ function renderListDetail(){
               </div>
             </div>
             <div class="cc-title">${esc(item.name)}</div>
-            ${item.link?`<div class="cc-meta" style="color:var(--acc2);cursor:pointer" onclick="window.open('${item.link}','_blank')">🔗 Voir le produit</div>`:''}
-          </div>`).join('')}
+            ${item.link?`<div class="cc-meta" style="color:var(--acc2);cursor:pointer" onclick="event.stopPropagation();window.open('${item.link}','_blank')">🔗 Voir le produit</div>`:''}
+          </div>`;
+    };
+
+    const itemsHtml = items.length
+      ? `<div class="cg-lg imglist-dropzone" id="imglist-grid"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="imgGroupDrop(event)">
+          ${items.map(renderCard).join('')}
         </div>`
       : '<div class="empty"><div class="empty-icon">🖼</div><div class="empty-title">Liste vide</div><div class="empty-sub">Ajoute ta première image avec le bouton +</div></div>';
 
@@ -7093,7 +7129,153 @@ function removeImgItem(itemId){
   const list = S.lists.find(l=>l.id===S.currentListId);
   if(!list||!list.imageItems) return;
   list.imageItems = list.imageItems.filter(i=>i.id!==itemId);
+  // Nettoyage : retirer les liens et positions d'ordre pointant vers cet élément
+  if(list.imageLinks){
+    delete list.imageLinks[itemId];
+    Object.keys(list.imageLinks).forEach(k=>{
+      list.imageLinks[k]=(list.imageLinks[k]||[]).filter(id=>id!==itemId);
+      if(!list.imageLinks[k].length) delete list.imageLinks[k];
+    });
+  }
+  if(list.imgOrders){
+    Object.keys(list.imgOrders).forEach(p=>{
+      list.imgOrders[p]=(list.imgOrders[p]||[]).filter(id=>id!==itemId);
+    });
+  }
   save(); renderListDetail();
+}
+
+// ─── DRAG & DROP + LIAISON — listes d'images ───
+let _imgDragging=null; // {itemId, fromPriority}
+
+function imgItemDragStart(e,itemId){
+  const list=S.lists.find(l=>l.id===S.currentListId);
+  const item=list?.imageItems?.find(i=>i.id===itemId);
+  _imgDragging={itemId, fromPriority:item?.priority||1};
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(()=>e.target.closest('.cc')?.classList.add('tier-item-drop-target'),0);
+}
+function imgItemDragEnd(e){
+  document.querySelectorAll('.imglist-dropzone').forEach(z=>z.classList.remove('drag-over'));
+  document.querySelectorAll('.cc.tier-item-drop-target').forEach(el=>el.classList.remove('tier-item-drop-target'));
+  _imgDragging=null;
+}
+
+async function imgGroupDrop(e){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(!_imgDragging) return;
+  const {itemId,fromPriority}=_imgDragging;
+  const list=S.lists.find(l=>l.id===S.currentListId);
+  if(!list) return;
+
+  // Détecter si on drop pile sur une vignette existante (zone centrale) → proposer de LIER
+  const allCards=[...e.currentTarget.querySelectorAll('.cc[data-item-id]')];
+  for(const card of allCards){
+    const targetId=card.dataset.itemId;
+    if(targetId===itemId) continue;
+    const rect=card.getBoundingClientRect();
+    const dx=Math.abs(e.clientX-(rect.left+rect.width/2));
+    const dy=Math.abs(e.clientY-(rect.top+rect.height/2));
+    if(dx<rect.width*0.4 && dy<rect.height*0.4){
+      const targetItem=list.imageItems.find(i=>i.id===targetId);
+      const srcItem=list.imageItems.find(i=>i.id===itemId);
+      const ok=confirm(`Lier "${srcItem?.name||''}" à "${targetItem?.name||''}" ?\n\nLes deux images seront regroupées ensemble.`);
+      if(ok){
+        if(!list.imageLinks) list.imageLinks={};
+        if(!list.imageLinks[targetId]) list.imageLinks[targetId]=[];
+        if(!list.imageLinks[targetId].includes(itemId)){
+          list.imageLinks[targetId].push(itemId);
+          save();
+          renderListDetail();
+          toast('Images liées ✓','ok');
+        }
+      }
+      return;
+    }
+  }
+
+  // Drop normal : réorganise uniquement parmi les images du MÊME niveau de priorité
+  // (le drag ne change pas le niveau — ça se fait via "Modifier")
+  const sameLevelCards=allCards.filter(c=>c.dataset.priority===String(fromPriority));
+  let insertBefore=null;
+  for(const card of sameLevelCards){
+    const rect=card.getBoundingClientRect();
+    if(e.clientX < rect.left+rect.width/2){ insertBefore=card; break; }
+  }
+  const newOrder=[];
+  for(const card of sameLevelCards){
+    const k=card.dataset.itemId;
+    if(k===itemId) continue;
+    if(insertBefore===card) newOrder.push(itemId);
+    newOrder.push(k);
+  }
+  if(!newOrder.includes(itemId)) newOrder.push(itemId);
+  if(!list.imgOrders) list.imgOrders={};
+  list.imgOrders[fromPriority]=newOrder;
+  save();
+  renderListDetail();
+}
+
+// ─── IMAGE ITEM CLICK → popup images liées ───
+let _imgLinksPopupOpen=null;
+
+function imgItemClick(e,itemId,el){
+  if(_imgDragging) return;
+  const list=S.lists.find(l=>l.id===S.currentListId);
+  if(!list) return;
+  const linked=(list.imageLinks||{})[itemId]||[];
+  if(!linked.length) return; // rien à afficher
+
+  if(_imgLinksPopupOpen===itemId){ closeImgLinksPopup(); return; }
+  closeImgLinksPopup();
+  _imgLinksPopupOpen=itemId;
+
+  const popup=document.createElement('div');
+  popup.className='tier-links-popup';
+  popup.id='img-links-popup';
+
+  const entries=linked.map(id=>{
+    const it=list.imageItems.find(i=>i.id===id);
+    if(!it) return '';
+    return `<div class="tier-link-entry">
+      <img class="tier-link-cover" src="${it.imgUrl||''}" loading="lazy" style="border-radius:6px;height:44px">
+      <div class="tier-link-info">
+        <div class="tier-link-name">${esc(it.name||'')}</div>
+        ${it.link?`<div class="tier-link-note" style="cursor:pointer" onclick="window.open('${it.link}','_blank')">🔗 Voir le produit</div>`:''}
+      </div>
+      <button class="tier-link-remove" onclick="unlinkImgItem('${itemId}','${id}',event)" title="Délier">✕</button>
+    </div>`;
+  }).join('');
+
+  popup.innerHTML=`<div class="tier-links-popup-title">Images liées</div>${entries}`;
+
+  const wrap=document.getElementById('listdetail-body');
+  wrap.style.position='relative';
+  const elRect=el.getBoundingClientRect();
+  const wrapRect=wrap.getBoundingClientRect();
+  popup.style.top=(elRect.bottom-wrapRect.top+6)+'px';
+  popup.style.left=Math.min(elRect.left-wrapRect.left, wrapRect.width-240)+'px';
+
+  wrap.appendChild(popup);
+  setTimeout(()=>document.addEventListener('click',closeImgLinksPopup,{once:true}),10);
+}
+
+function closeImgLinksPopup(){
+  _imgLinksPopupOpen=null;
+  const p=document.getElementById('img-links-popup');
+  if(p) p.remove();
+}
+
+function unlinkImgItem(targetId,srcId,e){
+  e.stopPropagation();
+  const list=S.lists.find(l=>l.id===S.currentListId);
+  if(!list||!list.imageLinks) return;
+  list.imageLinks[targetId]=(list.imageLinks[targetId]||[]).filter(id=>id!==srcId);
+  if(!list.imageLinks[targetId].length) delete list.imageLinks[targetId];
+  save();
+  closeImgLinksPopup();
+  renderListDetail();
 }
 
 function initFirebase(){
