@@ -1813,7 +1813,7 @@ textarea.fi{resize:vertical;min-height:72px}
             <button class="btn btn-primary" id="tl-filter-all" onclick="setTierFilter('all')" style="font-size:11px;padding:4px 10px">Tout</button>
             <button class="btn btn-ghost" id="tl-filter-manga" onclick="setTierFilter('manga')" style="font-size:11px;padding:4px 10px;color:var(--manga)">Manga</button>
             <button class="btn btn-ghost" id="tl-filter-anime" onclick="setTierFilter('anime')" style="font-size:11px;padding:4px 10px;color:var(--anime)">Animé</button>
-            <button class="btn btn-ghost" style="font-size:11px" onclick="renderTierList()">↺</button>
+            <button class="btn btn-ghost" style="font-size:11px" onclick="renderTierList();if(_lowTierOpen)renderTierList('low')">↺</button>
             <label title="Importer une image de tier list" style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid var(--border);color:var(--t2);transition:border-color .15s" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">
               🖼 Image
               <input type="file" accept="image/*" style="display:none" onchange="importTierImg(this)">
@@ -1825,6 +1825,15 @@ textarea.fi{resize:vertical;min-height:72px}
           <img id="tier-img-el" style="width:100%;display:block;max-height:600px;object-fit:contain;background:var(--bg3)">
         </div>
         <div id="tier-list-wrap"></div>
+
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+          <button class="btn btn-ghost" style="font-size:12px;width:100%;justify-content:center" onclick="toggleLowTierList()">
+            <span id="tier-list-low-toggle-label">▾ Afficher la suite (notes en dessous de 14)</span>
+          </button>
+          <div id="tier-list-low-section" style="display:none;margin-top:14px">
+            <div id="tier-list-low-wrap"></div>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -3397,17 +3406,20 @@ function rateWork(malId, type, rating){
   // Un changement de note doit toujours refléter la vraie tier list : on retire le
   // placement manuel (override) éventuel, sinon l'item reste figé dans son ancienne
   // tier même après avoir changé de note. Sa position (bas/haut du trait) redevient
-  // celle par défaut correspondant à la nouvelle note.
+  // celle par défaut correspondant à la nouvelle note. Idem pour la tier list bis (<14).
   const key=malId+'_'+type;
-  if(S.profile?.tierOverrides && S.profile.tierOverrides[key]!==undefined) delete S.profile.tierOverrides[key];
-  if(S.profile?.tierOrders){
-    Object.values(S.profile.tierOrders).forEach(order=>{
-      const idx=order.indexOf(key);
-      if(idx!==-1) order.splice(idx,1);
-    });
-  }
+  [['tierOverrides','tierOrders'],['tierOverridesLow','tierOrdersLow']].forEach(([ovKey,ordKey])=>{
+    if(S.profile?.[ovKey] && S.profile[ovKey][key]!==undefined) delete S.profile[ovKey][key];
+    if(S.profile?.[ordKey]){
+      Object.values(S.profile[ordKey]).forEach(order=>{
+        const idx=order.indexOf(key);
+        if(idx!==-1) order.splice(idx,1);
+      });
+    }
+  });
   save();
-  renderTierList(); // rafraîchit immédiatement si la tier list est déjà à l'écran
+  renderTierList('main'); // rafraîchit immédiatement si la tier list est déjà à l'écran
+  if(_lowTierOpen) renderTierList('low');
   if(rating>0) toast('Note sauvegardée : '+rating+'/20','ok');
 }
 
@@ -3819,6 +3831,7 @@ function renderProfile(){
   if(emptyEl) emptyEl.style.display=S.bannerUrl?'none':'flex';
   renderTop5Manual();
   renderTierList();
+  if(_lowTierOpen) renderTierList('low');
 }
 
 function openEditProfile(){
@@ -5254,7 +5267,39 @@ function splitTierHalf(items, tierIdx){
   return {low, high};
 }
 
+// ─── TIER LIST BIS (notes 0 à 13, paliers d'un point entier) ───
+const TIERS_LOW=[
+  {label:'13', base:13, high:null, color:'#5eead4',bg:'rgba(94,234,212,.18)'},
+  {label:'12', base:12, high:null, color:'#67e8b8',bg:'rgba(103,232,184,.18)'},
+  {label:'11', base:11, high:null, color:'#86efac',bg:'rgba(134,239,172,.18)'},
+  {label:'10', base:10, high:null, color:'#bef264',bg:'rgba(190,242,100,.18)'},
+  {label:'9',  base:9,  high:null, color:'#fde047',bg:'rgba(253,224,71,.18)'},
+  {label:'8',  base:8,  high:null, color:'#fdba74',bg:'rgba(253,186,116,.18)'},
+  {label:'7',  base:7,  high:null, color:'#fb923c',bg:'rgba(251,146,60,.18)'},
+  {label:'6',  base:6,  high:null, color:'#f87171',bg:'rgba(248,113,113,.18)'},
+  {label:'5',  base:5,  high:null, color:'#ef4444',bg:'rgba(239,68,68,.18)'},
+  {label:'4',  base:4,  high:null, color:'#dc2626',bg:'rgba(220,38,38,.18)'},
+  {label:'3',  base:3,  high:null, color:'#b91c1c',bg:'rgba(185,28,28,.18)'},
+  {label:'2',  base:2,  high:null, color:'#991b1b',bg:'rgba(153,27,27,.18)'},
+  {label:'1',  base:1,  high:null, color:'#7f1d1d',bg:'rgba(127,29,29,.18)'},
+  {label:'0',  base:0,  high:null, color:'#525252',bg:'rgba(82,82,82,.18)'},
+];
+function getTierIndexLow(rating){
+  if(rating>13||rating<0) return -1;
+  return 13-Math.round(rating);
+}
+let _lowTierOpen=false;
+function toggleLowTierList(){
+  _lowTierOpen=!_lowTierOpen;
+  const wrap=document.getElementById('tier-list-low-section');
+  const btn=document.getElementById('tier-list-low-toggle-label');
+  if(wrap) wrap.style.display=_lowTierOpen?'block':'none';
+  if(btn) btn.textContent=_lowTierOpen?'▴ Masquer la suite (notes en dessous de 14)':'▾ Afficher la suite (notes en dessous de 14)';
+  if(_lowTierOpen) renderTierList('low');
+}
+
 let _tierFilter='all';
+
 
 function setTierFilter(f){
   _tierFilter=f;
@@ -5267,11 +5312,18 @@ function setTierFilter(f){
   renderTierList();
 }
 
-function renderTierList(){
-  const el=document.getElementById('tier-list-wrap');
+function renderTierList(variant='main'){
+  const isLow = variant==='low';
+  const el=document.getElementById(isLow?'tier-list-low-wrap':'tier-list-wrap');
   if(!el) return;
   const filter=_tierFilter||'all';
-  const tierLinks=S.profile.tierLinks||{};
+  const TIERS_ACTIVE = isLow ? TIERS_LOW : TIERS;
+  const idxFn = isLow ? getTierIndexLow : getTierIndex;
+  const overridesKey = isLow ? 'tierOverridesLow' : 'tierOverrides';
+  const ordersKey = isLow ? 'tierOrdersLow' : 'tierOrders';
+  const labelsKey = isLow ? 'tierLabelsLow' : 'tierLabels';
+  const linksKey = isLow ? 'tierLinksLow' : 'tierLinks';
+  const tierLinks=S.profile[linksKey]||{};
 
   // Construire l'ensemble de toutes les œuvres qui sont "dans" une autre (liées)
   const linkedSrcs=new Set();
@@ -5297,21 +5349,21 @@ function renderTierList(){
     return true;
   });
 
-  const groups=TIERS.map(()=>[]);
-  const overrides=S.profile.tierOverrides||{};
-  const orders=S.profile.tierOrders||{};
-  const customLabels=S.profile.tierLabels||{};
+  const groups=TIERS_ACTIVE.map(()=>[]);
+  const overrides=S.profile[overridesKey]||{};
+  const orders=S.profile[ordersKey]||{};
+  const customLabels=S.profile[labelsKey]||{};
 
   all.forEach(t=>{
     const key=t.mal_id+'_'+t.type;
-    const idx=overrides[key]!==undefined?overrides[key]:getTierIndex(t.rating);
+    const idx=overrides[key]!==undefined?overrides[key]:idxFn(t.rating);
     if(idx>=0&&idx<groups.length) groups[idx].push({...t,_isCat:false});
   });
 
   // Ajouter les catégories dans leur tier selon leur note
   cats.forEach(c=>{
     const key='cat_'+c.id; // même clé que mal_id et que dragKey dans tierDrop
-    const idx=overrides[key]!==undefined?overrides[key]:getTierIndex(c.rating);
+    const idx=overrides[key]!==undefined?overrides[key]:idxFn(c.rating);
     if(idx>=0&&idx<groups.length) groups[idx].push({
       _isCat:true, id:c.id, type:'cat',
       title:c.name, cover:c.cover||'',
@@ -5321,7 +5373,7 @@ function renderTierList(){
 
   groups.forEach((g,i)=>{
     const order=orders[i]||[];
-    const tier=TIERS[i];
+    const tier=TIERS_ACTIVE[i];
     g.sort((a,b)=>{
       // clé cohérente avec dragKey : pour cat → mal_id, pour œuvre → mal_id+'_'+type
       const keyA = a._isCat ? String(a.mal_id) : String(a.mal_id)+'_'+(a.type||'');
@@ -5342,30 +5394,32 @@ function renderTierList(){
   });
 
   if(!all.length&&!cats.length){
-    el.innerHTML='<p style="color:var(--t3);font-size:13px">Aucune œuvre notée (Terminée ou À jour) à afficher.</p>';
+    el.innerHTML=isLow
+      ? '<p style="color:var(--t3);font-size:13px">Aucune œuvre notée en dessous de 14 (Terminée ou À jour) à afficher.</p>'
+      : '<p style="color:var(--t3);font-size:13px">Aucune œuvre notée (Terminée ou À jour) à afficher.</p>';
     return;
   }
 
-  el.innerHTML=TIERS.map((tier,i)=>{
+  el.innerHTML=TIERS_ACTIVE.map((tier,i)=>{
     const label=customLabels[i]||tier.label;
     return `<div class="tier-row">
       <div class="tier-label" style="background:${tier.bg};color:${tier.color}"
         title="Cliquer pour renommer"
-        onclick="renameTierLabel(${i},this)">${label}</div>
+        onclick="renameTierLabel(${i},this,'${variant}')">${label}</div>
       <div class="tier-items" data-tier="${i}"
         ondragover="event.preventDefault();this.classList.add('tier-drag-over')"
         ondragleave="this.classList.remove('tier-drag-over')"
-        ondrop="tierDrop(event,${i})">
+        ondrop="tierDrop(event,${i},'${variant}')">
         ${groups[i].length
           ? (()=>{
-              const tier=TIERS[i];
+              const tier=TIERS_ACTIVE[i];
               const renderItem=(t,idx)=>{
               const anim=`animation-delay:${idx*0.04}s`;
               if(t._isCat){
                 return `<div class="tier-item tier-item-cat tier-item-anim" draggable="true"
                   style="${anim}"
                   data-malid="${t.id}" data-type="cat" data-tier="${i}"
-                  ondragstart="tierDragStart(event,'cat_${t.id}','cat',${i})"
+                  ondragstart="tierDragStart(event,'cat_${t.id}','cat',${i},'${variant}')"
                   ondragend="tierDragEnd(event)"
                   onclick="openSuiviCategory('${t.id}')"
                   title="${esc(t.title)} ★${t.rating} (catégorie)">
@@ -5379,14 +5433,14 @@ function renderTierList(){
               const badge=filter==='all'
                 ? `<div style="position:absolute;top:2px;left:2px;width:6px;height:6px;border-radius:50%;background:${t.type==='manga'?'var(--manga)':'var(--anime)'}"></div>`
                 : '';
-              const linked = (S.profile.tierLinks||{})[String(t.mal_id)+'_'+t.type]||[];
+              const linked = (S.profile[linksKey]||{})[String(t.mal_id)+'_'+t.type]||[];
               const linkBadge = linked.length ? `<div class="tier-link-badge">+${linked.length}</div>` : '';
               return `<div class="tier-item tier-item-anim" draggable="true"
                 style="${anim}"
                 data-malid="${t.mal_id}" data-type="${t.type}" data-tier="${i}"
-                ondragstart="tierDragStart(event,${t.mal_id},'${t.type}',${i})"
+                ondragstart="tierDragStart(event,${t.mal_id},'${t.type}',${i},'${variant}')"
                 ondragend="tierDragEnd(event)"
-                onclick="tierItemClick(event,${t.mal_id},'${t.type}',this)"
+                onclick="tierItemClick(event,${t.mal_id},'${t.type}',this,'${variant}')"
                 title="${esc(t.title)} ★${t.rating} (${t.type})">
                 ${badge}
                 ${linkBadge}
@@ -5413,9 +5467,9 @@ function renderTierList(){
   }).join('');
 }
 
-let _tierDragging={malId:null,type:null,fromTier:null};
-function tierDragStart(e,malId,type,fromTier){
-  _tierDragging={malId,type,fromTier};
+let _tierDragging={malId:null,type:null,fromTier:null,variant:'main'};
+function tierDragStart(e,malId,type,fromTier,variant='main'){
+  _tierDragging={malId,type,fromTier,variant};
   e.dataTransfer.effectAllowed='move';
   e.currentTarget.style.opacity='0.4';
   // Stocker l'élément pour réordonnancement
@@ -5427,14 +5481,18 @@ function tierDragEnd(e){
   _tierDragEl=null;
   _tierLinkHandled=false;
   // Reset APRÈS un court délai pour que tierItemClick puisse encore l'ignorer si besoin
-  setTimeout(()=>{ _tierDragging={malId:null,type:null,fromTier:null}; }, 50);
+  setTimeout(()=>{ _tierDragging={malId:null,type:null,fromTier:null,variant:'main'}; }, 50);
 }
 let _tierDragEl=null;
-function tierDrop(e,newTierIdx){
+function tierDrop(e,newTierIdx,variant='main'){
   e.preventDefault();
   e.currentTarget.classList.remove('tier-drag-over');
   const {malId,type,fromTier}=_tierDragging;
   if(!malId) return;
+  const isLow = variant==='low';
+  const overridesKey = isLow ? 'tierOverridesLow' : 'tierOverrides';
+  const ordersKey = isLow ? 'tierOrdersLow' : 'tierOrders';
+  const linksKey = isLow ? 'tierLinksLow' : 'tierLinks';
 
   // Clé de l'élément draggé — pour les catégories mal_id est déjà 'cat_scat_xxx', type='cat'
   // On normalise la clé comme : pour cat → mal_id (ex: 'cat_scat_123'), pour œuvres → malId+'_'+type
@@ -5457,13 +5515,13 @@ function tierDrop(e,newTierIdx){
         if(malId===targetMalId && type===targetType) break;
         const targetKey=String(targetMalId)+'_'+targetType;
         const srcKey=String(malId)+'_'+type;
-        if(!S.profile.tierLinks) S.profile.tierLinks={};
-        if(!S.profile.tierLinks[targetKey]) S.profile.tierLinks[targetKey]=[];
-        if(!S.profile.tierLinks[targetKey].includes(srcKey)){
-          S.profile.tierLinks[targetKey].push(srcKey);
+        if(!S.profile[linksKey]) S.profile[linksKey]={};
+        if(!S.profile[linksKey][targetKey]) S.profile[linksKey][targetKey]=[];
+        if(!S.profile[linksKey][targetKey].includes(srcKey)){
+          S.profile[linksKey][targetKey].push(srcKey);
           item.classList.add('tier-item-drop-target');
           setTimeout(()=>item.classList.remove('tier-item-drop-target'),600);
-          save(); renderTierList();
+          save(); renderTierList(variant);
           toast('Œuvre liée ✓','ok');
         }
         return;
@@ -5472,9 +5530,9 @@ function tierDrop(e,newTierIdx){
   }
 
   // Drop normal : changer de tier + réordonner
-  if(!S.profile.tierOverrides) S.profile.tierOverrides={};
-  S.profile.tierOverrides[dragKey]=newTierIdx;
-  if(!S.profile.tierOrders) S.profile.tierOrders={};
+  if(!S.profile[overridesKey]) S.profile[overridesKey]={};
+  S.profile[overridesKey][dragKey]=newTierIdx;
+  if(!S.profile[ordersKey]) S.profile[ordersKey]={};
   const container=e.currentTarget;
   const allItems=[...container.querySelectorAll('.tier-item')];
   let insertBefore=null;
@@ -5492,27 +5550,30 @@ function tierDrop(e,newTierIdx){
     newOrder.push(k);
   }
   if(!newOrder.includes(dragKey)) newOrder.push(dragKey);
-  S.profile.tierOrders[newTierIdx]=newOrder;
+  S.profile[ordersKey][newTierIdx]=newOrder;
   save();
-  renderTierList();
+  renderTierList(variant);
 }
 
 // ─── TIER ITEM CLICK → popup œuvres liées ───
 let _tierPopupOpen = null;
 
-function tierItemClick(e, malId, type, el){
+function tierItemClick(e, malId, type, el, variant='main'){
   // Ignorer si c'était un drag
   if(_tierDragging.malId) return;
   e.stopPropagation();
 
+  const isLow = variant==='low';
+  const linksKey = isLow ? 'tierLinksLow' : 'tierLinks';
   const key = String(malId)+'_'+type;
-  const linked = (S.profile.tierLinks||{})[key]||[];
+  const linked = (S.profile[linksKey]||{})[key]||[];
   if(!linked.length) return; // rien à afficher, pas de popup
 
   // Fermer si déjà ouvert pour ce même item
   if(_tierPopupOpen === key){ closeTierPopup(); return; }
   closeTierPopup();
   _tierPopupOpen = key;
+  _tierPopupVariant = variant;
 
   const popup = document.createElement('div');
   popup.className = 'tier-links-popup';
@@ -5528,7 +5589,7 @@ function tierItemClick(e, malId, type, el){
         <div class="tier-link-name">${esc(tr.title||'')}</div>
         <div class="tier-link-note">★ ${tr.rating}/20 · ${tr.type}</div>
       </div>
-      <button class="tier-link-remove" onclick="unlinkTierItem('${key}','${k}',event)" title="Délier">✕</button>
+      <button class="tier-link-remove" onclick="unlinkTierItem('${key}','${k}',event,'${variant}')" title="Délier">✕</button>
     </div>`;
   }).join('');
 
@@ -5537,7 +5598,7 @@ function tierItemClick(e, malId, type, el){
     ${entries}`;
 
   // Positionner près de la vignette
-  const wrap = document.getElementById('tier-list-wrap');
+  const wrap = document.getElementById(isLow?'tier-list-low-wrap':'tier-list-wrap');
   wrap.style.position = 'relative';
   const elRect = el.getBoundingClientRect();
   const wrapRect = wrap.getBoundingClientRect();
@@ -5550,20 +5611,22 @@ function tierItemClick(e, malId, type, el){
   setTimeout(()=> document.addEventListener('click', closeTierPopup, {once:true}), 10);
 }
 
+let _tierPopupVariant = 'main';
 function closeTierPopup(){
   _tierPopupOpen = null;
   const p = document.getElementById('tier-links-popup');
   if(p) p.remove();
 }
 
-function unlinkTierItem(targetKey, srcKey, e){
+function unlinkTierItem(targetKey, srcKey, e, variant='main'){
   e.stopPropagation();
-  if(!S.profile.tierLinks) return;
-  S.profile.tierLinks[targetKey] = (S.profile.tierLinks[targetKey]||[]).filter(k=>k!==srcKey);
-  if(!S.profile.tierLinks[targetKey].length) delete S.profile.tierLinks[targetKey];
+  const linksKey = variant==='low' ? 'tierLinksLow' : 'tierLinks';
+  if(!S.profile[linksKey]) return;
+  S.profile[linksKey][targetKey] = (S.profile[linksKey][targetKey]||[]).filter(k=>k!==srcKey);
+  if(!S.profile[linksKey][targetKey].length) delete S.profile[linksKey][targetKey];
   save();
   closeTierPopup();
-  renderTierList();
+  renderTierList(variant);
   toast('Lien retiré','ok');
 }
 
@@ -5583,15 +5646,19 @@ function renameTierItem(e, malId, type){
     const val=input.value.trim();
     if(val) S.profile.tierItemNames[key]=val;
     save();
-    renderTierList();
+    renderTierList('main');
+    if(_lowTierOpen) renderTierList('low');
   }
   input.onblur=done;
   input.onkeydown=ev=>{ if(ev.key==='Enter') input.blur(); if(ev.key==='Escape'){ input.value=current; input.blur(); } };
 }
 
-function renameTierLabel(idx, el){
-  const customLabels=S.profile.tierLabels||{};
-  const current=customLabels[idx]||TIERS[idx].label;
+function renameTierLabel(idx, el, variant='main'){
+  const isLow = variant==='low';
+  const labelsKey = isLow ? 'tierLabelsLow' : 'tierLabels';
+  const TIERS_ACTIVE = isLow ? TIERS_LOW : TIERS;
+  const customLabels=S.profile[labelsKey]||{};
+  const current=customLabels[idx]||TIERS_ACTIVE[idx].label;
   const input=document.createElement('input');
   input.value=current;
   input.style.cssText='background:transparent;border:none;border-bottom:1px solid currentColor;color:inherit;font:inherit;text-align:center;width:100%;outline:none;font-size:11px';
@@ -5602,11 +5669,11 @@ function renameTierLabel(idx, el){
   function save_label(){
     const val=input.value.trim();
     if(val){
-      if(!S.profile.tierLabels) S.profile.tierLabels={};
-      S.profile.tierLabels[idx]=val;
+      if(!S.profile[labelsKey]) S.profile[labelsKey]={};
+      S.profile[labelsKey][idx]=val;
       save();
     }
-    renderTierList();
+    renderTierList(variant);
   }
   input.onblur=save_label;
   input.onkeydown=e=>{ if(e.key==='Enter') input.blur(); if(e.key==='Escape'){ input.value=current; input.blur(); } };
@@ -5708,6 +5775,7 @@ function applyCustomCover(malId,dataUrl){
   renderHomeInProgress();
   renderTop5Manual();
   renderTierList();
+  if(_lowTierOpen) renderTierList('low');
   toast('Couverture mise à jour ✅','ok');
 }
 
@@ -6308,15 +6376,18 @@ function saveSuiviCategory(){
     if(idx!==-1){
       // Si la note change, on retire l'override de tier manuel (même logique que rateWork) :
       // sinon la catégorie reste figée dans son ancienne tier après un changement de note.
+      // Idem pour la tier list bis (<14).
       if(S.suiviCategories[idx].rating!==rating){
         const key='cat_'+_scatEditing;
-        if(S.profile?.tierOverrides && S.profile.tierOverrides[key]!==undefined) delete S.profile.tierOverrides[key];
-        if(S.profile?.tierOrders){
-          Object.values(S.profile.tierOrders).forEach(order=>{
-            const oidx=order.indexOf(key);
-            if(oidx!==-1) order.splice(oidx,1);
-          });
-        }
+        [['tierOverrides','tierOrders'],['tierOverridesLow','tierOrdersLow']].forEach(([ovKey,ordKey])=>{
+          if(S.profile?.[ovKey] && S.profile[ovKey][key]!==undefined) delete S.profile[ovKey][key];
+          if(S.profile?.[ordKey]){
+            Object.values(S.profile[ordKey]).forEach(order=>{
+              const oidx=order.indexOf(key);
+              if(oidx!==-1) order.splice(oidx,1);
+            });
+          }
+        });
       }
       S.suiviCategories[idx]={...S.suiviCategories[idx],name,rating,description,cover,items:_scatItems.map((i,o)=>({...i,order:o}))};
     }
@@ -6333,6 +6404,7 @@ function saveSuiviCategory(){
   closeM('m-scat-create');
   renderSuivi();
   renderTierList();
+  if(_lowTierOpen) renderTierList('low');
   toast('Catégorie enregistrée ✓','ok');
 }
 
@@ -6342,6 +6414,7 @@ function deleteSuiviCategory(id){
   save();
   renderSuivi();
   renderTierList();
+  if(_lowTierOpen) renderTierList('low');
   toast('Catégorie supprimée','ok');
 }
 
