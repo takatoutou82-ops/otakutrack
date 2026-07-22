@@ -1071,7 +1071,7 @@ textarea.fi{resize:vertical;min-height:72px}
 .top5-manual{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;align-items:start}
 .top5-slot{cursor:pointer;position:relative;width:100%}
 .top5-slot-cover{
-  width:100%;height:160px;
+  width:100%;aspect-ratio:2/3;
   border-radius:8px;overflow:hidden;
   background:var(--surface);border:1.5px dashed var(--border2);
   display:flex;align-items:center;justify-content:center;
@@ -2193,6 +2193,14 @@ function malToWorkShape(mal, type){
   w.score=mal.mean||null;
   w.scored_by=mal.num_scoring_users||null;
   w.status=MAL_STATUS_MAP[mal.status]||mal.status||'';
+  // Recommandations (format compatible avec ce qu'utilise loadSimilar)
+  w._malRecommendations=(mal.recommendations||[]).map(r=>({
+    entry:{
+      mal_id:r.node?.id,
+      title:r.node?.title,
+      images:{jpg:{image_url:r.node?.main_picture?.medium||'', large_image_url:r.node?.main_picture?.large||r.node?.main_picture?.medium||''}}
+    }
+  })).filter(r=>r.entry.mal_id);
   if(type==='manga'){
     w.volumes=mal.num_volumes||null;
     w.chapters=mal.num_chapters||null;
@@ -3239,14 +3247,20 @@ async function loadSimilar(w){
   const el=document.getElementById('similar-section');
   el.innerHTML='<div class="loading"><div class="spin"></div></div>';
   try{
-    const d=await jikan(`/${w._type}/${w.mal_id}/recommendations`);
-    const recs=(d.data||[]).slice(0,10);
+    let recs;
+    if(w._malRecommendations && w._malRecommendations.length){
+      // Déjà récupérées avec la fiche via l'API MAL officielle : pas besoin de rappeler Jikan
+      recs=w._malRecommendations.slice(0,10);
+    } else {
+      const d=await jikan(`/${w._type}/${w.mal_id}/recommendations`);
+      recs=(d.data||[]).slice(0,10);
+    }
     if(!recs.length){el.innerHTML='<p style="color:var(--t3);font-size:13px">Aucune recommandation disponible.</p>';return}
     el.innerHTML=recs.map(r=>{
       const item=r.entry;item._type=w._type;
       return coverCard(item);
     }).join('');
-  }catch(e){el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de charger.</p>'}
+  }catch(e){el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de charger. <button class="btn btn-ghost btn-sm" onclick="loadSimilar(S.currentWork)">Réessayer</button></p>'}
 }
 
 function renderWorkSidebar(w, t){
@@ -5110,7 +5124,7 @@ async function loadCharacters(){
         <div class="char-card-series">${esc(role)}</div>
       </div>`;
     }).join('')}</div>`;
-  }catch(e){ el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de charger les personnages.</p>'; }
+  }catch(e){ el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de charger les personnages. <button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'chars-section\').dataset.loaded=\'\';loadCharacters()">Réessayer</button></p>'; }
 }
 
 // ─── TOP 5 COMBATS ───
