@@ -25,8 +25,8 @@ export default async function handler(req, res) {
   }
 
   const detailFields = type === 'anime'
-    ? 'id,title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,num_scoring_users,genres,media_type,status,num_episodes,start_season,broadcast,source,average_episode_duration,studios,rating'
-    : 'id,title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,num_scoring_users,genres,media_type,status,num_volumes,num_chapters,authors{first_name,last_name},serialization';
+    ? 'id,title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,num_scoring_users,genres,media_type,status,num_episodes,start_season,broadcast,source,average_episode_duration,studios,rating,recommendations'
+    : 'id,title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,num_scoring_users,genres,media_type,status,num_volumes,num_chapters,authors{first_name,last_name},serialization,recommendations';
 
   const listFields = type === 'anime'
     ? 'id,title,main_picture,alternative_titles,mean,studios,media_type,status'
