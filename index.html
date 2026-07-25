@@ -955,7 +955,7 @@ textarea.fi{resize:vertical;min-height:72px}
 .shelf-owned-count{font-size:11px;color:var(--t3);font-weight:600}
 
 /* ── TOP 5 MANUEL ── */
-.top5-manual{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
+/* (grille définie plus bas : .top5-manual en grid 5 colonnes) */
 .char-card{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;width:90px}
 .char-card-img{width:80px;height:80px;object-fit:cover;border-radius:50%;background:var(--bg3);border:2px solid var(--border);transition:border-color .2s;flex-shrink:0}
 .char-card:hover .char-card-img{border-color:var(--acc)}
@@ -963,7 +963,7 @@ textarea.fi{resize:vertical;min-height:72px}
 .char-card-series{font-size:10px;color:var(--t3);text-align:center}
 .chars-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:14px;padding:8px 0}
 .combat-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;display:flex;align-items:center;gap:12px;padding:10px;cursor:default;position:relative}
-.combat-card-img{width:56px;height:72px;object-fit:cover;border-radius:7px;flex-shrink:0;background:var(--bg4)}
+.combat-card-img{width:56px;height:72px;object-fit:contain;object-position:center;border-radius:7px;flex-shrink:0;background:var(--bg4)}
 .combat-card-rank{font-size:18px;font-weight:900;color:var(--acc);font-family:'Syne',sans-serif;min-width:24px;text-align:center;flex-shrink:0}
 .combat-card-info{flex:1;min-width:0}
 .combat-card-name{font-size:13px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1078,7 +1078,7 @@ textarea.fi{resize:vertical;min-height:72px}
   font-size:18px;color:var(--t4);transition:all .15s;margin-bottom:4px;
   flex-shrink:0;position:relative;
 }
-.top5-slot-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center;display:block;background:var(--bg3)}
+.top5-slot-cover img{position:absolute;inset:0;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;display:block;background:var(--bg3)}
 .top5-slot-cover:hover{border-color:var(--acc);color:var(--acc)}
 .top5-slot.filled .top5-slot-cover{border-style:solid;border-color:transparent}
 .top5-rank{font-size:9px;color:var(--t3);font-weight:700;font-family:'Syne',sans-serif}
@@ -4487,7 +4487,7 @@ async function loadRelations(w){
 
 // ─── MIGRATION : récupérer les scores communauté manquants ───
 async function fetchMissingScores(){
-  const missing=Object.values(S.tracking).filter(t=>!t._communityScore && t.mal_id && t.type && t.mal_id!=='undefined' && t.type!=='undefined');
+  const missing=Object.values(S.tracking).filter(t=>(!t._communityScore||!t._pubStatus) && t.mal_id && t.type && t.mal_id!=='undefined' && t.type!=='undefined');
   if(!missing.length) return;
   let changed=false;
   for(const t of missing){
@@ -4495,7 +4495,10 @@ async function fetchMissingScores(){
     try{
       const d=await jikan(`/${t.type}/${t.mal_id}`);
       const score=d.data?.score||0;
-      if(score){ S.tracking[t.mal_id]._communityScore=score; changed=true; }
+      if(score && !S.tracking[t.mal_id]._communityScore){ S.tracking[t.mal_id]._communityScore=score; changed=true; }
+      // Statut de parution (pour le filtre avancé "Publication")
+      const pubStatus=d.data?.status||'';
+      if(pubStatus && S.tracking[t.mal_id]._pubStatus!==pubStatus){ S.tracking[t.mal_id]._pubStatus=pubStatus; changed=true; }
       // Aussi assigner une date si manquante
       if(!S.tracking[t.mal_id]._addedAt){ S.tracking[t.mal_id]._addedAt=Date.now(); changed=true; }
     }catch(e){}
@@ -4603,14 +4606,13 @@ function renderSuivi(){
       (_safGenres.size===0||[..._safGenres].every(g=>(t._genres||[]).concat(t._themes||[]).includes(g))) &&
       (!_safDemo||(t._demographics||[]).some(d=>d===_safDemo)) &&
       (!_safStatus||(()=>{
-        // Correspondance directe via _pubStatus (stocké depuis l'API MAL)
-        if(t._pubStatus===_safStatus) return true;
+        // Correspondance via _pubStatus normalisé (manga: "Finished"/"Publishing"/"On Hiatus",
+        // animé: "Finished Airing"/"Currently Airing"/"On Hiatus", API officielle: minuscules)
+        const ps=normPubStatus(t._pubStatus);
+        if(ps) return ps===_safStatus;
         // Fallback : si _pubStatus absent, déduire depuis le statut utilisateur
-        if(!t._pubStatus){
-          if(_safStatus==='Finished') return t.status==='Terminé';
-          if(_safStatus==='Publishing') return t.status==='En cours'||t.status==='À jour';
-          if(_safStatus==='On Hiatus') return false;
-        }
+        if(_safStatus==='Finished') return t.status==='Terminé';
+        if(_safStatus==='Publishing') return t.status==='En cours'||t.status==='À jour';
         return false;
       })()) &&
       (!_safGenre||(t._genres||[]).includes(_safGenre)) &&
@@ -6854,6 +6856,19 @@ function clearTierImg(){
 // ─── FILTRES AVANCÉS SUIVI ───
 // ══════════════════════════════════════════════════════
 let _safDemo = '', _safStatus = '', _safGenre = '';
+
+// Normalise un statut de parution (manga ou animé, Jikan ou API MAL officielle)
+// vers 'Finished' / 'Publishing' / 'On Hiatus' / 'Discontinued' / '' si inconnu
+function normPubStatus(s){
+  if(!s) return '';
+  s=String(s).toLowerCase();
+  if(s.includes('hiatus')) return 'On Hiatus';
+  if(s.includes('discontinued')) return 'Discontinued';
+  if(s.includes('finished')||s.includes('complete')) return 'Finished';
+  if(s.includes('not yet')) return '';
+  if(s.includes('publishing')||s.includes('airing')||s.includes('releasing')) return 'Publishing';
+  return '';
+}
 
 function toggleSAF(){
   const el = document.getElementById('suivi-adv-filters');
