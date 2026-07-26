@@ -963,16 +963,16 @@ textarea.fi{resize:vertical;min-height:72px}
 .char-card-name{font-size:11px;font-weight:700;text-align:center;color:var(--t2);font-family:'Syne',sans-serif;line-height:1.2}
 .char-card-series{font-size:10px;color:var(--t3);text-align:center}
 .chars-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:14px;padding:8px 0}
-.combat-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;display:flex;align-items:center;gap:12px;padding:10px;cursor:default;position:relative}
-.combat-card-img{width:56px;height:72px;object-fit:contain;object-position:center;border-radius:7px;flex-shrink:0;background:var(--bg4)}
-.combat-card-rank{font-size:18px;font-weight:900;color:var(--acc);font-family:'Syne',sans-serif;min-width:24px;text-align:center;flex-shrink:0}
-.combat-card-info{flex:1;min-width:0}
-.combat-card-name{font-size:13px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.combat-card-work{font-size:11px;color:var(--t3)}
-.combat-add-btn{background:var(--bg3);border:1.5px dashed var(--border2);border-radius:10px;padding:12px;text-align:center;color:var(--t3);cursor:pointer;font-size:13px;margin-bottom:10px;transition:all .15s}
-.combat-add-btn:hover{border-color:var(--acc);color:var(--acc)}
+
 /* TIER LIST */
 .tier-row{display:flex;gap:0;margin-bottom:6px;border-radius:10px;overflow:hidden;min-height:72px}
+.tier-meta-col{width:76px;flex-shrink:0;display:flex;flex-direction:column;gap:3px}
+.tier-meta-box{
+  flex-grow:1;flex-basis:0;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  border-radius:8px;padding:4px 6px;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:10.5px;line-height:1.2;
+}
 .tier-label{width:130px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-family:'Syne',sans-serif;font-size:11px;text-align:center;padding:8px;line-height:1.3;word-break:keep-all;white-space:normal}
 .tier-items{flex:1;display:flex;flex-wrap:wrap;gap:5px;padding:6px;background:var(--bg3);border:1px solid var(--border);border-left:none;align-items:center;min-height:72px}
 .tier-item{width:46px;height:66px;border-radius:5px;overflow:hidden;cursor:pointer;position:relative;flex-shrink:0;transition:transform .15s}
@@ -1447,52 +1447,10 @@ textarea.fi{resize:vertical;min-height:72px}
 </div>
 
 <!-- Modal fiche personnage -->
-<div class="modal-bg" id="m-char-page">
-  <div class="modal" style="max-width:560px;width:100%;max-height:85vh;overflow-y:auto">
-    <div class="modal-title"><span id="char-page-name">Personnage</span> <span class="modal-close" onclick="closeM('m-char-page')">✕</span></div>
-    <div id="char-page-content"></div>
-  </div>
-</div>
+
 
 <!-- Modal ajout combat -->
-<div class="modal-bg" id="m-combat-add">
-  <div class="modal" style="max-width:480px;width:100%">
-    <div class="modal-title">⚔️ Ajouter un combat <span class="modal-close" onclick="closeM('m-combat-add')">✕</span></div>
 
-    <div style="margin-bottom:12px">
-      <label style="font-size:12px;color:var(--t3);display:block;margin-bottom:5px">Nom du combat *</label>
-      <input id="combat-name" type="text" placeholder="ex: Goku vs Vegeta" maxlength="80"
-        style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;box-sizing:border-box">
-    </div>
-
-    <div style="margin-bottom:12px">
-      <label style="font-size:12px;color:var(--t3);display:block;margin-bottom:5px">Œuvre (manga ou animé)</label>
-      <div style="display:flex;gap:8px">
-        <input id="combat-work-search" type="text" placeholder="Chercher un manga / animé…"
-          style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"
-          oninput="combatWorkSearchDebounce(this.value)">
-      </div>
-      <div id="combat-work-results" style="margin-top:6px;max-height:140px;overflow-y:auto"></div>
-      <div id="combat-work-selected" style="display:none;margin-top:8px;display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:8px 10px">
-        <img id="combat-work-img" src="" style="width:32px;height:44px;object-fit:cover;border-radius:4px">
-        <span id="combat-work-title" style="font-size:13px;font-weight:700;color:var(--text)"></span>
-        <button onclick="clearCombatWork()" style="margin-left:auto;background:none;border:none;color:var(--t3);cursor:pointer;font-size:14px">✕</button>
-      </div>
-    </div>
-
-    <div style="margin-bottom:16px">
-      <label style="font-size:12px;color:var(--t3);display:block;margin-bottom:5px">Image custom (optionnel)</label>
-      <input type="file" id="combat-img-file" accept="image/*" style="display:none" onchange="handleCombatImg(this.files[0])">
-      <button class="btn btn-ghost" onclick="document.getElementById('combat-img-file').click()" style="font-size:12px">📷 Choisir une image</button>
-      <span id="combat-img-name" style="font-size:11px;color:var(--t3);margin-left:8px"></span>
-    </div>
-
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-ghost" onclick="closeM('m-combat-add')">Annuler</button>
-      <button class="btn btn-primary" onclick="saveCombat()">Ajouter</button>
-    </div>
-  </div>
-</div>
 
 <!-- Modal choix couverture (local ou Fanart.tv) -->
 <div class="modal-bg" id="m-cover-picker">
@@ -1663,8 +1621,6 @@ textarea.fi{resize:vertical;min-height:72px}
       <div class="tabs" id="work-tabs">
         <button class="tab on" onclick="switchTab(this,'tp-progress')">Progression</button>
         <button class="tab" onclick="switchTab(this,'tp-reviews')">Critiques</button>
-        <button class="tab" onclick="switchTab(this,'tp-chars');loadCharacters()">Personnages</button>
-        <button class="tab" id="tab-saisons" style="display:none" onclick="switchTab(this,'tp-saisons');loadSaisons()">Saisons</button>
         <button class="tab" onclick="switchTab(this,'tp-similar')">Similaires</button>
         <button class="tab" onclick="switchTab(this,'tp-relations')">Relations</button>
       </div>
@@ -1673,8 +1629,6 @@ textarea.fi{resize:vertical;min-height:72px}
         <div id="reviews-section"></div>
         <button class="btn btn-ghost" onclick="openM('m-review')" style="margin-top:10px">+ Écrire une critique</button>
       </div>
-      <div class="tp" id="tp-chars"><div id="chars-section"></div></div>
-      <div class="tp" id="tp-saisons"><div id="saisons-section"></div></div>
       <div class="tp" id="tp-similar"><div class="cg" id="similar-section"></div></div>
       <div class="tp" id="tp-relations"><div id="relations-section"></div></div>
     </div>
@@ -1823,11 +1777,6 @@ textarea.fi{resize:vertical;min-height:72px}
           <button class="btn btn-primary" style="font-size:12px" onclick="openNewTopModal()">＋ Nouveau top</button>
         </div>
         <div id="custom-tops-wrap"></div>
-
-        <div class="sh" style="margin-bottom:14px;margin-top:24px">
-          <h2 class="sh-title">Mes Combats <span class="badge" style="background:rgba(248,113,113,.15);color:#f87171">COMBAT</span></h2>
-        </div>
-        <div id="top5-combats"></div>
       </div>
 
       <!-- COLONNE DROITE : TIER LIST -->
@@ -1838,26 +1787,23 @@ textarea.fi{resize:vertical;min-height:72px}
             <button class="btn btn-primary" id="tl-filter-all" onclick="setTierFilter('all')" style="font-size:11px;padding:4px 10px">Tout</button>
             <button class="btn btn-ghost" id="tl-filter-manga" onclick="setTierFilter('manga')" style="font-size:11px;padding:4px 10px;color:var(--manga)">Manga</button>
             <button class="btn btn-ghost" id="tl-filter-anime" onclick="setTierFilter('anime')" style="font-size:11px;padding:4px 10px;color:var(--anime)">Animé</button>
-            <button class="btn btn-ghost" style="font-size:11px" onclick="renderTierList();if(_lowTierOpen)renderTierList('low')">↺</button>
             <button class="btn btn-ghost" id="tl-show-abandoned" style="font-size:11px" onclick="toggleShowAbandoned(this)">👁 Afficher les abandonnés</button>
-            <label title="Importer une image de tier list" style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid var(--border);color:var(--t2);transition:border-color .15s" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">
-              🖼 Image
-              <input type="file" accept="image/*" style="display:none" onchange="importTierImg(this)">
-            </label>
-            <button class="btn btn-ghost" id="tl-img-clear" style="font-size:11px;display:none;color:var(--red)" onclick="clearTierImg()">✕ Retirer</button>
           </div>
         </div>
-        <div id="tier-img-preview" style="display:none;margin-bottom:14px;border-radius:10px;overflow:hidden;border:1px solid var(--border)">
-          <img id="tier-img-el" style="width:100%;display:block;max-height:600px;object-fit:contain;background:var(--bg3)">
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <div id="tier-list-wrap" style="flex:1;min-width:0"></div>
+          <div id="tier-meta-main" class="tier-meta-col"></div>
         </div>
-        <div id="tier-list-wrap"></div>
 
         <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
           <button class="btn btn-ghost" style="font-size:12px;width:100%;justify-content:center" onclick="toggleLowTierList()">
-            <span id="tier-list-low-toggle-label">▾ Afficher la suite (notes en dessous de 14)</span>
+            <span id="tier-list-low-toggle-label">▾ Afficher la suite (notes en dessous de 15)</span>
           </button>
           <div id="tier-list-low-section" style="display:none;margin-top:14px">
-            <div id="tier-list-low-wrap"></div>
+            <div style="display:flex;gap:8px;align-items:stretch">
+              <div id="tier-list-low-wrap" style="flex:1;min-width:0"></div>
+              <div id="tier-meta-low" class="tier-meta-col"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -3181,13 +3127,6 @@ function renderWorkPage(w){
   loadSimilar(w);
   loadRelations(w);
   renderWorkSidebar(w, t);
-
-  // Show saisons tab only for anime
-  const tabSaisons = document.getElementById('tab-saisons');
-  if(tabSaisons) tabSaisons.style.display = type==='anime' ? '' : 'none';
-  // Reset sections
-  const saisonsEl = document.getElementById('saisons-section');
-  if(saisonsEl){ saisonsEl.innerHTML=''; saisonsEl.dataset.loaded=''; }
   window._currentMalId = w.mal_id;
 }
 
@@ -5037,394 +4976,18 @@ function addScrollToTop(){
   window.addEventListener('scroll',()=>{ btn.style.display=window.scrollY>300?'flex':'none'; btn.style.alignItems='center'; btn.style.justifyContent='center'; });
 }
 
-
-// ─── PAGE PERSONNAGE ───
-async function openCharPage(charId){
-  document.getElementById('char-page-name').textContent='Chargement…';
-  document.getElementById('char-page-content').innerHTML='<div class="loading"><div class="spin"></div></div>';
-  openM('m-char-page');
-  try{
-    const d=await jikan(`/characters/${charId}/full`);
-    const c=d.data;
-    const img=c.images?.jpg?.image_url||c.images?.webp?.image_url||'';
-    const mangas=(c.manga||[]).slice(0,6);
-    const animes=(c.anime||[]).slice(0,6);
-    const about=(c.about||'').replace(/\n\n+/g,'\n').slice(0,600);
-    document.getElementById('char-page-name').textContent=c.name||'Personnage';
-    document.getElementById('char-page-content').innerHTML=`
-      <div style="display:flex;gap:18px;margin-bottom:18px;flex-wrap:wrap">
-        ${img?`<img src="${img}" style="width:110px;height:160px;object-fit:cover;border-radius:10px;flex-shrink:0">`:''} 
-        <div style="flex:1;min-width:160px">
-          ${c.name_kanji?`<div style="font-size:14px;color:var(--t3);margin-bottom:6px">${esc(c.name_kanji)}</div>`:''}
-          ${c.nicknames?.length?`<div style="font-size:12px;color:var(--t3);margin-bottom:10px">Alias : ${c.nicknames.slice(0,3).join(', ')}</div>`:''}
-          ${about?`<p style="font-size:12px;color:var(--t2);line-height:1.6;margin:0">${esc(about)}${c.about?.length>600?'…':''}</p>`:'<p style="color:var(--t3);font-size:12px">Pas de description disponible.</p>'}
-        </div>
-      </div>
-      ${mangas.length?`<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:var(--t3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Apparaît dans (manga)</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">${mangas.map(m=>`<span class="gtag" style="cursor:pointer" onclick="closeM('m-char-page');openWork(${m.manga.mal_id},'manga')">${esc(m.manga.title)}</span>`).join('')}</div></div>`:''}
-      ${animes.length?`<div><div style="font-size:12px;font-weight:700;color:var(--t3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Apparaît dans (animé)</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">${animes.map(a=>`<span class="gtag" style="cursor:pointer;background:rgba(56,189,248,.1);color:#38bdf8" onclick="closeM('m-char-page');openWork(${a.anime.mal_id},'anime')">${esc(a.anime.title)}</span>`).join('')}</div></div>`:''}
-    `;
-  }catch(e){
-    document.getElementById('char-page-content').innerHTML='<p style="color:var(--t3)">Erreur de chargement.</p>';
-  }
-}
-
 // ─── SAISONS ANIMÉ ───
-async function loadSaisons(){
-  const el=document.getElementById('saisons-section');
-  const w=S.currentWork;
-  if(!el||!w) return;
-  if(el.dataset.loaded===String(w.mal_id)) return;
-  el.innerHTML='<div class="loading"><div class="spin"></div> Chargement des saisons…</div>';
-
-  try{
-    // Récupérer les saisons via les relations Jikan
-    const relData=await jikan(`/anime/${w.mal_id}/relations`);
-    const relations=relData.data||[];
-
-    // Construire la liste des saisons : l'œuvre courante + les "Sequel"/"Prequel" etc.
-    let seasons=[];
-
-    // L'œuvre courante est une saison
-    seasons.push({
-      mal_id: w.mal_id,
-      title: w.title,
-      cover: w.images?.jpg?.large_image_url||w.images?.jpg?.image_url||'',
-      episodes: w.episodes||0,
-      season_label: 'Saison principale',
-      synopsis: w.synopsis||''
-    });
-
-    // Chercher les sequels directs = autres saisons
-    const sequels=relations.filter(r=>r.relation==='Sequel'||r.relation==='Prequel'||r.relation==='Alternative version');
-    for(const rel of sequels){
-      const entries=(rel.entry||[]).filter(e=>e.type==='anime');
-      for(const entry of entries){
-        try{
-          const d=await jikan(`/anime/${entry.mal_id}`);
-          const a=d.data;
-          if(a) seasons.push({
-            mal_id: a.mal_id,
-            title: a.title,
-            cover: a.images?.jpg?.large_image_url||a.images?.jpg?.image_url||'',
-            episodes: a.episodes||0,
-            season_label: rel.relation,
-            synopsis: a.synopsis||''
-          });
-        }catch(e){}
-      }
-    }
-
-    el.dataset.loaded=String(w.mal_id);
-    if(!S.tracking[w.mal_id]) S.tracking[w.mal_id]={...S.tracking[w.mal_id]||{},seasonRatings:{},episodeSeen:{}};
-    if(!S.tracking[w.mal_id].seasonRatings) S.tracking[w.mal_id].seasonRatings={};
-    if(!S.tracking[w.mal_id].episodeSeen) S.tracking[w.mal_id].episodeSeen={};
-
-    renderSaisonsSection(seasons, w.mal_id);
-  }catch(e){
-    el.innerHTML='<p style="color:var(--t3);font-size:13px">Erreur de chargement.</p>';
-  }
-}
-
-function renderSaisonsSection(seasons, rootMalId){
-  const el=document.getElementById('saisons-section');
-  if(!el) return;
-  const tracking=S.tracking[rootMalId]||{};
-  const seasonRatings=tracking.seasonRatings||{};
-
-  // Tier list des saisons notées
-  const ratedSeasons=seasons.filter(s=>seasonRatings[s.mal_id]>0);
-  let tierHtml='';
-  if(ratedSeasons.length>=2){
-    const tierGroups=TIERS.map(()=>[]);
-    ratedSeasons.forEach(s=>{
-      const idx=getTierIndex(seasonRatings[s.mal_id]);
-      if(idx>=0) tierGroups[idx].push({...s, rating:seasonRatings[s.mal_id]});
-    });
-    tierHtml=`<div class="saisons-tierlist">
-      <div class="saisons-tierlist-title">Tier List de tes saisons</div>
-      ${TIERS.map((tier,i)=>{
-        if(!tierGroups[i].length) return '';
-        const {low,high}=splitTierHalf(tierGroups[i], i);
-        const renderS=s=>`
-            <div style="width:32px;height:46px;border-radius:4px;overflow:hidden;flex-shrink:0" title="${esc(s.title)}">
-              <img src="${s.cover}" style="width:100%;height:100%;object-fit:cover">
-            </div>`;
-        return `
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-          <div style="width:80px;font-size:10px;font-weight:700;color:${tier.color};background:${tier.bg};border-radius:4px;padding:3px 6px;text-align:center;flex-shrink:0">${tier.label}</div>
-          <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">${high.map(renderS).join('')}${low.length&&high.length?'<div class="tier-divider" style="height:46px"></div>':''}${low.map(renderS).join('')}
-          </div>
-        </div>`;}).join('')}
-    </div>`;
-  }
-
-  el.innerHTML=tierHtml+seasons.map(s=>{
-    const myRating=seasonRatings[s.mal_id]||0;
-    const ratingOpts=buildRatingOptions(myRating,'—');
-    return `<div class="saison-card" id="saison-${s.mal_id}">
-      <div class="saison-header" onclick="toggleSaison(${s.mal_id},${rootMalId})">
-        <img class="saison-cover" src="${s.cover}" loading="lazy">
-        <div class="saison-info">
-          <div class="saison-title">${esc(s.title)}</div>
-          <div class="saison-meta">${s.season_label}${s.episodes?' · '+s.episodes+' épisodes':''}</div>
-        </div>
-        <div class="saison-note" onclick="event.stopPropagation()">
-          <select onchange="rateSaison(${s.mal_id},${rootMalId},parseFloat(this.value))"
-            style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 7px;color:var(--text);font-size:11px;outline:none">
-            ${ratingOpts}
-          </select>
-          ${myRating?`<span style="color:var(--yellow);font-size:12px;font-weight:700">★${myRating}</span>`:''}
-        </div>
-        <div style="font-size:14px;color:var(--t3);margin-left:6px">▸</div>
-      </div>
-      <div class="saison-body" id="saison-body-${s.mal_id}">
-        ${s.synopsis?`<div class="saison-synopsis">${esc(s.synopsis)}</div>`:''}
-        <div id="eps-${s.mal_id}" style="padding:8px 0">
-          <div style="text-align:center;padding:12px;color:var(--t3);font-size:12px">Clique pour charger les épisodes…</div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function toggleSaison(malId, rootMalId){
-  const body=document.getElementById('saison-body-'+malId);
-  if(!body) return;
-  const isOpen=body.classList.contains('open');
-  // Fermer toutes les autres
-  document.querySelectorAll('.saison-body.open').forEach(b=>b.classList.remove('open'));
-  if(isOpen) return;
-  body.classList.add('open');
-  // Charger les épisodes si pas encore fait
-  const epsEl=document.getElementById('eps-'+malId);
-  if(epsEl&&epsEl.dataset.loaded!=='1'){
-    epsEl.innerHTML='<div class="loading" style="padding:12px"><div class="spin"></div></div>';
-    try{
-      const d=await jikan(`/anime/${malId}/episodes?per_page=100`);
-      const eps=d.data||[];
-      if(!S.tracking[rootMalId].episodeSeen) S.tracking[rootMalId].episodeSeen={};
-      epsEl.dataset.loaded='1';
-      renderEpisodes(epsEl, eps, malId, rootMalId);
-    }catch(e){
-      epsEl.innerHTML='<p style="color:var(--t3);font-size:12px;padding:12px">Impossible de charger les épisodes.</p>';
-    }
-  }
-}
-
-function renderEpisodes(container, eps, saisonMalId, rootMalId){
-  if(!eps.length){ container.innerHTML='<p style="color:var(--t3);font-size:12px;padding:12px">Aucun épisode trouvé.</p>'; return; }
-  const seen=S.tracking[rootMalId]?.episodeSeen||{};
-  container.innerHTML=eps.map(ep=>{
-    const key=`${saisonMalId}_${ep.mal_id}`;
-    const isSeen=seen[key]||false;
-    const hasSynopsis=ep.synopsis&&ep.synopsis.trim();
-    return `<div class="ep-item" style="${isSeen?'opacity:.6':''}">
-      <div class="ep-num">E${ep.episode_id||ep.mal_id}</div>
-      <div class="ep-info">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div class="ep-title">${esc(ep.title||'Épisode '+ep.episode_id)}</div>
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:10px;color:var(--t3);flex-shrink:0;margin-left:auto">
-            <input type="checkbox" ${isSeen?'checked':''} onchange="toggleEpSeen('${key}',${rootMalId},this.checked)"
-              style="accent-color:var(--acc)"> Vu
-          </label>
-        </div>
-        ${hasSynopsis?`<div class="ep-synopsis spoil" onclick="this.classList.toggle('spoil');this.classList.toggle('revealed')" title="Cliquer pour révéler">${esc(ep.synopsis)}</div>`
-          :'<div style="font-size:10px;color:var(--t4)">Pas de synopsis disponible.</div>'}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function rateSaison(saisonMalId, rootMalId, rating){
-  if(!S.tracking[rootMalId]) return;
-  if(!S.tracking[rootMalId].seasonRatings) S.tracking[rootMalId].seasonRatings={};
-  S.tracking[rootMalId].seasonRatings[saisonMalId]=rating;
-  save();
-  // Rerender tier list
-  const el=document.getElementById('saisons-section');
-  if(el&&el.dataset.loaded){
-    // Refresh juste la tier list sans recharger tout
-    const allCards=document.querySelectorAll('.saison-card');
-    const seasons=[];
-    allCards.forEach(card=>{
-      const id=parseInt(card.id.replace('saison-',''));
-      const title=card.querySelector('.saison-title')?.textContent||'';
-      const cover=card.querySelector('.saison-cover')?.src||'';
-      seasons.push({mal_id:id,title,cover});
-    });
-    // Mettre à jour l'étoile
-    const noteEl=card?.querySelector('span');
-    renderSaisonsSection(seasons, rootMalId);
-  }
-}
-
-function toggleEpSeen(key, rootMalId, checked){
-  if(!S.tracking[rootMalId]) return;
-  if(!S.tracking[rootMalId].episodeSeen) S.tracking[rootMalId].episodeSeen={};
-  S.tracking[rootMalId].episodeSeen[key]=checked;
-  save();
-}
-async function loadCharacters(){
-  const el=document.getElementById('chars-section');
-  const w=S.currentWork;
-  if(!el||!w) return;
-  if(el.dataset.loaded===String(w.mal_id)) return; // déjà chargé
-  el.innerHTML='<div class="loading"><div class="spin"></div> Chargement des personnages…</div>';
-  try{
-    const d=await jikan(`/${w._type}/${w.mal_id}/characters`);
-    const chars=d.data||[];
-    if(!chars.length){ el.innerHTML='<p style="color:var(--t3);font-size:13px">Aucun personnage trouvé.</p>'; return; }
-    el.dataset.loaded=String(w.mal_id);
-    el.innerHTML=`<div class="chars-grid">${chars.map(c=>{
-      const char=c.character;
-      const img=char.images?.jpg?.image_url||char.images?.webp?.image_url||'';
-      const role=c.role||'';
-      return `<div class="char-card" onclick="openCharPage(${char.mal_id})">
-        <div style="position:relative">
-          <img class="char-card-img" src="${img}" loading="lazy">
-          ${role==='Main'?`<div style="position:absolute;top:4px;right:4px;background:var(--acc);color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px">MAIN</div>`:''}
-        </div>
-        <div class="char-card-name">${esc(char.name)}</div>
-        <div class="char-card-series">${esc(role)}</div>
-      </div>`;
-    }).join('')}</div>`;
-  }catch(e){ el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de charger les personnages. <button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'chars-section\').dataset.loaded=\'\';loadCharacters()">Réessayer</button></p>'; }
-}
-
-// ─── TOP 5 COMBATS ───
-function renderTop5Combats(){
-  const el=document.getElementById('top5-combats');
-  if(!el)return;
-  const combats=S.profile.top5_combats||[];
-  let html='';
-  // Slots remplis
-  combats.slice(0,5).forEach((c,i)=>{
-    const img=c.image||c.workCover||'';
-    html+=`<div class="combat-card">
-      <div class="combat-card-rank">#${i+1}</div>
-      ${img?`<img class="combat-card-img" src="${img}" loading="lazy">`:`<div class="combat-card-img" style="display:flex;align-items:center;justify-content:center;font-size:22px">⚔️</div>`}
-      <div class="combat-card-info">
-        <div class="combat-card-name">${esc(c.name)}</div>
-        ${c.workTitle?`<div class="combat-card-work">📖 ${esc(c.workTitle)}</div>`:''}
-      </div>
-      <button onclick="removeCombat(${i})" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:13px;padding:4px;flex-shrink:0" title="Retirer">✕</button>
-    </div>`;
-  });
-  // Bouton ajouter toujours visible
-  html+=`<div class="combat-add-btn" onclick="openAddCombat()">＋ Ajouter un combat</div>`;
-  el.innerHTML=html;
-}
-
-function removeCombat(i){
-  if(!S.profile.top5_combats) return;
-  S.profile.top5_combats.splice(i,1);
-  save(); renderTop5Combats();
-}
-
-function openAddCombat(){
-  S._combatWork=null;
-  S._combatImg=null;
-  document.getElementById('combat-name').value='';
-  document.getElementById('combat-work-search').value='';
-  document.getElementById('combat-work-results').innerHTML='';
-  document.getElementById('combat-work-selected').style.display='none';
-  document.getElementById('combat-img-name').textContent='';
-  document.getElementById('combat-img-file').value='';
-  openM('m-combat-add');
-}
-
-let _combatWorkTimer=null;
-function combatWorkSearchDebounce(q){
-  clearTimeout(_combatWorkTimer);
-  const el=document.getElementById('combat-work-results');
-  if(!q.trim()){ el.innerHTML=''; return; }
-  _combatWorkTimer=setTimeout(()=>combatWorkSearch(q),500);
-}
-
-async function combatWorkSearch(q){
-  const el=document.getElementById('combat-work-results');
-  el.innerHTML='<div class="loading" style="padding:8px"><div class="spin"></div></div>';
-  try{
-    const [md,ad]=await Promise.allSettled([
-      jikan(`/manga?q=${encodeURIComponent(q)}&limit=4&sfw`),
-      jikan(`/anime?q=${encodeURIComponent(q)}&limit=4&sfw`)
-    ]);
-    const mangas=(md.status==='fulfilled'?md.value.data:[]).map(m=>({...m,_type:'manga'}));
-    const animes=(ad.status==='fulfilled'?ad.value.data:[]).map(a=>({...a,_type:'anime'}));
-    const results=[...mangas,...animes].slice(0,6);
-    if(!results.length){ el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:6px">Aucun résultat.</p>'; return; }
-    el.innerHTML=results.map(r=>{
-      const cover=r.images?.jpg?.image_url||'';
-      return `<div class="lib-search-item" onclick="selectCombatWork(${r.mal_id},'${esc(r.title)}','${cover.replace(/'/g,"\\'")}')">
-        <img src="${cover}" loading="lazy" style="width:32px;height:44px;object-fit:cover;border-radius:4px;flex-shrink:0">
-        <div>
-          <div style="font-size:12px;font-weight:700">${esc(r.title)}</div>
-          <div style="font-size:10px;color:var(--t3)">${r._type}</div>
-        </div>
-      </div>`;
-    }).join('');
-  }catch(e){ el.innerHTML=''; }
-}
-
-function selectCombatWork(malId, title, cover){
-  S._combatWork={malId,title,cover};
-  document.getElementById('combat-work-results').innerHTML='';
-  document.getElementById('combat-work-search').value='';
-  document.getElementById('combat-work-img').src=cover;
-  document.getElementById('combat-work-title').textContent=title;
-  document.getElementById('combat-work-selected').style.display='flex';
-}
-
-function clearCombatWork(){
-  S._combatWork=null;
-  document.getElementById('combat-work-selected').style.display='none';
-}
-
-function handleCombatImg(file){
-  if(!file) return;
-  toast('Upload en cours…','ok');
-  uploadToCloudinary(file,'combats').then(url=>{
-    S._combatImg = url;
-    document.getElementById('combat-img-name').textContent = file.name;
-    toast('Image chargée ✓','ok');
-  }).catch(()=>{
-    // Fallback base64 (ne sera pas dans Firestore via profile)
-    const r=new FileReader();
-    r.onload=ev=>{ S._combatImg=ev.target.result; document.getElementById('combat-img-name').textContent=file.name; };
-    r.readAsDataURL(file);
-  });
-}
-
-function saveCombat(){
-  const name=document.getElementById('combat-name').value.trim();
-  if(!name){ toast('Donne un nom au combat','err'); return; }
-  if(!S.profile.top5_combats) S.profile.top5_combats=[];
-  S.profile.top5_combats.push({
-    name,
-    workTitle: S._combatWork?.title||'',
-    workCover: S._combatWork?.cover||'',
-    workMalId: S._combatWork?.malId||null,
-    image: S._combatImg||S._combatWork?.cover||''
-  });
-  save(); closeM('m-combat-add'); renderTop5Combats();
-  toast('Combat ajouté ⚔️','ok');
-}
-
 // ─── TIER LIST ───
 // Échelle /20. Chaque tier regroupe 2 valeurs (base et base+0.5), sauf la tier 10
 // qui ne contient que 20 (il n'existe pas de "20.5"). Un trait sépare visuellement
 // les deux sous-groupes à l'intérieur de chaque tier.
 const TIERS=[
-  {label:"Chef d'œuvre absolu", min:20,  base:20,  high:null, color:'#ff4d4d',bg:'rgba(255,77,77,.22)'},
-  {label:'INCROYABLE',          min:19,  base:19,  high:19.5, color:'#ff7f00',bg:'rgba(255,127,0,.22)'},
-  {label:'MASTERCLASS',         min:18,  base:18,  high:18.5, color:'#ffd700',bg:'rgba(255,215,0,.22)'},
+  {label:'Parfait',              min:20,  base:20,  high:null, color:'#ff4d4d',bg:'rgba(255,77,77,.22)'},
+  {label:"Chef-d'œuvre",         min:19,  base:19,  high:19.5, color:'#ff7f00',bg:'rgba(255,127,0,.22)'},
+  {label:'Incroyable',           min:18,  base:18,  high:18.5, color:'#ffd700',bg:'rgba(255,215,0,.22)'},
   {label:'TROPPPP BIENN',       min:17,  base:17,  high:17.5, color:'#adff2f',bg:'rgba(173,255,47,.22)'},
   {label:'TROPP COOL',          min:16,  base:16,  high:16.5, color:'#00e5ff',bg:'rgba(0,229,255,.22)'},
   {label:'Pas mal',             min:15,  base:15,  high:15.5, color:'#7c4dff',bg:'rgba(124,77,255,.22)'},
-  {label:'A lire',              min:14,  base:14,  high:14.5, color:'#ff80ab',bg:'rgba(255,128,171,.22)'},
-  // Dernière ligne supprimée (Je relirais pas)
 ];
 
 function getTierIndex(rating){
@@ -5434,8 +4997,7 @@ function getTierIndex(rating){
   if(rating>=17) return 3;
   if(rating>=16) return 4;
   if(rating>=15) return 5;
-  if(rating>=14) return 6;
-  return -1; // note < 14 (/20) → pas dans la tierlist
+  return -1; // note < 15 (/20) → dans la tierlist bis
 }
 // Découpe les items d'une tier en deux sous-groupes (valeur basse / valeur haute, ex: 16 et 16.5)
 // pour permettre d'afficher un trait séparateur bien visible entre les deux.
@@ -5447,26 +5009,27 @@ function splitTierHalf(items, tierIdx){
   return {low, high};
 }
 
-// ─── TIER LIST BIS (notes 0 à 13, paliers d'un point entier) ───
+// ─── TIER LIST BIS (notes 0 à 14, paliers d'un point entier) ───
 const TIERS_LOW=[
-  {label:'13', base:13, high:null, color:'#5eead4',bg:'rgba(94,234,212,.18)'},
-  {label:'12', base:12, high:null, color:'#67e8b8',bg:'rgba(103,232,184,.18)'},
-  {label:'11', base:11, high:null, color:'#86efac',bg:'rgba(134,239,172,.18)'},
-  {label:'10', base:10, high:null, color:'#bef264',bg:'rgba(190,242,100,.18)'},
-  {label:'9',  base:9,  high:null, color:'#fde047',bg:'rgba(253,224,71,.18)'},
-  {label:'8',  base:8,  high:null, color:'#fdba74',bg:'rgba(253,186,116,.18)'},
-  {label:'7',  base:7,  high:null, color:'#fb923c',bg:'rgba(251,146,60,.18)'},
-  {label:'6',  base:6,  high:null, color:'#f87171',bg:'rgba(248,113,113,.18)'},
-  {label:'5',  base:5,  high:null, color:'#ef4444',bg:'rgba(239,68,68,.18)'},
-  {label:'4',  base:4,  high:null, color:'#dc2626',bg:'rgba(220,38,38,.18)'},
-  {label:'3',  base:3,  high:null, color:'#b91c1c',bg:'rgba(185,28,28,.18)'},
-  {label:'2',  base:2,  high:null, color:'#991b1b',bg:'rgba(153,27,27,.18)'},
-  {label:'1',  base:1,  high:null, color:'#7f1d1d',bg:'rgba(127,29,29,.18)'},
-  {label:'0',  base:0,  high:null, color:'#525252',bg:'rgba(82,82,82,.18)'},
+  {label:'14', base:14, high:null, color:'#5eead4',bg:'rgba(94,234,212,.18)'},
+  {label:'13', base:13, high:null, color:'#67e8b8',bg:'rgba(103,232,184,.18)'},
+  {label:'12', base:12, high:null, color:'#86efac',bg:'rgba(134,239,172,.18)'},
+  {label:'11', base:11, high:null, color:'#bef264',bg:'rgba(190,242,100,.18)'},
+  {label:'10', base:10, high:null, color:'#fde047',bg:'rgba(253,224,71,.18)'},
+  {label:'9',  base:9,  high:null, color:'#fdba74',bg:'rgba(253,186,116,.18)'},
+  {label:'8',  base:8,  high:null, color:'#fb923c',bg:'rgba(251,146,60,.18)'},
+  {label:'7',  base:7,  high:null, color:'#f87171',bg:'rgba(248,113,113,.18)'},
+  {label:'6',  base:6,  high:null, color:'#ef4444',bg:'rgba(239,68,68,.18)'},
+  {label:'5',  base:5,  high:null, color:'#dc2626',bg:'rgba(220,38,38,.18)'},
+  {label:'4',  base:4,  high:null, color:'#b91c1c',bg:'rgba(185,28,28,.18)'},
+  {label:'3',  base:3,  high:null, color:'#991b1b',bg:'rgba(153,27,27,.18)'},
+  {label:'2',  base:2,  high:null, color:'#7f1d1d',bg:'rgba(127,29,29,.18)'},
+  {label:'1',  base:1,  high:null, color:'#525252',bg:'rgba(82,82,82,.18)'},
+  {label:'0',  base:0,  high:null, color:'#3f3f3f',bg:'rgba(63,63,63,.18)'},
 ];
 function getTierIndexLow(rating){
-  if(rating>13||rating<0) return -1;
-  return 13-Math.round(rating);
+  if(rating>14.5||rating<0) return -1;
+  return 14-Math.floor(rating);
 }
 let _lowTierOpen=false;
 let _showAbandoned=false;
@@ -5482,7 +5045,7 @@ function toggleLowTierList(){
   const wrap=document.getElementById('tier-list-low-section');
   const btn=document.getElementById('tier-list-low-toggle-label');
   if(wrap) wrap.style.display=_lowTierOpen?'block':'none';
-  if(btn) btn.textContent=_lowTierOpen?'▴ Masquer la suite (notes en dessous de 14)':'▾ Afficher la suite (notes en dessous de 14)';
+  if(btn) btn.textContent=_lowTierOpen?'▴ Masquer la suite (notes en dessous de 15)':'▾ Afficher la suite (notes en dessous de 15)';
   if(_lowTierOpen) renderTierList('low');
 }
 
@@ -5584,7 +5147,7 @@ function renderTierList(variant='main'){
 
   if(!all.length&&!cats.length){
     el.innerHTML=isLow
-      ? '<p style="color:var(--t3);font-size:13px">Aucune œuvre notée en dessous de 14 (Terminée ou À jour) à afficher.</p>'
+      ? '<p style="color:var(--t3);font-size:13px">Aucune œuvre notée en dessous de 15 (Terminée ou À jour) à afficher.</p>'
       : '<p style="color:var(--t3);font-size:13px">Aucune œuvre notée (Terminée ou À jour) à afficher.</p>';
     return;
   }
@@ -5654,6 +5217,32 @@ function renderTierList(variant='main'){
       </div>
     </div>`;
   }).join('');
+  renderTierMetaCol(variant);
+}
+
+// ─── Légende de la tier list (encadrés groupant plusieurs rangées) ───
+// Regroupe les tiers en catégories descriptives, de la moins bonne à la meilleure.
+// "rows" = nombre de rangées de tier list couvertes par cette catégorie (utilisé pour
+// dimensionner proportionnellement l'encadré, via flex-grow, en l'absence de mesure pixel exacte).
+const TIER_META_MAIN=[
+  {label:'Favoris',    rows:3, color:'#fff', bg:'linear-gradient(135deg,#ffd700,#ff8fab)'},
+  {label:'Excellent',  rows:1, color:'#0b1220', bg:'#38bdf8'},
+  {label:'Très bien',  rows:1, color:'#0b1220', bg:'#22d3ee'},
+  {label:'Bien',       rows:1, color:'#0b1220', bg:'#4ade80'},
+];
+const TIER_META_LOW=[
+  {label:'Ça va',      rows:3, color:'#1a1600', bg:'#bef264'},
+  {label:'Moyen',      rows:2, color:'#1a1600', bg:'#fde047'},
+  {label:'Pas ouf',    rows:4, color:'#2a1600', bg:'#fdba74'},
+  {label:'Nul',        rows:6, color:'#fff',    bg:'#525252'},
+];
+function renderTierMetaCol(variant){
+  const el=document.getElementById(variant==='low'?'tier-meta-low':'tier-meta-main');
+  if(!el) return;
+  const groups = variant==='low' ? TIER_META_LOW : TIER_META_MAIN;
+  el.innerHTML=groups.map(g=>
+    `<div class="tier-meta-box" style="flex-grow:${g.rows};background:${g.bg};color:${g.color}">${g.label}</div>`
+  ).join('');
 }
 
 let _tierDragging={malId:null,type:null,fromTier:null,variant:'main'};
@@ -7005,50 +6594,6 @@ function applyMergedData(d){
   if(d.bannerPos) S.bannerPos=d.bannerPos;
 }
 
-// ══════════════════════════════════════════════════════
-function importTierImg(input){
-  const file = input.files[0];
-  if(!file) return;
-  toast('Upload en cours…','ok');
-  uploadToCloudinary(file,'tierimgs').then(url=>{
-    S.tierImg = url;
-    save();
-    showTierImg(url);
-    toast('Image importée ✓','ok');
-  }).catch(()=>{
-    // Fallback base64 localStorage seulement
-    const reader = new FileReader();
-    reader.onload = e => {
-      S.tierImg = e.target.result;
-      save();
-      showTierImg(e.target.result);
-      toast('Image importée ✓','ok');
-    };
-    reader.readAsDataURL(file);
-  });
-  input.value = '';
-}
-
-function showTierImg(url){
-  const preview = document.getElementById('tier-img-preview');
-  const img = document.getElementById('tier-img-el');
-  const clearBtn = document.getElementById('tl-img-clear');
-  if(!preview||!img) return;
-  img.src = url;
-  preview.style.display = 'block';
-  if(clearBtn) clearBtn.style.display = '';
-}
-
-function clearTierImg(){
-  S.tierImg = null;
-  save();
-  const preview = document.getElementById('tier-img-preview');
-  const clearBtn = document.getElementById('tl-img-clear');
-  if(preview) preview.style.display = 'none';
-  if(clearBtn) clearBtn.style.display = 'none';
-  toast('Image retirée','ok');
-}
-
 // ─── FILTRES AVANCÉS SUIVI ───
 // ══════════════════════════════════════════════════════
 let _safDemo = '', _safStatus = '', _safGenre = '';
@@ -7223,12 +6768,6 @@ async function migrateAllImagesToCloudinary(){
   for(const [id,url] of Object.entries(S.arcsImgs||{})){
     if(isB64(url)){
       try{ S.arcsImgs[id] = await uploadToCloudinary(url,'arcs'); changed=true; }catch(e){}
-    }
-  }
-  // profile.top5_combats
-  for(const [i,c] of (S.profile.top5_combats||[]).entries()){
-    if(isB64(c?.image)){
-      try{ S.profile.top5_combats[i].image = await uploadToCloudinary(c.image,'combats'); changed=true; }catch(e){}
     }
   }
   // profile.customTops covers
@@ -7659,13 +7198,8 @@ function fbSave(immediate=true){
         )};
       });
 
-      // profile : virer les images base64 dans top5_combats et customTops
+      // profile : virer les images base64 dans customTops
       const profileClean={...S.profile};
-      if(profileClean.top5_combats){
-        profileClean.top5_combats=profileClean.top5_combats.map(c=>
-          isB64(c.image) ? {...c, image:''} : c
-        );
-      }
       if(profileClean.customTops){
         profileClean.customTops=profileClean.customTops.map(top=>({
           ...top,
@@ -7732,7 +7266,6 @@ if('serviceWorker' in navigator){
 load();
 addScrollToTop();
 renderCustomTops();
-if(S.tierImg) showTierImg(S.tierImg);
 // initRouting est appelé après le chargement Firebase (voir loadFromFirebase)
 initFirebase();
 
