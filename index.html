@@ -255,6 +255,7 @@ body::after{
   transition:all .15s;
 }
 .prio-opt-special{font-size:10.5px;letter-spacing:.3px}
+.prio-opt.active{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border-color:transparent;box-shadow:0 3px 12px rgba(139,124,248,.35)}
 .prio-opt.active[data-p="1"]{background:linear-gradient(135deg,#ffe27a,#f5b942);color:#3a2a00;border-color:transparent;box-shadow:0 3px 12px rgba(245,185,66,.4)}
 .prio-opt.active[data-p="2"]{background:linear-gradient(135deg,#e5eaf0,#a8b4c2);color:#20242c;border-color:transparent;box-shadow:0 3px 12px rgba(168,180,194,.35)}
 .prio-opt.active[data-p="3"]{background:linear-gradient(135deg,#e0a15f,#a3672f);color:#2a1600;border-color:transparent;box-shadow:0 3px 12px rgba(163,103,47,.4)}
@@ -955,7 +956,7 @@ textarea.fi{resize:vertical;min-height:72px}
 .shelf-owned-count{font-size:11px;color:var(--t3);font-weight:600}
 
 /* ── TOP 5 MANUEL ── */
-/* (grille définie plus bas : .top5-manual en grid 5 colonnes) */
+/* (grille des tops personnalisés définie plus bas : .ctop-grid) */
 .char-card{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;width:90px}
 .char-card-img{width:80px;height:80px;object-fit:cover;border-radius:50%;background:var(--bg3);border:2px solid var(--border);transition:border-color .2s;flex-shrink:0}
 .char-card:hover .char-card-img{border-color:var(--acc)}
@@ -1068,9 +1069,13 @@ textarea.fi{resize:vertical;min-height:72px}
 .fanart-item:hover{border-color:var(--acc)}
 .fanart-item img{width:100%;height:100%;object-fit:cover}
 /* TOP5 en ligne de 5 */
-.top5-manual{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;align-items:start}
-.top5-slot{cursor:pointer;position:relative;width:100%}
-.top5-slot-cover{
+.ctop-block{margin-bottom:26px}
+.ctop-block-title{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-family:'Syne',sans-serif;font-weight:900;font-size:14px;cursor:pointer}
+.ctop-block-del{font-size:11px;color:var(--t3);cursor:pointer;padding:3px 8px;border-radius:6px;transition:color .15s}
+.ctop-block-del:hover{color:var(--red)}
+.ctop-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;align-items:start}
+.ctop-slot{cursor:pointer;position:relative;width:100%}
+.ctop-slot-cover{
   width:100%;aspect-ratio:2/3;
   border-radius:8px;overflow:hidden;
   background:var(--surface);border:1.5px dashed var(--border2);
@@ -1078,15 +1083,16 @@ textarea.fi{resize:vertical;min-height:72px}
   font-size:18px;color:var(--t4);transition:all .15s;margin-bottom:4px;
   flex-shrink:0;position:relative;
 }
-.top5-slot-cover img{position:absolute;inset:0;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;display:block;background:var(--bg3)}
-.top5-slot-cover:hover{border-color:var(--acc);color:var(--acc)}
-.top5-slot.filled .top5-slot-cover{border-style:solid;border-color:transparent}
-.top5-rank{font-size:9px;color:var(--t3);font-weight:700;font-family:'Syne',sans-serif}
-.top5-title{font-size:10px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.top5-slot-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.7);border-radius:4px;color:#fff;font-size:10px;padding:2px 4px;opacity:0;transition:opacity .15s;border:none;cursor:pointer}
-.top5-slot:hover .top5-slot-del{opacity:1}
-.top5-slot-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.7);border-radius:4px;color:#fff;font-size:10px;padding:2px 4px;opacity:0;transition:opacity .15s;border:none;cursor:pointer}
-.top5-slot:hover .top5-slot-del{opacity:1}
+.ctop-slot-cover img{position:absolute;inset:0;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;display:block;background:var(--bg3)}
+.ctop-slot-cover:hover{border-color:var(--acc);color:var(--acc)}
+.ctop-slot.filled .ctop-slot-cover{border-style:solid;border-color:transparent}
+.ctop-rank{font-size:9px;color:var(--t3);font-weight:700;font-family:'Syne',sans-serif}
+.ctop-title{font-size:10px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctop-slot-btns{position:absolute;top:4px;right:4px;display:flex;gap:3px;opacity:0;transition:opacity .15s}
+.ctop-slot:hover .ctop-slot-btns{opacity:1}
+.ctop-slot-btn{background:rgba(0,0,0,.7);border-radius:4px;color:#fff;font-size:10px;padding:2px 5px;border:none;cursor:pointer}
+.ctop-slot-btn:hover{background:rgba(0,0,0,.9)}
+
 
 /* ── ADD TO LIBRARY MODAL ── */
 .lib-search-results{max-height:300px;overflow-y:auto;margin-top:8px}
@@ -1380,35 +1386,63 @@ textarea.fi{resize:vertical;min-height:72px}
   </div>
 </div>
 
-<!-- MODAL: TOP5 PICKER -->
-<div class="modal-bg" id="m-top5-pick">
-  <div class="modal" style="max-width:480px;width:100%">
-    <div class="modal-title">Choisir une œuvre <span class="modal-close" onclick="closeM('m-top5-pick')">✕</span></div>
-    <div class="lib-search-results" id="top5-pick-list" style="max-height:380px"></div>
+<!-- MODAL: NOUVEAU TOP -->
+<div class="modal-bg" id="m-newtop-create">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">Nouveau classement <span class="modal-close" onclick="closeM('m-newtop-create')">✕</span></div>
+    <div class="fg"><label class="fl">Titre</label><input class="fi" id="newtop-title" placeholder="Ex: Mes mangas préférés"></div>
+    <div class="fg">
+      <label class="fl">Taille</label>
+      <div style="display:flex;gap:6px" id="newtop-size-group">
+        <button type="button" class="prio-opt" data-size="top5" onclick="selectNewTopSize('top5')">Top 5</button>
+        <button type="button" class="prio-opt" data-size="top10" onclick="selectNewTopSize('top10')">Top 10</button>
+        <button type="button" class="prio-opt" data-size="unlimited" onclick="selectNewTopSize('unlimited')">Illimité</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeM('m-newtop-create')">Annuler</button>
+      <button class="btn btn-primary" style="flex:1" onclick="createCustomTop()">Créer</button>
+    </div>
   </div>
 </div>
 
-<!-- Modal recherche personnage -->
-<div class="modal-bg" id="m-char-pick">
-  <div class="modal" style="max-width:480px;width:100%">
-    <div class="modal-title">Choisir un personnage <span class="modal-close" onclick="closeM('m-char-pick')">✕</span></div>
-    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
-      <label style="font-size:12px;color:var(--t3);white-space:nowrap">Position :</label>
-      <select id="char-pick-position" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;outline:none">
-        <option value="0">#1</option><option value="1">#2</option><option value="2">#3</option>
-        <option value="3">#4</option><option value="4">#5</option><option value="5">#6</option>
-        <option value="6">#7</option><option value="7">#8</option><option value="8">#9</option>
-        <option value="9">#10</option>
-      </select>
-    </div>
+<!-- MODAL: REMPLIR UN SLOT DE TOP -->
+<div class="modal-bg" id="m-ctop-fill">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title">Ajouter un élément <span class="modal-close" onclick="closeM('m-ctop-fill')">✕</span></div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <input id="char-search-input" type="text" placeholder="Nom du personnage…"
-        style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"
-        oninput="searchCharDebounce(this.value)">
+      <button class="btn btn-sm btn-primary" id="ctop-tab-search" style="flex:1" onclick="switchCtopTab('search')">🔍 Rechercher une œuvre</button>
+      <button class="btn btn-sm btn-secondary" id="ctop-tab-image" style="flex:1" onclick="switchCtopTab('image')">🖼 Image perso</button>
     </div>
-    <div class="lib-search-results" id="char-pick-list" style="max-height:320px">
-      <p style="color:var(--t3);font-size:13px;padding:12px">Tapez un nom pour chercher…</p>
+
+    <div id="ctop-src-search">
+      <input class="fi" id="ctop-search-input" placeholder="Chercher un manga ou animé…" oninput="ctopSearchDebounce(this.value)" style="margin-bottom:10px">
+      <div class="lib-search-results" id="ctop-search-results" style="max-height:260px"></div>
     </div>
+
+    <div id="ctop-src-image" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-sm btn-primary" id="ctop-imgsrc-tab-file" onclick="switchCtopImgSrc('file')">📁 Fichier</button>
+        <button class="btn btn-sm btn-secondary" id="ctop-imgsrc-tab-url" onclick="switchCtopImgSrc('url')">🔗 URL</button>
+      </div>
+      <div id="ctop-imgsrc-file-section">
+        <label style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:14px;border-radius:8px;background:var(--surface);border:1.5px dashed var(--border2);color:var(--t2);font-size:13px">
+          <span id="ctop-upload-label">📁 Choisir une image</span>
+          <input type="file" accept="image/*" style="display:none" onchange="ctopPreviewFile(this)">
+        </label>
+      </div>
+      <div id="ctop-imgsrc-url-section" style="display:none">
+        <input class="fi" id="ctop-url-input" placeholder="https://…" oninput="ctopPreviewUrl(this.value)">
+      </div>
+    </div>
+
+    <div id="ctop-preview" style="display:none;margin-top:14px">
+      <img id="ctop-preview-img" style="width:100px;height:140px;object-fit:cover;border-radius:8px;display:block;margin:0 auto 10px">
+      <div class="fg"><label class="fl">Nom affiché</label><input class="fi" id="ctop-name-input" placeholder="Nom…"></div>
+    </div>
+    <div id="ctop-uploading" style="display:none;color:var(--t3);font-size:12px;margin-top:8px">Envoi en cours…</div>
+
+    <button class="btn btn-primary" style="width:100%;margin-top:14px" id="ctop-save-btn" onclick="saveCtopSlot()">Enregistrer</button>
   </div>
 </div>
 
@@ -1785,19 +1819,10 @@ textarea.fi{resize:vertical;min-height:72px}
       <!-- COLONNE GAUCHE : TOPS -->
       <div>
         <div class="sh" style="margin-bottom:14px">
-          <h2 class="sh-title">Top 5 Mangas <span class="badge b-manga">MANGA</span></h2>
+          <h2 class="sh-title">Mes classements</h2>
+          <button class="btn btn-primary" style="font-size:12px" onclick="openNewTopModal()">＋ Nouveau top</button>
         </div>
-        <div class="top5-manual" id="top5-manga"></div>
-
-        <div class="sh" style="margin-bottom:14px;margin-top:24px">
-          <h2 class="sh-title">Top 5 Animés <span class="badge b-anime">ANIMÉ</span></h2>
-        </div>
-        <div class="top5-manual" id="top5-anime"></div>
-
-        <div class="sh" style="margin-bottom:14px;margin-top:24px">
-          <h2 class="sh-title">Top 10 Personnages <span class="badge" style="background:rgba(251,191,36,.15);color:#fbbf24">PERSO</span></h2>
-        </div>
-        <div class="top5-manual" id="top5-chars"></div>
+        <div id="custom-tops-wrap"></div>
 
         <div class="sh" style="margin-bottom:14px;margin-top:24px">
           <h2 class="sh-title">Mes Combats <span class="badge" style="background:rgba(248,113,113,.15);color:#f87171">COMBAT</span></h2>
@@ -1814,6 +1839,7 @@ textarea.fi{resize:vertical;min-height:72px}
             <button class="btn btn-ghost" id="tl-filter-manga" onclick="setTierFilter('manga')" style="font-size:11px;padding:4px 10px;color:var(--manga)">Manga</button>
             <button class="btn btn-ghost" id="tl-filter-anime" onclick="setTierFilter('anime')" style="font-size:11px;padding:4px 10px;color:var(--anime)">Animé</button>
             <button class="btn btn-ghost" style="font-size:11px" onclick="renderTierList();if(_lowTierOpen)renderTierList('low')">↺</button>
+            <button class="btn btn-ghost" id="tl-show-abandoned" style="font-size:11px" onclick="toggleShowAbandoned(this)">👁 Afficher les abandonnés</button>
             <label title="Importer une image de tier list" style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid var(--border);color:var(--t2);transition:border-color .15s" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">
               🖼 Image
               <input type="file" accept="image/*" style="display:none" onchange="importTierImg(this)">
@@ -3406,6 +3432,18 @@ function quickTrack(malId, type, title, cover){
   if(!S.tracking[malId]){
     S.tracking[malId]={mal_id:malId,type,title,cover,status:'Planifié',chapter:0,volume:0,episode:0,rating:0,reviews:[],_addedAt:Date.now()};
     toast(`"${title}" ajouté au suivi`,'ok');
+    // Récupération en arrière-plan des métadonnées (statut de publication, genres, score)
+    // pour que les filtres avancés du Suivi fonctionnent tout de suite, sans attendre
+    // d'avoir ouvert la fiche ou le passage de rattrapage global.
+    fetchWorkMain(type, malId).then(w=>{
+      if(!w || !S.tracking[malId]) return;
+      let changed=false;
+      const genreNames=(w.genres||[]).map(g=>g.name);
+      if(genreNames.length){ S.tracking[malId]._genres=genreNames; changed=true; }
+      if(w.status){ S.tracking[malId]._pubStatus=w.status; changed=true; }
+      if(w.score){ S.tracking[malId]._communityScore=w.score; changed=true; }
+      if(changed){ save(); renderSuivi(); }
+    }).catch(()=>{});
   } else {
     toast(`Déjà dans votre suivi`,'');
   }
@@ -3843,7 +3881,7 @@ function submitReview(){
 function renderProfile(){
   const emptyEl=document.getElementById('profile-banner-empty');
   if(emptyEl) emptyEl.style.display=S.bannerUrl?'none':'flex';
-  renderTop5Manual();
+  renderCustomTops();
   renderTierList();
   if(_lowTierOpen) renderTierList('low');
 }
@@ -4493,11 +4531,11 @@ async function fetchMissingScores(){
   for(const t of missing){
     if(!t.mal_id || !t.type || t.mal_id==='undefined' || t.type==='undefined') continue;
     try{
-      const d=await jikan(`/${t.type}/${t.mal_id}`);
-      const score=d.data?.score||0;
+      const w=await fetchWorkMain(t.type, t.mal_id);
+      const score=w?.score||0;
       if(score && !S.tracking[t.mal_id]._communityScore){ S.tracking[t.mal_id]._communityScore=score; changed=true; }
       // Statut de parution (pour le filtre avancé "Publication")
-      const pubStatus=d.data?.status||'';
+      const pubStatus=w?.status||'';
       if(pubStatus && S.tracking[t.mal_id]._pubStatus!==pubStatus){ S.tracking[t.mal_id]._pubStatus=pubStatus; changed=true; }
       // Aussi assigner une date si manquante
       if(!S.tracking[t.mal_id]._addedAt){ S.tracking[t.mal_id]._addedAt=Date.now(); changed=true; }
@@ -4705,92 +4743,271 @@ function switchTrackTab(type,tab,btn){
 }
 
 // ─── TOP 5 MANUEL ───
-function renderTop5Manual(){
-  ['manga','anime'].forEach(type=>{
-    const el=document.getElementById('top5-'+type);
-    if(!el)return;
-    const top=S.profile['top5_'+type]||[null,null,null,null,null];
-    el.innerHTML=top.map((item,i)=>{
+// ─── TOPS PERSONNALISÉS (remplace l'ancien Top 5 fixe) ───
+function renderCustomTops(){
+  const wrap=document.getElementById('custom-tops-wrap');
+  if(!wrap) return;
+  const tops=S.profile.customTops||[];
+  if(!tops.length){
+    wrap.innerHTML='<p style="color:var(--t3);font-size:13px">Aucun classement pour l\'instant. Clique sur "＋ Nouveau top" pour en créer un.</p>';
+    return;
+  }
+  wrap.innerHTML=tops.map(top=>{
+    const size = top.size==='top5'?5 : top.size==='top10'?10 : null;
+    let slots = top.slots||[];
+    if(size){ slots=slots.slice(0,size); while(slots.length<size) slots.push(null); }
+    const slotHtml=slots.map((item,i)=>{
       if(item){
-        return `<div class="top5-slot filled" onclick="openWork(${item.mal_id},'${type}')">
-          <div class="top5-slot-cover"><img src="${item.cover||''}" loading="lazy"></div>
-          <div class="top5-rank">#${i+1}</div>
-          <div class="top5-title">${esc(item.title||'')}</div>
-          <button class="top5-slot-del" onclick="event.stopPropagation();removeTop5('${type}',${i})" title="Retirer">✕</button>
+        const clickAction = item.source==='search' ? `onclick="openWork(${item.malId},'${item.type}')"` : '';
+        return `<div class="ctop-slot filled">
+          <div class="ctop-slot-cover" ${clickAction} style="${item.source==='search'?'cursor:pointer':''}">
+            <img src="${item.cover||''}" loading="lazy">
+            <div class="ctop-slot-btns">
+              <button class="ctop-slot-btn" onclick="event.stopPropagation();openCtopFillModal('${top.id}',${i},true)" title="Modifier">✎</button>
+              <button class="ctop-slot-btn" onclick="event.stopPropagation();removeCtopSlot('${top.id}',${i})" title="Retirer">✕</button>
+            </div>
+          </div>
+          <div class="ctop-rank">#${i+1}</div>
+          <div class="ctop-title">${esc(item.name||'')}</div>
         </div>`;
       } else {
-        return `<div class="top5-slot" onclick="openTop5Picker('${type}',${i})">
-          <div class="top5-slot-cover">＋</div>
-          <div class="top5-rank">#${i+1}</div>
-          <div class="top5-title" style="color:var(--t3)">Ajouter</div>
+        return `<div class="ctop-slot" onclick="openCtopFillModal('${top.id}',${i})">
+          <div class="ctop-slot-cover">＋</div>
+          <div class="ctop-rank">#${i+1}</div>
+          <div class="ctop-title" style="color:var(--t3)">Ajouter</div>
         </div>`;
       }
-    }).join('');
-  });
-  renderTop5Chars();
-  renderTop5Combats();
-}
+    }).join('') + (!size ? `<div class="ctop-slot" onclick="addUnlimitedCtopSlot('${top.id}')">
+          <div class="ctop-slot-cover">＋</div>
+          <div class="ctop-rank">#${slots.length+1}</div>
+          <div class="ctop-title" style="color:var(--t3)">Ajouter</div>
+        </div>` : '');
 
-function openTop5Picker(type,slot){
-  S._top5Picking={type,slot};
-  const items=Object.values(S.tracking).filter(t=>t.type===type);
-  const el=document.getElementById('top5-pick-list');
-  if(!items.length){el.innerHTML='<p style="color:var(--t3);padding:12px">Aucun '+type+' suivi.</p>';openM('m-top5-pick');return;}
-  el.innerHTML=items.map(t=>`
-    <div class="lib-search-item" onclick="selectTop5Item(${t.mal_id})">
-      <img src="${t.cover||''}" loading="lazy">
-      <div>
-        <div style="font-size:13px;font-weight:700;font-family:'Syne',sans-serif">${esc(t.title)}</div>
-        <div style="font-size:11px;color:var(--t3)">${t.status||''}</div>
+    return `<div class="ctop-block">
+      <div class="sh" style="margin-bottom:12px">
+        <div class="ctop-block-title" onclick="renameCtopTitle('${top.id}',this)" title="Cliquer pour renommer">${esc(top.title||'Sans titre')}</div>
+        <div class="ctop-block-del" onclick="deleteCustomTop('${top.id}')">🗑 Supprimer</div>
       </div>
-    </div>`).join('');
-  openM('m-top5-pick');
-}
-
-function selectTop5Item(malId){
-  const {type,slot}=S._top5Picking||{};
-  if(type===undefined||slot===undefined)return;
-  const t=S.tracking[malId];
-  if(!t)return;
-  if(!S.profile['top5_'+type])S.profile['top5_'+type]=[null,null,null,null,null];
-  S.profile['top5_'+type][slot]={mal_id:malId,title:t.title,cover:t.cover};
-  save();
-  closeM('m-top5-pick');
-  renderTop5Manual();
-  toast('Top 5 mis à jour','ok');
-}
-
-function removeTop5(type,slot){
-  if(!S.profile['top5_'+type])return;
-  S.profile['top5_'+type][slot]=null;
-  save();
-  renderTop5Manual();
-}
-
-// ─── TOP 5 PERSONNAGES ───
-function renderTop5Chars(){
-  const el=document.getElementById('top5-chars');
-  if(!el)return;
-  const top=S.profile.top5_chars||Array(10).fill(null);
-  // Assurer 10 slots
-  while(top.length<10) top.push(null);
-  el.innerHTML=top.slice(0,10).map((item,i)=>{
-    if(item){
-      return `<div class="top5-slot filled" onclick="openCharPage(${item.id})">
-        <div class="top5-slot-cover"><img src="${item.image||''}" loading="lazy"></div>
-        <div class="top5-rank">#${i+1}</div>
-        <div class="top5-title">${esc(item.name||'')}</div>
-        <button class="top5-slot-del" onclick="event.stopPropagation();removeTop5Char(${i})" title="Retirer">✕</button>
-      </div>`;
-    } else {
-      return `<div class="top5-slot" onclick="openCharPicker(${i})">
-        <div class="top5-slot-cover">＋</div>
-        <div class="top5-rank">#${i+1}</div>
-        <div class="top5-title" style="color:var(--t3)">Ajouter</div>
-      </div>`;
-    }
+      <div class="ctop-grid">${slotHtml}</div>
+    </div>`;
   }).join('');
 }
+
+function openNewTopModal(){
+  document.getElementById('newtop-title').value='';
+  selectNewTopSize('top5');
+  openM('m-newtop-create');
+}
+let _newTopSize='top5';
+function selectNewTopSize(size){
+  _newTopSize=size;
+  document.querySelectorAll('#newtop-size-group .prio-opt').forEach(b=>b.classList.toggle('active', b.dataset.size===size));
+}
+function createCustomTop(){
+  const title=document.getElementById('newtop-title').value.trim();
+  if(!title){ toast('Donne un titre à ton classement','err'); return; }
+  if(!S.profile.customTops) S.profile.customTops=[];
+  S.profile.customTops.push({ id:'ctop_'+Date.now(), title, size:_newTopSize, slots:[] });
+  save();
+  closeM('m-newtop-create');
+  renderCustomTops();
+  toast('Classement créé ✓','ok');
+}
+function deleteCustomTop(topId){
+  if(!confirm('Supprimer ce classement entier ?')) return;
+  S.profile.customTops=(S.profile.customTops||[]).filter(t=>t.id!==topId);
+  save();
+  renderCustomTops();
+}
+function renameCtopTitle(topId, el){
+  const top=(S.profile.customTops||[]).find(t=>t.id===topId);
+  if(!top) return;
+  const current=top.title||'';
+  const input=document.createElement('input');
+  input.value=current;
+  input.style.cssText='background:transparent;border:none;border-bottom:1px solid currentColor;color:inherit;font:inherit;outline:none';
+  el.innerHTML=''; el.appendChild(input); input.focus(); input.select();
+  function done(){
+    const val=input.value.trim();
+    if(val) top.title=val;
+    save();
+    renderCustomTops();
+  }
+  input.onblur=done;
+  input.onkeydown=e=>{ if(e.key==='Enter') input.blur(); if(e.key==='Escape'){ input.value=current; input.blur(); } };
+}
+function addUnlimitedCtopSlot(topId){
+  const top=(S.profile.customTops||[]).find(t=>t.id===topId);
+  if(!top) return;
+  if(!top.slots) top.slots=[];
+  top.slots.push(null);
+  openCtopFillModal(topId, top.slots.length-1);
+}
+function removeCtopSlot(topId, slotIndex){
+  const top=(S.profile.customTops||[]).find(t=>t.id===topId);
+  if(!top||!top.slots) return;
+  if(top.size==='unlimited'){
+    top.slots.splice(slotIndex,1);
+  } else {
+    top.slots[slotIndex]=null;
+  }
+  save();
+  renderCustomTops();
+}
+
+// ─── Modale de remplissage d'un slot de top ───
+let _ctopTarget=null; // {topId, slotIndex}
+let _ctopData=null;   // {malId,type,cover,name,source}
+let _ctopFile=null;
+let _ctopUrlValue='';
+
+function openCtopFillModal(topId, slotIndex, isEdit=false){
+  _ctopTarget={topId, slotIndex};
+  _ctopData=null;
+  _ctopFile=null;
+  _ctopUrlValue='';
+  document.getElementById('ctop-search-input').value='';
+  document.getElementById('ctop-search-results').innerHTML='';
+  document.getElementById('ctop-url-input').value='';
+  document.getElementById('ctop-upload-label').textContent='📁 Choisir une image';
+  document.getElementById('ctop-preview').style.display='none';
+  document.getElementById('ctop-uploading').style.display='none';
+
+  if(isEdit){
+    const top=(S.profile.customTops||[]).find(t=>t.id===topId);
+    const item=top?.slots?.[slotIndex];
+    if(item){
+      _ctopData={...item};
+      document.getElementById('ctop-preview-img').src=item.cover||'';
+      document.getElementById('ctop-name-input').value=item.name||'';
+      document.getElementById('ctop-preview').style.display='block';
+    }
+  }
+  switchCtopTab('search');
+  switchCtopImgSrc('file');
+  openM('m-ctop-fill');
+}
+
+function switchCtopTab(tab){
+  document.getElementById('ctop-src-search').style.display = tab==='search' ? '' : 'none';
+  document.getElementById('ctop-src-image').style.display = tab==='image' ? '' : 'none';
+  document.getElementById('ctop-tab-search').className = 'btn btn-sm ' + (tab==='search'?'btn-primary':'btn-secondary');
+  document.getElementById('ctop-tab-image').className = 'btn btn-sm ' + (tab==='image'?'btn-primary':'btn-secondary');
+}
+function switchCtopImgSrc(tab){
+  document.getElementById('ctop-imgsrc-file-section').style.display = tab==='file' ? '' : 'none';
+  document.getElementById('ctop-imgsrc-url-section').style.display = tab==='url' ? '' : 'none';
+  document.getElementById('ctop-imgsrc-tab-file').className = 'btn btn-sm ' + (tab==='file'?'btn-primary':'btn-secondary');
+  document.getElementById('ctop-imgsrc-tab-url').className = 'btn btn-sm ' + (tab==='url'?'btn-primary':'btn-secondary');
+}
+
+let _ctopSearchTimer=null;
+function ctopSearchDebounce(q){
+  clearTimeout(_ctopSearchTimer);
+  const el=document.getElementById('ctop-search-results');
+  if(!q.trim()){ el.innerHTML=''; return; }
+  el.innerHTML='<div class="loading"><div class="spin"></div></div>';
+  _ctopSearchTimer=setTimeout(()=>ctopDoSearch(q),450);
+}
+async function ctopDoSearch(q){
+  const el=document.getElementById('ctop-search-results');
+  try{
+    const [mangas,animes]=await Promise.allSettled([
+      malSearch('manga', q, 5),
+      malSearch('anime', q, 5)
+    ]).then(rs=>rs.map(r=>r.status==='fulfilled'?r.value:[]));
+    const results=[...mangas,...animes];
+    if(!results.length){ el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:10px">Aucun résultat.</p>'; return; }
+    el.innerHTML=results.map(item=>{
+      const safeTitle=esc(item.title).replace(/'/g,'&#39;');
+      const safeCover=(item.images?.jpg?.image_url||'').replace(/'/g,'&#39;');
+      return `<div class="lib-search-item" onclick='ctopSelectSearchResult(${item.mal_id},"${item._type}","${safeTitle}","${safeCover}")'>
+        <img src="${item.images?.jpg?.image_url||''}" loading="lazy">
+        <div>
+          <div style="font-size:13px;font-weight:700;font-family:'Syne',sans-serif">${esc(item.title)}</div>
+          <div style="font-size:11px;color:var(--t3)">${item._type==='manga'?'Manga':'Animé'}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:10px">Erreur de recherche.</p>'; }
+}
+function ctopSelectSearchResult(malId,type,title,cover){
+  _ctopData={malId,type,cover,name:title,source:'search'};
+  document.getElementById('ctop-preview-img').src=cover;
+  document.getElementById('ctop-name-input').value=title;
+  document.getElementById('ctop-preview').style.display='block';
+}
+
+function ctopPreviewFile(input){
+  const file=input.files[0];
+  if(!file) return;
+  _ctopFile=file;
+  _ctopUrlValue='';
+  const url=URL.createObjectURL(file);
+  document.getElementById('ctop-preview-img').src=url;
+  document.getElementById('ctop-preview').style.display='block';
+  document.getElementById('ctop-upload-label').textContent='✓ '+file.name;
+  if(!document.getElementById('ctop-name-input').value) document.getElementById('ctop-name-input').value=file.name.replace(/\.[^.]+$/,'');
+}
+let _ctopUrlTimer=null;
+function ctopPreviewUrl(val){
+  _ctopUrlValue=val.trim();
+  _ctopFile=null;
+  clearTimeout(_ctopUrlTimer);
+  if(!_ctopUrlValue) return;
+  _ctopUrlTimer=setTimeout(()=>{
+    const el=document.getElementById('ctop-preview-img');
+    el.onerror=()=>{ document.getElementById('ctop-preview').style.display='none'; };
+    el.onload=()=>{ document.getElementById('ctop-preview').style.display='block'; };
+    el.src=_ctopUrlValue;
+  },500);
+}
+
+async function saveCtopSlot(){
+  const {topId,slotIndex}=_ctopTarget||{};
+  if(!topId) return;
+  const top=(S.profile.customTops||[]).find(t=>t.id===topId);
+  if(!top) return;
+  const name=document.getElementById('ctop-name-input').value.trim();
+
+  let finalItem=null;
+  const saveBtn=document.getElementById('ctop-save-btn');
+  const uploadingEl=document.getElementById('ctop-uploading');
+
+  if(_ctopFile || _ctopUrlValue){
+    if(!name){ toast('Donne un nom affiché','err'); return; }
+    uploadingEl.style.display='block'; saveBtn.disabled=true;
+    let cover='';
+    try{
+      if(_ctopFile){
+        cover=await uploadToCloudinary(_ctopFile,'custom-tops');
+      } else {
+        const fd=new FormData();
+        fd.append('file', _ctopUrlValue);
+        fd.append('upload_preset', CLOUDINARY_PRESET);
+        fd.append('folder','custom-tops');
+        const res=await fetch(CLOUDINARY_URL,{method:'POST',body:fd});
+        cover = res.ok ? (await res.json()).secure_url : _ctopUrlValue;
+      }
+    }catch(e){ cover=_ctopUrlValue||''; }
+    uploadingEl.style.display='none'; saveBtn.disabled=false;
+    finalItem={cover, name, source:'image'};
+  } else if(_ctopData){
+    if(!name){ toast('Donne un nom affiché','err'); return; }
+    finalItem={...(_ctopData.malId?{malId:_ctopData.malId,type:_ctopData.type,source:'search'}:{source:'image'}), cover:_ctopData.cover, name};
+  } else {
+    toast('Choisis une image ou recherche une œuvre','err');
+    return;
+  }
+
+  if(!top.slots) top.slots=[];
+  top.slots[slotIndex]=finalItem;
+  save();
+  closeM('m-ctop-fill');
+  renderCustomTops();
+  toast('Ajouté ✓','ok');
+}
+
 
 function filterListItems(){
   const q=(document.getElementById('list-search')?.value||'').toLowerCase().trim();
@@ -4820,59 +5037,6 @@ function addScrollToTop(){
   window.addEventListener('scroll',()=>{ btn.style.display=window.scrollY>300?'flex':'none'; btn.style.alignItems='center'; btn.style.justifyContent='center'; });
 }
 
-function removeTop5Char(slot){
-  if(!S.profile.top5_chars) return;
-  S.profile.top5_chars[slot]=null;
-  save(); renderTop5Chars();
-}
-
-function openCharPicker(slot){
-  S._charPickSlot=slot;
-  const sel=document.getElementById('char-pick-position');
-  if(sel) sel.value=String(slot);
-  document.getElementById('char-search-input').value='';
-  document.getElementById('char-pick-list').innerHTML='<p style="color:var(--t3);font-size:13px;padding:12px">Tapez un nom pour chercher…</p>';
-  openM('m-char-pick');
-}
-
-let _charSearchTimer=null;
-function searchCharDebounce(q){
-  clearTimeout(_charSearchTimer);
-  if(!q.trim()){ document.getElementById('char-pick-list').innerHTML='<p style="color:var(--t3);font-size:13px;padding:12px">Tapez un nom pour chercher…</p>'; return; }
-  _charSearchTimer=setTimeout(()=>searchChars(q),500);
-}
-
-async function searchChars(q){
-  const el=document.getElementById('char-pick-list');
-  el.innerHTML='<div class="loading"><div class="spin"></div></div>';
-  try{
-    const d=await jikan(`/characters?q=${encodeURIComponent(q)}&limit=12`);
-    const results=d.data||[];
-    if(!results.length){ el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:12px">Aucun résultat.</p>'; return; }
-    el.innerHTML=results.map(c=>{
-      const img=c.images?.jpg?.image_url||c.images?.webp?.image_url||'';
-      const series=[...(c.manga||[]),...(c.anime||[])].map(s=>s.manga?.title||s.anime?.title).filter(Boolean)[0]||'';
-      return `<div class="lib-search-item" onclick="selectChar(${c.mal_id},'${esc(c.name)}','${img.replace(/'/g,"\\'")}','${esc(series)}')">
-        <img src="${img}" loading="lazy" style="width:44px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0">
-        <div>
-          <div style="font-size:13px;font-weight:700;font-family:'Syne',sans-serif">${esc(c.name)}</div>
-          <div style="font-size:11px;color:var(--t3)">${esc(series)}</div>
-        </div>
-      </div>`;
-    }).join('');
-  }catch(e){ el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:12px">Erreur API.</p>'; }
-}
-
-function selectChar(id,name,image,series){
-  const sel=document.getElementById('char-pick-position');
-  const slot=sel?parseInt(sel.value):S._charPickSlot;
-  if(slot===undefined||slot===null) return;
-  if(!S.profile.top5_chars) S.profile.top5_chars=Array(10).fill(null);
-  while(S.profile.top5_chars.length<10) S.profile.top5_chars.push(null);
-  S.profile.top5_chars[slot]={id,name,image,series};
-  save(); closeM('m-char-pick'); renderTop5Chars();
-  toast('Personnage ajouté en position #'+(slot+1),'ok');
-}
 
 // ─── PAGE PERSONNAGE ───
 async function openCharPage(charId){
@@ -5305,6 +5469,14 @@ function getTierIndexLow(rating){
   return 13-Math.round(rating);
 }
 let _lowTierOpen=false;
+let _showAbandoned=false;
+function toggleShowAbandoned(btn){
+  _showAbandoned=!_showAbandoned;
+  btn.classList.toggle('btn-primary', _showAbandoned);
+  btn.classList.toggle('btn-ghost', !_showAbandoned);
+  renderTierList('main');
+  if(_lowTierOpen) renderTierList('low');
+}
 function toggleLowTierList(){
   _lowTierOpen=!_lowTierOpen;
   const wrap=document.getElementById('tier-list-low-section');
@@ -5347,6 +5519,7 @@ function renderTierList(variant='main'){
 
   // Statuts autorisés dans la tierlist : seulement Terminé et À jour
   const ALLOWED_STATUSES = new Set(['Terminé','À jour']);
+  if(_showAbandoned) ALLOWED_STATUSES.add('Abandonné');
 
   // Catégories de suivi qui ont une note → apparaissent comme éléments
   const cats=(S.suiviCategories||[]).filter(c=>
@@ -5789,7 +5962,7 @@ function applyCustomCover(malId,dataUrl){
     if(cc&&cc.getAttribute('onclick')&&cc.getAttribute('onclick').includes(String(malId))) img.src=dataUrl;
   });
   renderHomeInProgress();
-  renderTop5Manual();
+  renderCustomTops();
   renderTierList();
   if(_lowTierOpen) renderTierList('low');
   toast('Couverture mise à jour ✅','ok');
@@ -6485,8 +6658,31 @@ function renderScatViewItems(){
         <img src="${item.cover||''}" style="width:100%;height:100%;object-fit:cover" loading="lazy">
         ${item.rating?`<div class="cc-rating" style="position:absolute;top:4px;left:4px;z-index:2">★ ${item.rating}</div>`:''}
       </div>
-      <div style="font-size:11px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
+      <div style="font-size:11px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" ondblclick="renameScatItem(event,${item.mal_id},'${item.type}')" title="Double-clic pour renommer">${esc(item.displayName||item.title)}</div>
     </div>`).join('')+`</div>`;
+}
+
+function renameScatItem(e, malId, type){
+  e.stopPropagation();
+  const id=document.getElementById('m-scat-view').dataset.catId;
+  const cat=(S.suiviCategories||[]).find(c=>c.id===id);
+  if(!cat) return;
+  const item=(cat.items||[]).find(i=>i.mal_id===malId&&i.type===type);
+  if(!item) return;
+  const el=e.currentTarget;
+  const current=item.displayName||item.title||'';
+  const input=document.createElement('input');
+  input.value=current;
+  input.style.cssText='background:transparent;border:none;border-bottom:1px solid currentColor;color:inherit;font:inherit;width:100%;outline:none;font-size:11px';
+  el.innerHTML=''; el.appendChild(input); input.focus(); input.select();
+  function done(){
+    const val=input.value.trim();
+    if(val) item.displayName=val;
+    save();
+    renderScatViewItems();
+  }
+  input.onblur=done;
+  input.onkeydown=ev=>{ if(ev.key==='Enter') input.blur(); if(ev.key==='Escape'){ input.value=current; input.blur(); } };
 }
 
 // ─── CRITIQUES DE CATÉGORIES ───
@@ -6616,8 +6812,8 @@ async function exportProfileImage(){
   const totalEp=animes.reduce((s,t)=>s+(t.episode||0),0);
   const avgR=all.filter(t=>t.rating>0).length
     ?(all.filter(t=>t.rating>0).reduce((s,t)=>s+t.rating,0)/all.filter(t=>t.rating>0).length).toFixed(1):'—';
-  const top5m=(S.profile?.top5_manga||[]).slice(0,5);
-  const top5a=(S.profile?.top5_anime||[]).slice(0,5);
+  const top5m=mangas.filter(t=>t.rating>0).sort((a,b)=>b.rating-a.rating).slice(0,5);
+  const top5a=animes.filter(t=>t.rating>0).sort((a,b)=>b.rating-a.rating).slice(0,5);
 
   const W=900, H=500;
   const canvas=document.createElement('canvas');
@@ -7035,11 +7231,11 @@ async function migrateAllImagesToCloudinary(){
       try{ S.profile.top5_combats[i].image = await uploadToCloudinary(c.image,'combats'); changed=true; }catch(e){}
     }
   }
-  // profile.top5_manga / top5_anime covers
-  for(const type of ['manga','anime']){
-    for(const [i,item] of (S.profile['top5_'+type]||[]).entries()){
-      if(item && isB64(item.cover)){
-        try{ S.profile['top5_'+type][i].cover = await uploadToCloudinary(item.cover,'covers'); changed=true; }catch(e){}
+  // profile.customTops covers
+  for(const top of (S.profile.customTops||[])){
+    for(const [i,slot] of (top.slots||[]).entries()){
+      if(slot && isB64(slot.cover)){
+        try{ top.slots[i].cover = await uploadToCloudinary(slot.cover,'covers'); changed=true; }catch(e){}
       }
     }
   }
@@ -7421,7 +7617,7 @@ async function loadFromFirebase(){
       suiviCategories:S.suiviCategories||[],
       tierImg:S.tierImg||null,arcsImgs:S.arcsImgs||{}
     })); }catch(e){}
-    renderTop5Manual();
+    renderCustomTops();
     renderTierList();
     // Migrer les images base64 vers Cloudinary si nécessaire
     setTimeout(migrateAllImagesToCloudinary, 2000);
@@ -7463,20 +7659,21 @@ function fbSave(immediate=true){
         )};
       });
 
-      // profile : virer les images base64 dans top5_combats et top5
+      // profile : virer les images base64 dans top5_combats et customTops
       const profileClean={...S.profile};
       if(profileClean.top5_combats){
         profileClean.top5_combats=profileClean.top5_combats.map(c=>
           isB64(c.image) ? {...c, image:''} : c
         );
       }
-      ['manga','anime'].forEach(type=>{
-        if(profileClean['top5_'+type]){
-          profileClean['top5_'+type]=profileClean['top5_'+type].map(item=>
-            item && isB64(item.cover) ? {...item, cover:''} : item
-          );
-        }
-      });
+      if(profileClean.customTops){
+        profileClean.customTops=profileClean.customTops.map(top=>({
+          ...top,
+          slots:(top.slots||[]).map(slot=>
+            slot && isB64(slot.cover) ? {...slot, cover:''} : slot
+          )
+        }));
+      }
 
       // bannerUrl : virer si base64
       const bannerClean = isB64(S.bannerUrl) ? null : (S.bannerUrl||null);
@@ -7534,7 +7731,7 @@ if('serviceWorker' in navigator){
 }
 load();
 addScrollToTop();
-renderTop5Manual();
+renderCustomTops();
 if(S.tierImg) showTierImg(S.tierImg);
 // initRouting est appelé après le chargement Firebase (voir loadFromFirebase)
 initFirebase();
