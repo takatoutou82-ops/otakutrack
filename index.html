@@ -967,12 +967,7 @@ textarea.fi{resize:vertical;min-height:72px}
 /* TIER LIST */
 .tier-row{display:flex;gap:0;margin-bottom:6px;border-radius:10px;overflow:hidden;min-height:72px}
 .tier-meta-col{width:76px;flex-shrink:0;display:flex;flex-direction:column;gap:3px}
-.tier-meta-group{flex-grow:1;flex-basis:0;display:flex;flex-direction:column;border-radius:8px;overflow:hidden;position:relative}
-.tier-meta-tag{
-  position:absolute;top:2px;left:0;right:0;text-align:center;
-  font-size:7.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;
-  opacity:.75;pointer-events:none;z-index:1;
-}
+.tier-meta-group{flex-grow:1;flex-basis:0;display:flex;flex-direction:column;border-radius:8px;overflow:hidden}
 .tier-meta-seg{
   flex-grow:1;flex-basis:0;
   display:flex;align-items:center;justify-content:center;text-align:center;
@@ -5271,22 +5266,15 @@ function renderTierMetaCol(variant){
   const el=document.getElementById(variant==='low'?'tier-meta-low':'tier-meta-main');
   if(!el) return;
   const groups = variant==='low' ? TIER_META_LOW : TIER_META_MAIN;
-  const TIERS_ACTIVE = variant==='low' ? TIERS_LOW : TIERS;
-  const customLabels = S.profile[variant==='low'?'tierLabelsLow':'tierLabels']||{};
-  let startIdx=0;
   el.innerHTML=groups.map(g=>{
     // Un encadré qui couvre plusieurs rangées est subdivisé visuellement (traits fins),
-    // chaque segment affichant le vrai nom de SON tier (ex: Favoris = Parfait + Chef-d'œuvre
-    // + Incroyable). Le nom du groupe (ex: "Favoris") reste visible en petite étiquette au-dessus,
-    // uniquement quand le groupe couvre plusieurs tiers distincts.
-    const segs=Array.from({length:g.rows},(_,i)=>{
-      const tierIdx=startIdx+i;
-      const tierName=customLabels[tierIdx]||TIERS_ACTIVE[tierIdx]?.label||'';
-      return `<div class="tier-meta-seg"${i>0?' style="border-top:1px solid rgba(255,255,255,.22)"':''}">${esc(tierName)}</div>`;
-    }).join('');
-    startIdx+=g.rows;
-    const tag=g.rows>1?`<div class="tier-meta-tag">${g.label}</div>`:'';
-    return `<div class="tier-meta-group" style="flex-grow:${g.rows};background:${g.bg};color:${g.color}">${tag}${segs}</div>`;
+    // avec le nom du groupe affiché au milieu, pour bien montrer qu'il regroupe
+    // plusieurs tiers distincts (ex: Favoris = Parfait + Chef-d'œuvre + Incroyable).
+    const mid=Math.floor((g.rows-1)/2);
+    const segs=Array.from({length:g.rows},(_,i)=>
+      `<div class="tier-meta-seg"${i>0?' style="border-top:1px solid rgba(255,255,255,.22)"':''}">${i===mid?g.label:''}</div>`
+    ).join('');
+    return `<div class="tier-meta-group" style="flex-grow:${g.rows};background:${g.bg};color:${g.color}">${segs}</div>`;
   }).join('');
 }
 
