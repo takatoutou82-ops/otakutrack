@@ -976,6 +976,34 @@ textarea.fi{resize:vertical;min-height:72px}
 }
 .tier-label{width:130px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-family:'Syne',sans-serif;font-size:11px;text-align:center;padding:8px;line-height:1.3;word-break:keep-all;white-space:normal}
 .tier-items{flex:1;display:flex;flex-wrap:wrap;gap:5px;padding:6px;background:var(--bg3);border:1px solid var(--border);border-left:none;align-items:center;min-height:72px}
+
+/* ── Tier Lists personnalisées ── */
+.ctl-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.ctl-card:hover{border-color:var(--acc)}
+.ctl-card-preview{aspect-ratio:16/9;background:var(--bg3);display:grid;grid-template-columns:repeat(4,1fr);gap:1px;overflow:hidden}
+.ctl-card-preview img{width:100%;height:100%;object-fit:cover}
+.ctl-card-preview-empty{display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--t4);grid-column:1/-1}
+.ctl-card-body{padding:12px 14px}
+.ctl-card-name{font-family:'Syne',sans-serif;font-weight:800;font-size:14px;margin-bottom:2px}
+.ctl-card-count{font-size:11.5px;color:var(--t3)}
+
+.ctl-row{display:flex;gap:0;margin-bottom:6px;border-radius:10px;overflow:hidden;min-height:78px}
+.ctl-label{width:70px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-family:'Syne',sans-serif;font-size:12px;text-align:center;padding:6px}
+.ctl-zones{flex:1;display:flex;min-width:0}
+.ctl-zone{flex:1;display:flex;flex-wrap:wrap;gap:6px;padding:7px;background:var(--bg3);border:1px solid var(--border);border-left:none;align-items:center;min-height:78px;min-width:0;transition:background .15s}
+.ctl-zone.drag-over{background:rgba(139,124,248,.08)}
+.ctl-zone+.ctl-zone{border-left:1px dashed var(--border2)}
+.ctl-item{width:50px;height:70px;border-radius:6px;overflow:hidden;cursor:grab;position:relative;flex-shrink:0;background:var(--bg4)}
+.ctl-item:active{cursor:grabbing}
+.ctl-item img{width:100%;height:100%;object-fit:cover;display:block}
+.ctl-item-name{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.75);color:#fff;font-size:7px;font-weight:700;text-align:center;padding:1px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl-item-del{position:absolute;top:1px;right:1px;background:rgba(0,0,0,.75);color:#fff;font-size:9px;width:14px;height:14px;display:flex;align-items:center;justify-content:center;border-radius:3px;opacity:0;transition:opacity .15s;z-index:2}
+.ctl-item:hover .ctl-item-del{opacity:1}
+.ctl-pool{display:flex;flex-wrap:wrap;gap:8px;padding:14px;background:var(--bg3);border:1.5px dashed var(--border2);border-radius:12px;min-height:100px;align-items:center}
+.ctl-pool-add{width:50px;height:70px;border-radius:6px;border:1.5px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--t3);cursor:pointer;flex-shrink:0;transition:all .15s}
+.ctl-pool-add:hover{border-color:var(--acc);color:var(--acc)}
+.ctl-pool-empty{color:var(--t3);font-size:12.5px;font-style:italic}
+
 .tier-item{width:46px;height:66px;border-radius:5px;overflow:hidden;cursor:pointer;position:relative;flex-shrink:0;transition:transform .15s}
 .tier-item:hover{transform:translateY(-3px)}
 .tier-item img{width:100%;height:100%;object-fit:cover}
@@ -1169,13 +1197,14 @@ textarea.fi{resize:vertical;min-height:72px}
   </div>
   <div class="nav-links">
     <div class="nl on" data-page="home" onclick="nav('home')">Accueil</div>
+    <div class="nl" data-page="profile" onclick="nav('profile')">Profil</div>
+    <div class="nl" data-page="suivi" onclick="nav('suivi')">Suivi</div>
+    <div class="nl" data-page="lists" onclick="nav('lists')">Listes</div>
+    <div class="nl" data-page="tierlists" onclick="nav('tierlists')">Tier List</div>
     <div class="nl manga-nl" data-page="manga" onclick="nav('manga')">Manga</div>
     <div class="nl anime-nl" data-page="anime" onclick="nav('anime')">Animé</div>
-    <div class="nl" data-page="profile" onclick="nav('profile')">Profil</div>
-    <div class="nl" data-page="lists" onclick="nav('lists')">Listes</div>
-    <div class="nl" data-page="suivi" onclick="nav('suivi')">Suivi</div>
-    <div class="nl" data-page="stats" onclick="nav('stats')">Stats</div>
     <div class="nl" data-page="collection" onclick="nav('collection')">Collection</div>
+    <div class="nl" data-page="stats" onclick="nav('stats')">Stats</div>
   </div>
   <div class="nav-r">
     <div class="nav-searchbox" style="position:relative">
@@ -1243,6 +1272,18 @@ textarea.fi{resize:vertical;min-height:72px}
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-createlist')">Annuler</button>
       <button class="btn btn-primary" style="flex:1" onclick="doCreateList()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NOUVELLE TIER LIST -->
+<div class="modal-bg" id="m-newctl">
+  <div class="modal">
+    <div class="modal-title">Nouvelle tier list <span class="modal-close" onclick="closeM('m-newctl')">✕</span></div>
+    <div class="fg"><label class="fl">Nom</label><input class="fi" id="newctl-name" placeholder="Ex: Mes persos préférés"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-newctl')">Annuler</button>
+      <button class="btn btn-primary" style="flex:1" onclick="createCustomTierList()">Créer</button>
     </div>
   </div>
 </div>
@@ -1832,6 +1873,25 @@ textarea.fi{resize:vertical;min-height:72px}
   </div>
 </div>
 
+<!-- PAGE: TIER LISTS (galerie) -->
+<div class="pg" id="pg-tierlists">
+  <div class="wrap pt32 pb40">
+    <div class="sh">
+      <h1 class="sh-title" style="font-size:22px">Mes Tier Lists</h1>
+      <button class="btn btn-primary" onclick="openNewCtlModal()">+ Nouvelle tier list</button>
+    </div>
+    <div id="ctl-grid"></div>
+  </div>
+</div>
+
+<!-- PAGE: TIER LIST DETAIL -->
+<div class="pg" id="pg-tierlistdetail">
+  <div class="wrap pt32 pb40">
+    <button class="back-btn" onclick="goBack()">← Mes tier lists</button>
+    <div id="ctldetail-body"></div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════════ -->
 <!-- PAGE: STATS -->
 <!-- ═══════════════════════════════════════════ -->
@@ -2074,7 +2134,8 @@ function save(){
       bannerSize:S.bannerSize,bannerPos:S.bannerPos,
       physCategories:S.physCategories||[],
       suiviCategories:S.suiviCategories||[],
-      tierImg:S.tierImg||null,arcsImgs:S.arcsImgs||{}
+      tierImg:S.tierImg||null,arcsImgs:S.arcsImgs||{},
+      customTierLists:S.customTierLists||[]
     }));
     localStorage.setItem('ot_last_update',String(Date.now()));
   }catch(e){}
@@ -2100,6 +2161,7 @@ function load(){
     if(d.suiviCategories) S.suiviCategories=d.suiviCategories;
     if(d.tierImg) S.tierImg=d.tierImg;
     if(d.arcsImgs) S.arcsImgs=d.arcsImgs;
+    if(d.customTierLists) S.customTierLists=d.customTierLists;
     if(d.bannerUrl){
       S.bannerUrl=d.bannerUrl;
       var bg=document.getElementById('profile-banner-bg');
@@ -2417,6 +2479,7 @@ function _afterNav(page){
   if(page==='stats')renderStats();
   if(page==='collection')renderCollection();
   if(page==='suivi'){renderSuivi();populateSuiviGenreFilter();fetchMissingScores();}
+  if(page==='tierlists')renderTierListsGallery();
 }
 
 function activate(el){
@@ -2443,7 +2506,7 @@ window.addEventListener('popstate', e=>{
     return;
   }
   const page=state?.page || hash || 'home';
-  const validPages=['home','manga','anime','profile','lists','suivi','stats','collection','listdetail'];
+  const validPages=['home','manga','anime','profile','lists','suivi','stats','collection','listdetail','tierlists','tierlistdetail'];
   nav(validPages.includes(page)?page:'home', false);
 });
 
@@ -2461,7 +2524,11 @@ function initRouting(){
     const id=hash.replace('listdetail-','');
     if(S.lists.find(l=>l.id===id)){ S.currentListId=id; history.replaceState({page:'listdetail',listId:id},'',location.hash); renderListDetail(); nav('listdetail',false); return; }
   }
-  const validPages=['home','manga','anime','profile','lists','suivi','stats','collection'];
+  if(hash.startsWith('tierlistdetail-')){
+    const id=hash.replace('tierlistdetail-','');
+    if((S.customTierLists||[]).find(l=>l.id===id)){ S.currentCtlId=id; history.replaceState({page:'tierlistdetail',ctlId:id},'',location.hash); renderCtlDetail(); nav('tierlistdetail',false); return; }
+  }
+  const validPages=['home','manga','anime','profile','lists','suivi','stats','collection','tierlists'];
   const page=validPages.includes(hash)?hash:'home';
   history.replaceState({page},'','#'+page);
   nav(page, false);
@@ -5278,7 +5345,311 @@ function renderTierMetaCol(variant){
   }).join('');
 }
 
-let _tierDragging={malId:null,type:null,fromTier:null,variant:'main'};
+// ══════════════════════════════════════════════════════
+// TIER LISTS PERSONNALISÉES (page à part, avec images libres)
+// ══════════════════════════════════════════════════════
+
+// Rangées de la tier list principale : 20 → 12, avec sous-division (.5) pour 13→20
+const CTL_MAIN=[
+  {base:20, high:null, color:'#ff4d4d',bg:'rgba(255,77,77,.22)'},
+  {base:19, high:19.5, color:'#ff7f00',bg:'rgba(255,127,0,.22)'},
+  {base:18, high:18.5, color:'#ffd700',bg:'rgba(255,215,0,.22)'},
+  {base:17, high:17.5, color:'#adff2f',bg:'rgba(173,255,47,.22)'},
+  {base:16, high:16.5, color:'#00e5ff',bg:'rgba(0,229,255,.22)'},
+  {base:15, high:15.5, color:'#7c4dff',bg:'rgba(124,77,255,.22)'},
+  {base:14, high:14.5, color:'#5eead4',bg:'rgba(94,234,212,.18)'},
+  {base:13, high:13.5, color:'#86efac',bg:'rgba(134,239,172,.18)'},
+  {base:12, high:null, color:'#fde047',bg:'rgba(253,224,71,.18)'},
+];
+// Rangées de la tier list bis : 11 → 0, sans sous-division
+const CTL_LOW=[
+  {base:11, color:'#fdba74',bg:'rgba(253,186,116,.18)'},
+  {base:10, color:'#fb923c',bg:'rgba(251,146,60,.18)'},
+  {base:9,  color:'#f87171',bg:'rgba(248,113,113,.18)'},
+  {base:8,  color:'#ef4444',bg:'rgba(239,68,68,.18)'},
+  {base:7,  color:'#dc2626',bg:'rgba(220,38,38,.18)'},
+  {base:6,  color:'#b91c1c',bg:'rgba(185,28,28,.18)'},
+  {base:5,  color:'#991b1b',bg:'rgba(153,27,27,.18)'},
+  {base:4,  color:'#7f1d1d',bg:'rgba(127,29,29,.18)'},
+  {base:3,  color:'#525252',bg:'rgba(82,82,82,.18)'},
+  {base:2,  color:'#3f3f3f',bg:'rgba(63,63,63,.18)'},
+  {base:1,  color:'#333',   bg:'rgba(51,51,51,.18)'},
+  {base:0,  color:'#222',   bg:'rgba(34,34,34,.18)'},
+];
+
+function renderTierListsGallery(){
+  const el=document.getElementById('ctl-grid');
+  if(!el) return;
+  const tops=S.customTierLists||[];
+  if(!tops.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">🏆</div><div class="empty-title">Aucune tier list</div><div class="empty-sub">Clique sur "+ Nouvelle tier list" pour en créer une</div></div>';
+    return;
+  }
+  el.innerHTML=`<div class="cg-lg">${tops.map(ctl=>{
+    const previewItems=Object.values(ctl.items||{}).slice(0,4);
+    const preview=previewItems.length
+      ? previewItems.map(it=>`<img src="${it.img||''}" loading="lazy">`).join('')
+      : '<div class="ctl-card-preview-empty">🏆</div>';
+    return `<div class="ctl-card" onclick="openCustomTierList('${ctl.id}')">
+      <div class="ctl-card-preview">${preview}</div>
+      <div class="ctl-card-body">
+        <div class="ctl-card-name">${esc(ctl.name)}</div>
+        <div class="ctl-card-count">${Object.keys(ctl.items||{}).length} élément${Object.keys(ctl.items||{}).length!==1?'s':''}</div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function openNewCtlModal(){
+  document.getElementById('newctl-name').value='';
+  openM('m-newctl');
+}
+function createCustomTierList(){
+  const name=document.getElementById('newctl-name').value.trim();
+  if(!name){ toast('Donne un nom à ta tier list','err'); return; }
+  if(!S.customTierLists) S.customTierLists=[];
+  const ctl={ id:'ctl_'+Date.now(), name, items:{}, assign:{}, orders:{} };
+  S.customTierLists.push(ctl);
+  save();
+  closeM('m-newctl');
+  openCustomTierList(ctl.id);
+}
+function openCustomTierList(id){
+  S.currentCtlId=id;
+  history.pushState({page:'tierlistdetail',ctlId:id},'','#tierlistdetail-'+id);
+  renderCtlDetail();
+  nav('tierlistdetail',false);
+}
+function deleteCustomTierList(id){
+  if(!confirm('Supprimer cette tier list entière ? Cette action est irréversible.')) return;
+  S.customTierLists=(S.customTierLists||[]).filter(l=>l.id!==id);
+  save();
+  goBack();
+}
+function renameCustomTierList(id, el){
+  const ctl=(S.customTierLists||[]).find(l=>l.id===id);
+  if(!ctl) return;
+  const current=ctl.name;
+  const input=document.createElement('input');
+  input.value=current;
+  input.style.cssText='background:transparent;border:none;border-bottom:1px solid currentColor;color:inherit;font:inherit;font-size:20px;font-weight:800;outline:none';
+  el.innerHTML=''; el.appendChild(input); input.focus(); input.select();
+  function done(){
+    const val=input.value.trim();
+    if(val) ctl.name=val;
+    save();
+    renderCtlDetail();
+  }
+  input.onblur=done;
+  input.onkeydown=e=>{ if(e.key==='Enter') input.blur(); if(e.key==='Escape'){ input.value=current; input.blur(); } };
+}
+
+let _ctlLowOpen=false;
+function toggleCtlLow(){
+  _ctlLowOpen=!_ctlLowOpen;
+  renderCtlDetail();
+}
+
+function renderCtlDetail(){
+  const el=document.getElementById('ctldetail-body');
+  const ctl=(S.customTierLists||[]).find(l=>l.id===S.currentCtlId);
+  if(!el||!ctl) return;
+
+  const items=ctl.items||{};
+  const assign=ctl.assign||{};
+  const orders=ctl.orders||{};
+
+  const orderKey=(block,tierIdx,sub)=>`${block}_${tierIdx}_${sub||'x'}`;
+  const itemsInZone=(block,tierIdx,sub)=>{
+    const ids=Object.keys(items).filter(id=>{
+      const a=assign[id];
+      return a && a.block===block && a.tierIdx===tierIdx && (a.sub||null)===(sub||null);
+    });
+    const order=orders[orderKey(block,tierIdx,sub)]||[];
+    ids.sort((a,b)=>{
+      const ia=order.indexOf(a), ib=order.indexOf(b);
+      return (ia===-1?9999:ia)-(ib===-1?9999:ib);
+    });
+    return ids;
+  };
+  const poolIds=(()=>{
+    const ids=Object.keys(items).filter(id=>!assign[id]);
+    const order=orders['pool']||[];
+    ids.sort((a,b)=>{
+      const ia=order.indexOf(a), ib=order.indexOf(b);
+      return (ia===-1?9999:ia)-(ib===-1?9999:ib);
+    });
+    return ids;
+  })();
+
+  const renderItem=id=>{
+    const it=items[id];
+    if(!it) return '';
+    return `<div class="ctl-item" draggable="true" data-item-id="${id}"
+      ondragstart="ctlItemDragStart(event,'${id}')" ondragend="ctlItemDragEnd(event)"
+      title="${esc(it.name||'')}">
+      <img src="${it.img||''}" loading="lazy">
+      ${it.name?`<div class="ctl-item-name">${esc(it.name)}</div>`:''}
+      <div class="ctl-item-del" onclick="event.stopPropagation();removeCtlItem('${id}')">✕</div>
+    </div>`;
+  };
+
+  const renderRow=(tier,tierIdx,block)=>{
+    const label = tier.high!=null ? `${tier.base}` : `${tier.base}`;
+    if(tier.high!=null){
+      const highIds=itemsInZone(block,tierIdx,'high');
+      const lowIds=itemsInZone(block,tierIdx,'low');
+      return `<div class="ctl-row">
+        <div class="ctl-label" style="background:${tier.bg};color:${tier.color}">${tier.base}<br><span style="font-size:9px;opacity:.7">/ ${tier.high}</span></div>
+        <div class="ctl-zones">
+          <div class="ctl-zone" data-block="${block}" data-tier="${tierIdx}" data-sub="high"
+            ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')"
+            ondrop="ctlZoneDrop(event,'${block}',${tierIdx},'high')">
+            ${highIds.length?highIds.map(renderItem).join(''):''}
+          </div>
+          <div class="ctl-zone" data-block="${block}" data-tier="${tierIdx}" data-sub="low"
+            ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')"
+            ondrop="ctlZoneDrop(event,'${block}',${tierIdx},'low')">
+            ${lowIds.length?lowIds.map(renderItem).join(''):''}
+          </div>
+        </div>
+      </div>`;
+    }
+    const ids=itemsInZone(block,tierIdx,null);
+    return `<div class="ctl-row">
+      <div class="ctl-label" style="background:${tier.bg};color:${tier.color}">${tier.base}</div>
+      <div class="ctl-zones">
+        <div class="ctl-zone" data-block="${block}" data-tier="${tierIdx}" data-sub=""
+          ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')"
+          ondrop="ctlZoneDrop(event,'${block}',${tierIdx},null)">
+          ${ids.length?ids.map(renderItem).join(''):''}
+        </div>
+      </div>
+    </div>`;
+  };
+
+  el.innerHTML=`
+    <div class="sh" style="margin-bottom:18px">
+      <h1 class="sh-title" style="font-size:20px;cursor:pointer" onclick="renameCustomTierList('${ctl.id}',this)" title="Cliquer pour renommer">${esc(ctl.name)}</h1>
+      <button class="btn btn-ghost" style="color:var(--red);font-size:12px" onclick="deleteCustomTierList('${ctl.id}')">🗑 Supprimer</button>
+    </div>
+
+    <div class="sh" style="margin-bottom:10px"><h2 class="sh-title" style="font-size:14px">Éléments à placer</h2></div>
+    <div class="ctl-pool" id="ctl-pool"
+      ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')"
+      ondrop="ctlPoolDrop(event)">
+      <label class="ctl-pool-add" title="Ajouter des images">
+        ＋<input type="file" accept="image/*" multiple style="display:none" onchange="ctlAddImages(this)">
+      </label>
+      ${poolIds.length?poolIds.map(renderItem).join(''):'<span class="ctl-pool-empty">Glisse une image ici ou ajoute-en avec le ＋</span>'}
+    </div>
+
+    <div style="margin-top:24px">
+      ${CTL_MAIN.map((tier,i)=>renderRow(tier,i,'main')).join('')}
+    </div>
+
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+      <button class="btn btn-ghost" style="font-size:12px;width:100%;justify-content:center" onclick="toggleCtlLow()">
+        <span>${_ctlLowOpen?'▴ Masquer la suite (notes en dessous de 12)':'▾ Afficher la suite (notes en dessous de 12)'}</span>
+      </button>
+      <div style="display:${_ctlLowOpen?'block':'none'};margin-top:14px">
+        ${CTL_LOW.map((tier,i)=>renderRow(tier,i,'low')).join('')}
+      </div>
+    </div>
+  `;
+}
+
+async function ctlAddImages(input){
+  const ctl=(S.customTierLists||[]).find(l=>l.id===S.currentCtlId);
+  if(!ctl||!input.files.length) return;
+  const files=[...input.files];
+  toast(`Import de ${files.length} image${files.length>1?'s':''}…`,'ok');
+  for(const file of files){
+    try{
+      const url=await uploadToCloudinary(file,'custom-tierlists');
+      const id='cti_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+      if(!ctl.items) ctl.items={};
+      ctl.items[id]={id, img:url, name:file.name.replace(/\.[^.]+$/,'')};
+    }catch(e){}
+  }
+  save();
+  renderCtlDetail();
+  toast('Images ajoutées ✓','ok');
+  input.value='';
+}
+
+function removeCtlItem(id){
+  const ctl=(S.customTierLists||[]).find(l=>l.id===S.currentCtlId);
+  if(!ctl) return;
+  delete ctl.items[id];
+  delete ctl.assign[id];
+  Object.values(ctl.orders||{}).forEach(order=>{
+    const idx=order.indexOf(id);
+    if(idx!==-1) order.splice(idx,1);
+  });
+  save();
+  renderCtlDetail();
+}
+
+let _ctlDragging=null; // itemId
+function ctlItemDragStart(e,itemId){
+  _ctlDragging=itemId;
+  e.dataTransfer.effectAllowed='move';
+}
+function ctlItemDragEnd(){
+  document.querySelectorAll('.ctl-zone.drag-over,.ctl-pool.drag-over').forEach(el=>el.classList.remove('drag-over'));
+  _ctlDragging=null;
+}
+
+function ctlReorderInContainer(container, itemId, orderArr){
+  const cards=[...container.querySelectorAll('.ctl-item')];
+  let insertBefore=null;
+  for(const card of cards){
+    const rect=card.getBoundingClientRect();
+    if(event.clientX < rect.left+rect.width/2){ insertBefore=card; break; }
+  }
+  const newOrder=[];
+  for(const card of cards){
+    const k=card.dataset.itemId;
+    if(k===itemId) continue;
+    if(insertBefore===card) newOrder.push(itemId);
+    newOrder.push(k);
+  }
+  if(!newOrder.includes(itemId)) newOrder.push(itemId);
+  return newOrder;
+}
+
+function ctlZoneDrop(e, block, tierIdx, sub){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const itemId=_ctlDragging;
+  if(!itemId) return;
+  const ctl=(S.customTierLists||[]).find(l=>l.id===S.currentCtlId);
+  if(!ctl) return;
+  if(!ctl.assign) ctl.assign={};
+  if(!ctl.orders) ctl.orders={};
+  ctl.assign[itemId]={block, tierIdx, sub: sub||null};
+  const key=`${block}_${tierIdx}_${sub||'x'}`;
+  ctl.orders[key]=ctlReorderInContainer(e.currentTarget, itemId, ctl.orders[key]||[]);
+  save();
+  renderCtlDetail();
+}
+
+function ctlPoolDrop(e){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const itemId=_ctlDragging;
+  if(!itemId) return;
+  const ctl=(S.customTierLists||[]).find(l=>l.id===S.currentCtlId);
+  if(!ctl) return;
+  delete ctl.assign[itemId];
+  if(!ctl.orders) ctl.orders={};
+  ctl.orders['pool']=ctlReorderInContainer(e.currentTarget, itemId, ctl.orders['pool']||[]);
+  save();
+  renderCtlDetail();
+}
+
+
 function tierDragStart(e,malId,type,fromTier,variant='main'){
   _tierDragging={malId,type,fromTier,variant};
   e.dataTransfer.effectAllowed='move';
@@ -7180,6 +7551,7 @@ async function loadFromFirebase(){
     if(remote.customCovers) S.customCovers=remote.customCovers;
     if(remote.tierImg!==undefined) S.tierImg=remote.tierImg;
     if(remote.arcsImgs) S.arcsImgs=remote.arcsImgs;
+    if(remote.customTierLists) S.customTierLists=remote.customTierLists;
     try{ localStorage.setItem('ot_v3',JSON.stringify({
       tracking:S.tracking,lists:S.lists,collection:S.collection,
       collectionMeta:S.collectionMeta,profile:S.profile,
@@ -7187,7 +7559,8 @@ async function loadFromFirebase(){
       bannerSize:S.bannerSize,bannerPos:S.bannerPos,
       physCategories:S.physCategories||[],
       suiviCategories:S.suiviCategories||[],
-      tierImg:S.tierImg||null,arcsImgs:S.arcsImgs||{}
+      tierImg:S.tierImg||null,arcsImgs:S.arcsImgs||{},
+      customTierLists:S.customTierLists||[]
     })); }catch(e){}
     renderCustomTops();
     renderTierList();
@@ -7260,6 +7633,12 @@ function fbSave(immediate=true){
         if(!isB64(url)) arcsImgsClean[id]=url;
       });
 
+      // customTierLists : virer les images base64
+      const customTierListsClean=(S.customTierLists||[]).map(ctl=>({
+        ...ctl,
+        items:Object.fromEntries(Object.entries(ctl.items||{}).map(([id,it])=>[id, isB64(it.img)?{...it,img:''}:it]))
+      }));
+
       await fbDb.collection('users').doc(getDeviceId()).set({
         tracking:trackingClean,
         lists:listsClean,
@@ -7274,6 +7653,7 @@ function fbSave(immediate=true){
         arcsImgs:arcsImgsClean,
         physCategories:S.physCategories||[],
         suiviCategories:S.suiviCategories||[],
+        customTierLists:customTierListsClean,
         _updatedAt:Date.now()
       });
     }catch(e){ console.error('Firebase save error',e); }
