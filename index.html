@@ -1931,6 +1931,12 @@ textarea.fi{resize:vertical;min-height:72px}
       <div class="sh"><h2 class="sh-title">Top auteurs / studios</h2></div>
       <div id="top-authors" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div>
     </div>
+
+    <!-- Stockage Firebase (indicateur en lecture seule, ne modifie jamais rien) -->
+    <div style="margin-top:32px">
+      <div class="sh"><h2 class="sh-title">Stockage Firebase</h2></div>
+      <div id="fb-storage-indicator"></div>
+    </div>
   </div>
 </div>
 
@@ -4054,6 +4060,145 @@ function renderStats(){
 
   // ── Top auteurs / studios ──
   renderTopAuthors(all);
+
+  // ── Stockage Firebase (lecture seule) ──
+  renderFbStorageIndicator();
+}
+
+// ═══════════════════════════════════════════════════════════
+// INDICATEUR DE TAILLE DU DOCUMENT FIREBASE — 100% LECTURE SEULE
+// Cette fonction ne fait QUE lire S et calculer une taille en octets.
+// Elle n'appelle jamais save(), fbSave(), ni aucune fonction d'écriture,
+// et ne modifie aucune donnée. Elle reproduit EXACTEMENT (sans y toucher)
+// la même logique de nettoyage que fbSave(), uniquement pour mesurer
+// la taille du document qui serait envoyé — rien n'est envoyé ici.
+// ═══════════════════════════════════════════════════════════
+function computeFirebaseDocSize(){
+  const isB64 = v => typeof v==='string' && v.startsWith('data:');
+
+  const trackingClean={};
+  Object.entries(S.tracking).forEach(([id,t])=>{
+    trackingClean[id]={...t};
+    if(isB64(trackingClean[id].cover)) delete trackingClean[id].cover;
+  });
+
+  const listsClean=(S.lists||[]).map(list=>{
+    if(!list.imageItems) return list;
+    return {...list, imageItems: list.imageItems.map(item=>
+      isB64(item.imgUrl) ? {...item, imgUrl:''} : item
+    )};
+  });
+
+  const profileClean={...S.profile};
+  if(profileClean.customTops){
+    profileClean.customTops=profileClean.customTops.map(top=>({
+      ...top,
+      slots:(top.slots||[]).map(slot=>
+        slot && isB64(slot.cover) ? {...slot, cover:''} : slot
+      )
+    }));
+  }
+
+  const bannerClean = isB64(S.bannerUrl) ? null : (S.bannerUrl||null);
+  const tierImgClean = isB64(S.tierImg) ? null : (S.tierImg||null);
+
+  const customCoversClean={};
+  Object.entries(S.customCovers||{}).forEach(([id,url])=>{
+    if(!isB64(url)) customCoversClean[id]=url;
+  });
+
+  const arcsImgsClean={};
+  Object.entries(S.arcsImgs||{}).forEach(([id,url])=>{
+    if(!isB64(url)) arcsImgsClean[id]=url;
+  });
+
+  const customTierListsClean=(S.customTierLists||[]).map(ctl=>({
+    ...ctl,
+    items:Object.fromEntries(Object.entries(ctl.items||{}).map(([id,it])=>[id, isB64(it.img)?{...it,img:''}:it]))
+  }));
+
+  // Même structure exacte que le payload envoyé par fbSave() — mais on ne l'envoie
+  // nulle part ici, on se contente de mesurer sa taille une fois converti en JSON.
+  const payload={
+    tracking:trackingClean,
+    lists:listsClean,
+    collection:S.collection,
+    collectionMeta:S.collectionMeta,
+    profile:profileClean,
+    customCovers:customCoversClean,
+    bannerUrl:bannerClean,
+    bannerSize:S.bannerSize||null,
+    bannerPos:S.bannerPos||null,
+    tierImg:tierImgClean,
+    arcsImgs:arcsImgsClean,
+    physCategories:S.physCategories||[],
+    suiviCategories:S.suiviCategories||[],
+    customTierLists:customTierListsClean,
+    _updatedAt:Date.now()
+  };
+
+  let bytes=0;
+  try{
+    const json=JSON.stringify(payload);
+    // Taille en octets réels (UTF-8), pas en nombre de caractères JS (UTF-16) :
+    // c'est cette mesure-là qui correspond à la limite de 1 Mo de Firestore.
+    bytes = new Blob([json]).size;
+  }catch(e){ bytes=-1; }
+
+  // Détail par grosse section, pour voir ce qui pèse le plus si besoin
+  const breakdown={};
+  try{
+    breakdown.tracking = new Blob([JSON.stringify(trackingClean)]).size;
+    breakdown.lists = new Blob([JSON.stringify(listsClean)]).size;
+    breakdown.profile = new Blob([JSON.stringify(profileClean)]).size;
+    breakdown.customTierLists = new Blob([JSON.stringify(customTierListsClean)]).size;
+    breakdown.suiviCategories = new Blob([JSON.stringify(S.suiviCategories||[])]).size;
+    breakdown.collection = new Blob([JSON.stringify(S.collection||{})]).size;
+  }catch(e){}
+
+  return {bytes, breakdown};
+}
+
+function fmtBytes(n){
+  if(n<0) return '—';
+  if(n<1024) return n+' o';
+  if(n<1024*1024) return (n/1024).toFixed(1)+' Ko';
+  return (n/(1024*1024)).toFixed(2)+' Mo';
+}
+
+function renderFbStorageIndicator(){
+  const el=document.getElementById('fb-storage-indicator');
+  if(!el) return;
+  const LIMIT=1048576; // 1 Mo, limite dure d'un document Firestore
+  const {bytes, breakdown}=computeFirebaseDocSize();
+  if(bytes<0){
+    el.innerHTML='<p style="color:var(--t3);font-size:13px">Impossible de calculer la taille pour le moment.</p>';
+    return;
+  }
+  const pct=Math.min(100, (bytes/LIMIT)*100);
+  const color = pct<50 ? 'var(--green)' : pct<80 ? 'var(--yellow)' : 'var(--red)';
+  const sortedBreakdown=Object.entries(breakdown).sort((a,b)=>b[1]-a[1]);
+  const labels={tracking:'Suivi (œuvres)', lists:'Listes', profile:'Profil (tops, tier list...)', customTierLists:'Tier Lists perso', suiviCategories:'Catégories de suivi', collection:'Collection'};
+
+  el.innerHTML=`
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px">${fmtBytes(bytes)} <span style="color:var(--t3);font-weight:600;font-size:12px">/ 1 Mo (limite Firestore)</span></div>
+        <div style="font-family:'Syne',sans-serif;font-weight:900;font-size:15px;color:${color}">${pct.toFixed(1)}%</div>
+      </div>
+      <div style="height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;margin-bottom:14px">
+        <div style="height:100%;width:${pct}%;background:${color};transition:width .3s"></div>
+      </div>
+      ${pct>=80?'<p style="color:var(--red);font-size:12.5px;margin-bottom:12px">⚠ Tu approches de la limite. Au-delà de 1 Mo, la sauvegarde vers Firebase échouera (tes données resteront quand même en local, sur cet appareil).</p>':''}
+      <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-bottom:8px">Répartition</div>
+      ${sortedBreakdown.map(([k,v])=>`
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--t2)">${labels[k]||k}</span>
+          <span style="color:var(--t3)">${fmtBytes(v)}</span>
+        </div>`).join('')}
+      <button class="btn btn-ghost" style="font-size:11px;margin-top:12px" onclick="renderFbStorageIndicator()">↺ Recalculer</button>
+    </div>
+  `;
 }
 
 function renderRadarChart(genreCount){
