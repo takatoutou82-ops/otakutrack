@@ -987,23 +987,36 @@ textarea.fi{resize:vertical;min-height:72px}
 .ctl-card-name{font-family:'Syne',sans-serif;font-weight:800;font-size:14px;margin-bottom:2px}
 .ctl-card-count{font-size:11.5px;color:var(--t3)}
 
-.ctl-row{display:flex;gap:0;margin-bottom:10px;border-radius:10px;overflow:hidden;min-height:1320px}
+.ctl-row{display:flex;gap:0;margin-bottom:8px;border-radius:10px;overflow:hidden;min-height:240px}
 .ctl-label{width:70px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-family:'Syne',sans-serif;font-size:12px;text-align:center;padding:6px}
 .ctl-zones{flex:1;display:flex;min-width:0}
-.ctl-zone{flex:1;display:flex;flex-wrap:wrap;gap:16px;padding:16px;background:var(--bg3);border:1px solid var(--border);border-left:none;align-items:center;min-height:1320px;min-width:0;transition:background .15s}
+.ctl-zone{flex:1;display:flex;flex-wrap:wrap;gap:10px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-left:none;align-items:center;min-height:240px;min-width:0;transition:background .15s}
 .ctl-zone.drag-over{background:rgba(139,124,248,.08)}
 .ctl-zone+.ctl-zone{border-left:1px dashed var(--border2)}
-.ctl-item{width:960px;height:1320px;border-radius:14px;overflow:hidden;cursor:grab;position:relative;flex-shrink:0;background:var(--bg4)}
+.ctl-item{width:160px;height:224px;border-radius:10px;overflow:hidden;cursor:grab;position:relative;flex-shrink:0;background:var(--bg4)}
 .ctl-item:active{cursor:grabbing}
 .ctl-item img{width:100%;height:100%;object-fit:cover;display:block}
-.ctl-item-name{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.8);color:#fff;font-size:26px;font-weight:700;text-align:center;padding:14px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text}
+.ctl-item-name{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.8);color:#fff;font-size:12px;font-weight:700;text-align:center;padding:6px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text}
 .ctl-item-name:empty::before{content:'Renommer…';opacity:.5;font-style:italic;font-weight:400}
-.ctl-item-del{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.8);color:#fff;font-size:24px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:8px;opacity:0;transition:opacity .15s;z-index:2}
+.ctl-item-del{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.8);color:#fff;font-size:14px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;opacity:0;transition:opacity .15s;z-index:2}
 .ctl-item:hover .ctl-item-del{opacity:1}
-.ctl-pool{display:flex;flex-wrap:wrap;gap:16px;padding:16px;background:var(--bg3);border:1.5px dashed var(--border2);border-radius:12px;min-height:1320px;align-items:center}
-.ctl-pool-add{width:960px;height:1320px;border-radius:14px;border:1.5px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:96px;color:var(--t3);cursor:pointer;flex-shrink:0;transition:all .15s}
+.ctl-pool{display:flex;flex-wrap:wrap;gap:10px;padding:14px;background:var(--bg3);border:1.5px dashed var(--border2);border-radius:12px;min-height:240px;align-items:center}
+.ctl-pool-add{width:160px;height:224px;border-radius:10px;border:1.5px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--t3);cursor:pointer;flex-shrink:0;transition:all .15s}
 .ctl-pool-add:hover{border-color:var(--acc);color:var(--acc)}
 .ctl-pool-empty{color:var(--t3);font-size:12.5px;font-style:italic}
+
+/* ── Roulette "Quoi lire/voir ensuite ?" ── */
+.roulette-window{position:relative;height:200px;border-radius:12px;overflow:hidden;background:var(--bg3);border:1px solid var(--border)}
+.roulette-window::before,.roulette-window::after{content:'';position:absolute;top:0;bottom:0;width:40px;z-index:3;pointer-events:none}
+.roulette-window::before{left:0;background:linear-gradient(90deg,var(--bg3),transparent)}
+.roulette-window::after{right:0;background:linear-gradient(270deg,var(--bg3),transparent)}
+.roulette-pointer{position:absolute;top:2px;left:50%;transform:translateX(-50%);z-index:4;color:var(--acc);font-size:16px;text-shadow:0 2px 4px rgba(0,0,0,.6)}
+.roulette-strip{display:flex;align-items:center;height:100%;will-change:transform}
+.roulette-card{width:130px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:0 10px;box-sizing:border-box}
+.roulette-card img{width:90px;height:126px;object-fit:cover;border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.roulette-card.winner img{box-shadow:0 0 0 3px var(--acc),0 8px 24px rgba(139,124,248,.5)}
+.roulette-card-title{font-size:10.5px;font-weight:700;text-align:center;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+
 
 .tier-item{width:46px;height:66px;border-radius:5px;overflow:hidden;cursor:pointer;position:relative;flex-shrink:0;transition:transform .15s}
 .tier-item:hover{transform:translateY(-3px)}
@@ -1289,6 +1302,41 @@ textarea.fi{resize:vertical;min-height:72px}
   </div>
 </div>
 
+<!-- MODAL: ROULETTE "Quoi lire/voir ensuite ?" -->
+<div class="modal-bg" id="m-roulette">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">🎲 Quoi lire/voir ensuite ? <span class="modal-close" onclick="closeM('m-roulette')">✕</span></div>
+
+    <div id="roulette-choice">
+      <p style="font-size:13px;color:var(--t3);margin-bottom:14px">On pioche dans ta liste "Planifié". Manga ou animé ?</p>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" style="flex:1" onclick="startRoulette('manga')">📖 Manga</button>
+        <button class="btn btn-secondary" style="flex:1" onclick="startRoulette('anime')">🎬 Animé</button>
+      </div>
+    </div>
+
+    <div id="roulette-empty" style="display:none;text-align:center;padding:20px 0">
+      <div style="font-size:36px;margin-bottom:10px">🤷</div>
+      <p style="color:var(--t3);font-size:13px">Rien dans ta liste "Planifié" pour ce type. Ajoutes-en depuis une fiche !</p>
+      <button class="btn btn-ghost" style="margin-top:12px" onclick="resetRouletteModal()">← Retour</button>
+    </div>
+
+    <div id="roulette-spin-wrap" style="display:none">
+      <div class="roulette-window">
+        <div class="roulette-pointer">▼</div>
+        <div id="roulette-strip" class="roulette-strip"></div>
+      </div>
+      <div id="roulette-result" style="display:none;text-align:center;margin-top:18px">
+        <div id="roulette-result-title" style="font-family:'Syne',sans-serif;font-weight:800;font-size:16px;margin-bottom:14px"></div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" id="roulette-open-btn" onclick="">Ouvrir la fiche</button>
+          <button class="btn btn-ghost" onclick="resetRouletteModal()">🎲 Relancer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal : ajouter un élément image dans une liste -->
 <div class="modal-bg" id="m-add-img-item">
   <div class="modal" style="max-width:440px">
@@ -1557,6 +1605,7 @@ textarea.fi{resize:vertical;min-height:72px}
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="nav('manga')">Parcourir les mangas</button>
       <button class="btn btn-secondary" onclick="nav('anime')">Parcourir les animés</button>
+      <button class="btn btn-secondary" onclick="openRouletteModal()">🎲 Quoi lire/voir ensuite ?</button>
     </div>
   </div>
 
@@ -2693,6 +2742,75 @@ async function renderHome(){
   loadHomePopular();
   setTimeout(()=>loadHomeTop(), 500);
   setTimeout(()=>loadRecommendations(), 1200);
+}
+
+// ─── ROULETTE "Quoi lire/voir ensuite ?" ───
+function openRouletteModal(){
+  resetRouletteModal();
+  openM('m-roulette');
+}
+function resetRouletteModal(){
+  document.getElementById('roulette-choice').style.display='block';
+  document.getElementById('roulette-empty').style.display='none';
+  document.getElementById('roulette-spin-wrap').style.display='none';
+  document.getElementById('roulette-result').style.display='none';
+  const stripEl=document.getElementById('roulette-strip');
+  stripEl.style.transition='none';
+  stripEl.style.transform='translateX(0)';
+  stripEl.innerHTML='';
+}
+
+function startRoulette(type){
+  const items=Object.values(S.tracking).filter(t=>t.type===type && t.status==='Planifié');
+  if(!items.length){
+    document.getElementById('roulette-choice').style.display='none';
+    document.getElementById('roulette-empty').style.display='block';
+    return;
+  }
+  document.getElementById('roulette-choice').style.display='none';
+  document.getElementById('roulette-spin-wrap').style.display='block';
+  document.getElementById('roulette-result').style.display='none';
+
+  // Mélanger et répéter la liste plusieurs fois pour créer une longue bande à faire défiler
+  const shuffled=[...items].sort(()=>Math.random()-0.5);
+  const loops=Math.max(4, Math.ceil(24/shuffled.length));
+  let strip=[];
+  for(let i=0;i<loops;i++) strip=strip.concat(shuffled);
+  // Le gagnant est choisi dans l'avant-dernière boucle (pas trop tôt, pas coupé à la fin)
+  const winnerLoopIndex=loops-2;
+  const winnerPosInLoop=Math.floor(Math.random()*shuffled.length);
+  const winnerIndex=winnerLoopIndex*shuffled.length + winnerPosInLoop;
+  const winner=strip[winnerIndex];
+
+  const stripEl=document.getElementById('roulette-strip');
+  const cardWidth=130;
+  stripEl.style.transition='none';
+  stripEl.style.transform='translateX(0)';
+  stripEl.innerHTML=strip.map((it,i)=>`<div class="roulette-card" data-idx="${i}">
+    <img src="${it.cover||''}" loading="lazy">
+    <div class="roulette-card-title">${esc(it.title||'')}</div>
+  </div>`).join('');
+
+  void stripEl.offsetWidth; // force le reflow avant de lancer la transition
+
+  const windowWidth=document.querySelector('#roulette-spin-wrap .roulette-window').offsetWidth;
+  const targetX=-(winnerIndex*cardWidth + cardWidth/2 - windowWidth/2);
+
+  requestAnimationFrame(()=>{
+    stripEl.style.transition='transform 4s cubic-bezier(0.12,0.68,0.15,1)';
+    stripEl.style.transform=`translateX(${targetX}px)`;
+  });
+
+  setTimeout(()=>{
+    const winnerCard=stripEl.querySelector(`[data-idx="${winnerIndex}"]`);
+    if(winnerCard) winnerCard.classList.add('winner');
+    document.getElementById('roulette-result').style.display='block';
+    document.getElementById('roulette-result-title').textContent=winner.title||'';
+    document.getElementById('roulette-open-btn').onclick=()=>{
+      closeM('m-roulette');
+      openWork(winner.mal_id, winner.type);
+    };
+  }, 4200);
 }
 
 async function loadRecommendations(force=false){
@@ -4564,18 +4682,27 @@ function renderCollection(){
       const isOngoing=meta._isOngoing||false;
       const ownedCount=allNums.length;
       const hue=((malId*53)%360);
+      const coverUrl=(t.cover||'').replace(/'/g,"\\'");
       const spines=[];
       for(let i=1;i<=maxVol;i++){
         const isOwned=!!owned[i];
+        // Recadrage différent de la couverture de la série pour chaque tome, pour simuler
+        // des dos de livre visuellement distincts plutôt qu'un simple aplat de couleur
+        const bgPosX=(i*37)%100;
+        const bgPosY=(i*61)%100;
         spines.push(
           '<div class="book-spine'+(isOwned?'':' not-owned')+'" '
           +'onclick="toggleVol('+malId+','+i+',true)" '
           +'title="Tome '+i+(isOwned?' ✓':' (manquant)')+'">'
           +'<div style="width:34px;height:118px;border-radius:3px 7px 7px 3px;overflow:hidden;position:relative;'
-          +'background:hsl('+hue+','+(isOwned?'55%,28%':'30%,18%')+')">'
-          +'<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">'
-          +'<span style="font-size:14px;font-weight:900;color:rgba(255,255,255,'+(isOwned?'0.9':'0.3')+');font-family:\'Syne\',sans-serif;line-height:1">'+i+'</span>'
-          +(isOwned?'<span style="font-size:7px;color:rgba(255,255,255,0.5)">✓</span>':'')
+          +(coverUrl
+            ?('background-image:url(\''+coverUrl+'\');background-size:220% 340%;background-position:'+bgPosX+'% '+bgPosY+'%;'
+              +'box-shadow:inset 0 0 0 1000px hsla('+hue+',60%,'+(isOwned?'22%,.42':'15%,.72')+')')
+            :('background:hsl('+hue+','+(isOwned?'55%,28%':'30%,18%')+')'))
+          +'">'
+          +'<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.55) 100%)">'
+          +'<span style="font-size:14px;font-weight:900;color:rgba(255,255,255,'+(isOwned?'0.95':'0.35')+');font-family:\'Syne\',sans-serif;line-height:1;text-shadow:0 1px 4px rgba(0,0,0,.8);margin-top:auto;margin-bottom:6px">'+i+'</span>'
+          +(isOwned?'<span style="font-size:7px;color:rgba(255,255,255,0.6);margin-bottom:2px">✓</span>':'')
           +'</div>'
           +'</div>'
           +'</div>'
