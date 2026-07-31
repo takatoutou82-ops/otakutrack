@@ -191,16 +191,26 @@ body::after{
 .cg-lg{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
 
 .cc{cursor:pointer}
+@keyframes cc-breathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-2px) scale(1.008)}}
 .cc-wrap{
   position:relative;border-radius:12px;overflow:hidden;aspect-ratio:2/3;
   background:var(--bg3);margin-bottom:8px;
   transition:transform .28s cubic-bezier(.34,1.4,.64,1), box-shadow .28s;
   box-shadow:0 2px 8px rgba(0,0,0,.4);
+  animation:cc-breathe 5s ease-in-out infinite;
+  animation-delay:calc(var(--cc-delay, 0) * 1s);
 }
 .cc:hover .cc-wrap{
+  animation-play-state:paused;
   transform:translateY(-6px) scale(1.02);
   box-shadow:0 20px 50px rgba(0,0,0,.7), 0 0 0 1px rgba(139,124,248,.18);
 }
+.cc-wrap::before{
+  content:'';position:absolute;inset:0;z-index:5;pointer-events:none;
+  background:radial-gradient(circle at var(--shine-x,50%) var(--shine-y,50%), rgba(255,255,255,.4), rgba(139,124,248,.12) 35%, transparent 65%);
+  opacity:0;transition:opacity .25s;mix-blend-mode:overlay;
+}
+.cc:hover .cc-wrap::before{opacity:1}
 .cc-img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
 .cc:hover .cc-img{transform:scale(1.06)}
 .cc-overlay{
@@ -351,6 +361,7 @@ body::after{
 /* ── WORK PAGE ── */
 .work-hero{position:relative;padding:36px 20px 28px;max-width:1200px;margin:0 auto}
 .work-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.05;filter:blur(60px);pointer-events:none;z-index:0}
+.work-tint{position:absolute;inset:0;opacity:0;pointer-events:none;z-index:0;transition:opacity .8s,background .8s}
 .work-layout{display:grid;grid-template-columns:180px 1fr;gap:30px;position:relative;z-index:1}
 @media(max-width:580px){.work-layout{grid-template-columns:1fr}}
 .work-cover-box{
@@ -396,7 +407,7 @@ body::after{
   padding:7px 13px;color:var(--text);font-size:14px;font-weight:700;
   font-family:'Syne',sans-serif;outline:none;cursor:pointer;transition:all .15s;min-width:90px;
 }
-.rating-select:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(139,124,248,.12)}
+.rating-select:focus{border-color:var(--work-accent, var(--acc));box-shadow:0 0 0 3px rgba(139,124,248,.12)}
 .rating-display{color:var(--yellow);font-size:15px;font-weight:800;font-family:'Syne',sans-serif}
 
 /* ── TABS ── */
@@ -1019,6 +1030,12 @@ textarea.fi{resize:vertical;min-height:72px}
 
 
 .tier-item{width:46px;height:66px;border-radius:5px;overflow:hidden;cursor:pointer;position:relative;flex-shrink:0;transition:transform .15s}
+.tier-item-shine::after{
+  content:'';position:absolute;top:0;left:-150%;width:60%;height:100%;
+  background:linear-gradient(115deg,transparent 0%,rgba(255,255,255,.55) 50%,transparent 100%);
+  animation:tier-shine-sweep 3.2s ease-in-out infinite;pointer-events:none;z-index:3;
+}
+@keyframes tier-shine-sweep{0%{left:-150%}35%{left:150%}100%{left:150%}}
 .tier-item:hover{transform:translateY(-3px)}
 .tier-item img{width:100%;height:100%;object-fit:cover}
 .tier-item-title{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.78);font-size:7px;font-weight:700;text-align:center;padding:2px;color:#fff;line-height:1.2}
@@ -1703,6 +1720,7 @@ textarea.fi{resize:vertical;min-height:72px}
 <div class="pg" id="pg-work">
   <div class="work-hero">
     <div class="work-bg" id="work-bg"></div>
+    <div class="work-tint" id="work-tint"></div>
     <div class="wrap"><button class="back-btn" onclick="goBack()">← Retour</button></div>
     <div class="wrap">
       <div class="work-layout" id="work-layout"></div>
@@ -1864,6 +1882,8 @@ textarea.fi{resize:vertical;min-height:72px}
     <div class="sh" style="margin-bottom:20px">
       <button class="btn btn-ghost" onclick="openEditProfile()" style="font-size:12px">✏️ Modifier le profil</button>
     </div>
+
+    <div id="mascot-section" style="margin-bottom:32px"></div>
     <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:32px;align-items:start">
 
       <!-- COLONNE GAUCHE : TOPS -->
@@ -3253,12 +3273,62 @@ async function openWork(malId, type='manga'){
   }
 }
 
+// ─── COULEUR D'AMBIANCE (extraite de la couverture) ───
+let _ambianceCache={};
+function extractDominantColor(imgUrl, callback){
+  if(!imgUrl){ callback(null); return; }
+  if(_ambianceCache[imgUrl]!==undefined){ callback(_ambianceCache[imgUrl]); return; }
+  try{
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=()=>{
+      try{
+        const size=24; // un petit échantillon suffit largement
+        const canvas=document.createElement('canvas');
+        canvas.width=size; canvas.height=size;
+        const ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,size,size);
+        const data=ctx.getImageData(0,0,size,size).data;
+        let r=0,g=0,b=0,n=0;
+        for(let i=0;i<data.length;i+=4){
+          const rr=data[i],gg=data[i+1],bb=data[i+2];
+          const lum=(rr+gg+bb)/3;
+          if(lum<25||lum>230) continue; // ignore le quasi-noir/blanc pour une teinte plus riche
+          r+=rr; g+=gg; b+=bb; n++;
+        }
+        if(n===0){ for(let i=0;i<data.length;i+=4){ r+=data[i]; g+=data[i+1]; b+=data[i+2]; } n=data.length/4; }
+        const color=`rgb(${Math.round(r/n)},${Math.round(g/n)},${Math.round(b/n)})`;
+        _ambianceCache[imgUrl]=color;
+        callback(color);
+      }catch(e){ _ambianceCache[imgUrl]=null; callback(null); }
+    };
+    img.onerror=()=>{ _ambianceCache[imgUrl]=null; callback(null); };
+    img.src=imgUrl;
+  }catch(e){ callback(null); }
+}
+function applyWorkAmbiance(imgUrl){
+  const tintEl=document.getElementById('work-tint');
+  const pageEl=document.getElementById('pg-work');
+  if(!tintEl||!pageEl) return;
+  tintEl.style.opacity='0';
+  extractDominantColor(imgUrl, color=>{
+    // Si la fiche a changé entre temps (navigation rapide), on ignore le résultat obsolète
+    if(!document.getElementById('pg-work').classList.contains('on')) return;
+    if(!color){ pageEl.style.removeProperty('--work-accent'); return; }
+    pageEl.style.setProperty('--work-accent', color);
+    tintEl.style.background=`radial-gradient(ellipse at top, ${color} 0%, transparent 70%)`;
+    tintEl.style.opacity='0.16';
+  });
+}
+
 function renderWorkPage(w){
   const t=S.tracking[w.mal_id]||{};
   const type=w._type;
 
   // Backdrop
-  document.getElementById('work-bg').style.backgroundImage=`url(${w.images?.jpg?.large_image_url||w.images?.jpg?.image_url||''})`;
+  const coverForBg=w.images?.jpg?.large_image_url||w.images?.jpg?.image_url||'';
+  document.getElementById('work-bg').style.backgroundImage=`url(${coverForBg})`;
+  applyWorkAmbiance(coverForBg);
 
   // Rating 0-20 (paliers 0.5 de 14 à 20, paliers 1 de 0 à 13), avec commentaire
   const myRating=t.rating||0;
@@ -3753,6 +3823,7 @@ function rateWork(malId, type, rating){
   renderTierList('main'); // rafraîchit immédiatement si la tier list est déjà à l'écran
   if(_lowTierOpen) renderTierList('low');
   if(rating>0) toast('Note sauvegardée : '+rating+'/20','ok');
+  if(rating===20) launchConfetti();
 }
 
 function updateTrackProg(malId, type, val, max){
@@ -3774,6 +3845,57 @@ function updateTrackVol(malId, val){
   save();
 }
 
+// ─── CONFETTIS DE CÉLÉBRATION ───
+function launchConfetti(){
+  const canvas=document.createElement('canvas');
+  canvas.style.cssText='position:fixed;inset:0;z-index:9999;pointer-events:none';
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx=canvas.getContext('2d');
+  const colors=['#8b7cf8','#f472b6','#fbbf24','#4ade80','#38bdf8','#ff8fab','#ffd700'];
+  const particles=[];
+  const count=90;
+  for(let i=0;i<count;i++){
+    particles.push({
+      x: canvas.width/2 + (Math.random()-0.5)*120,
+      y: canvas.height*0.35 + (Math.random()-0.5)*40,
+      vx: (Math.random()-0.5)*11,
+      vy: -Math.random()*11 - 4,
+      size: 5+Math.random()*6,
+      color: colors[Math.floor(Math.random()*colors.length)],
+      rot: Math.random()*360,
+      vrot: (Math.random()-0.5)*14,
+      shape: Math.random()<0.5?'rect':'circle'
+    });
+  }
+  let frame=0;
+  const gravity=0.35;
+  function tick(){
+    frame++;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    let alive=false;
+    particles.forEach(p=>{
+      p.vy+=gravity;
+      p.x+=p.vx;
+      p.y+=p.vy;
+      p.rot+=p.vrot;
+      if(p.y<canvas.height+30) alive=true;
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.rot*Math.PI/180);
+      ctx.fillStyle=p.color;
+      ctx.globalAlpha=Math.max(0, 1-frame/140);
+      if(p.shape==='rect') ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*0.6);
+      else{ ctx.beginPath(); ctx.arc(0,0,p.size/2,0,Math.PI*2); ctx.fill(); }
+      ctx.restore();
+    });
+    if(alive && frame<160){ requestAnimationFrame(tick); }
+    else{ canvas.remove(); }
+  }
+  requestAnimationFrame(tick);
+}
+
 function updateStatus(malId, type, status, title, cover){
   if(!status)return;
   if(!S.tracking[malId]) S.tracking[malId]={mal_id:malId,type,title,cover,status,chapter:0,volume:0,episode:0,rating:0,reviews:[],_addedAt:Date.now()};
@@ -3783,6 +3905,7 @@ function updateStatus(malId, type, status, title, cover){
   save();
   if(typeof fbSave==='function') fbSave(true);
   toast(`Statut: ${status}`,'ok');
+  if(status==='Terminé') launchConfetti();
   if(S.currentWork&&S.currentWork.mal_id==malId) renderWorkSidebar(S.currentWork, S.tracking[malId]);
 }
 
@@ -4180,9 +4303,121 @@ function submitReview(){
 }
 
 // ─── PROFILE ───
+// ─── MASCOTTE ÉVOLUTIVE ───
+function renderMascot(){
+  const el=document.getElementById('mascot-section');
+  if(!el) return;
+
+  const completed=Object.values(S.tracking).filter(t=>t.status==='Terminé').length;
+  const physicalSeries=Object.values(S.collection||{}).filter(c=>c && c.volumes && Object.keys(c.volumes).length>0).length;
+  const cbzSeries=Object.values(S.collection||{}).filter(c=>c && (c.cbz||[]).length>0).length;
+
+  const hasBadge=completed>=20;
+  const hasCape=completed>=50;
+  const hasMedal=completed>=75;
+  const hasCrown=completed>=100;
+
+  const nextPalier = completed<20?20 : completed<50?50 : completed<75?75 : completed<100?100 : null;
+
+  // Pile de livres : un livre par série physique possédée (plafonné visuellement à 14 + un "+N")
+  const bookColors=['#8b7cf8','#f472b6','#fbbf24','#4ade80','#38bdf8','#ff8fab','#a78bfa'];
+  const maxBooksShown=14;
+  const booksToShow=Math.min(physicalSeries, maxBooksShown);
+  let bookStackHtml='';
+  for(let i=0;i<booksToShow;i++){
+    const c=bookColors[i%bookColors.length];
+    const w=34+((i*7)%10); // largeurs légèrement variables pour un effet "pile réelle"
+    bookStackHtml+=`<div style="width:${w}px;height:11px;background:${c};border-radius:2px;margin:0 auto;box-shadow:0 1px 3px rgba(0,0,0,.4);border-top:1px solid rgba(255,255,255,.25)"></div>`;
+  }
+
+  el.innerHTML=`
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+
+      <div style="flex-shrink:0">${mascotSVG(hasBadge,hasCape,hasMedal,hasCrown)}</div>
+
+      <div style="display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;flex:1;min-width:200px">
+        <!-- Pile de livres (collection physique) -->
+        <div style="text-align:center">
+          <div style="display:flex;flex-direction:column-reverse;gap:1px;min-height:20px;justify-content:flex-start">
+            ${physicalSeries>0 ? bookStackHtml : ''}
+          </div>
+          ${physicalSeries>maxBooksShown?`<div style="font-size:9px;color:var(--t3);margin-top:2px">+${physicalSeries-maxBooksShown}</div>`:''}
+          <div style="font-size:10.5px;color:var(--t3);margin-top:6px;font-weight:700">📚 ${physicalSeries} série${physicalSeries!==1?'s':''}</div>
+        </div>
+
+        <!-- Tablette (collection CBZ) -->
+        ${cbzSeries>0 ? `
+        <div style="text-align:center">
+          <div style="width:38px;height:52px;border-radius:6px;background:linear-gradient(160deg,#2a2a35,#15151c);border:2px solid #444;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(0,0,0,.4)">
+            <div style="width:28px;height:38px;border-radius:2px;background:linear-gradient(135deg,#8b7cf8,#38bdf8);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;font-family:'Syne',sans-serif">${cbzSeries}</div>
+          </div>
+          <div style="font-size:10.5px;color:var(--t3);margin-top:6px;font-weight:700">📲 ${cbzSeries} CBZ</div>
+        </div>` : ''}
+      </div>
+
+      <div style="flex:1;min-width:220px">
+        <div style="font-family:'Syne',sans-serif;font-weight:900;font-size:16px;margin-bottom:4px">Ta mascotte</div>
+        <div style="font-size:12.5px;color:var(--t3);line-height:1.6">
+          ${completed} œuvre${completed!==1?'s':''} terminée${completed!==1?'s':''} (manga + animé)
+          ${nextPalier?`<br>Encore <strong style="color:var(--t2)">${nextPalier-completed}</strong> pour le prochain palier (${nextPalier})`:'<br>🏆 Tous les paliers débloqués !'}
+        </div>
+        <div style="display:flex;gap:5px;margin-top:10px;flex-wrap:wrap">
+          <span class="badge" style="background:${hasBadge?'rgba(139,124,248,.18);color:var(--acc)':'rgba(255,255,255,.05);color:var(--t4)'}">🎖 20</span>
+          <span class="badge" style="background:${hasCape?'rgba(244,114,182,.18);color:#f472b6':'rgba(255,255,255,.05);color:var(--t4)'}">🧣 50</span>
+          <span class="badge" style="background:${hasMedal?'rgba(251,191,36,.18);color:#fbbf24':'rgba(255,255,255,.05);color:var(--t4)'}">⭐ 75</span>
+          <span class="badge" style="background:${hasCrown?'linear-gradient(135deg,#ffd700,#ff8fab);color:#1a1600':'rgba(255,255,255,.05);color:var(--t4)'}">👑 100</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+// Génère le SVG de la mascotte (hibou) avec ses accessoires débloqués
+function mascotSVG(hasBadge,hasCape,hasMedal,hasCrown){
+  return `<svg width="120" height="140" viewBox="0 0 120 140" style="overflow:visible">
+    ${hasCape?`<path d="M35 55 Q10 90 20 130 L60 100 L100 130 Q110 90 85 55 Z" fill="url(#capeGrad)" opacity="0.92"/>
+    <defs><linearGradient id="capeGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f472b6"/><stop offset="100%" stop-color="#8b7cf8"/></linearGradient></defs>`:''}
+
+    <!-- corps -->
+    <ellipse cx="60" cy="78" rx="34" ry="40" fill="#8b7cf8"/>
+    <ellipse cx="60" cy="86" rx="22" ry="27" fill="#efe9ff"/>
+
+    <!-- ailes -->
+    <ellipse cx="27" cy="80" rx="9" ry="20" fill="#7a68e0" transform="rotate(-12 27 80)"/>
+    <ellipse cx="93" cy="80" rx="9" ry="20" fill="#7a68e0" transform="rotate(12 93 80)"/>
+
+    <!-- pieds -->
+    <path d="M48 116 l-4 10 M48 116 l4 10 M72 116 l-4 10 M72 116 l4 10" stroke="#f5b942" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- aigrettes -->
+    <path d="M42 40 L36 20 L50 34 Z" fill="#8b7cf8"/>
+    <path d="M78 40 L84 20 L70 34 Z" fill="#8b7cf8"/>
+
+    <!-- yeux -->
+    <circle cx="46" cy="62" r="14" fill="#fff"/>
+    <circle cx="74" cy="62" r="14" fill="#fff"/>
+    <circle cx="47" cy="63" r="7" fill="#2a2140"/>
+    <circle cx="75" cy="63" r="7" fill="#2a2140"/>
+    <circle cx="49" cy="60" r="2" fill="#fff"/>
+    <circle cx="77" cy="60" r="2" fill="#fff"/>
+
+    <!-- bec -->
+    <path d="M56 74 L64 74 L60 82 Z" fill="#f5b942"/>
+
+    ${hasBadge?`<circle cx="60" cy="98" r="8" fill="#fbbf24" stroke="#fff" stroke-width="1.5"/><path d="M60 93 l1.8 3.6 4 0.6 -2.9 2.8 0.7 4 -3.6-1.9 -3.6 1.9 0.7-4 -2.9-2.8 4-0.6z" fill="#fff"/>`:''}
+
+    ${hasMedal?`<path d="M52 96 L60 110 L68 96" stroke="#fbbf24" stroke-width="3" fill="none"/><circle cx="60" cy="112" r="9" fill="#fbbf24" stroke="#fff" stroke-width="2"/><circle cx="60" cy="112" r="4" fill="#fff8e1"/>`:''}
+
+    ${hasCrown?`<g transform="translate(60,18)">
+      <path d="M-18 10 L-18 -6 L-9 4 L0 -10 L9 4 L18 -6 L18 10 Z" fill="#ffd700" stroke="#e6b800" stroke-width="1"/>
+      <circle cx="-9" cy="-6" r="2.5" fill="#ff4d4d"/><circle cx="0" cy="-10" r="2.5" fill="#4ade80"/><circle cx="9" cy="-6" r="2.5" fill="#38bdf8"/>
+    </g>`:''}
+  </svg>`;
+}
+
 function renderProfile(){
   const emptyEl=document.getElementById('profile-banner-empty');
   if(emptyEl) emptyEl.style.display=S.bannerUrl?'none':'flex';
+  renderMascot();
   renderCustomTops();
   renderTierList();
   if(_lowTierOpen) renderTierList('low');
@@ -5727,7 +5962,8 @@ function renderTierList(variant='main'){
                 : '';
               const linked = (S.profile[linksKey]||{})[String(t.mal_id)+'_'+t.type]||[];
               const linkBadge = linked.length ? `<div class="tier-link-badge">+${linked.length}</div>` : '';
-              return `<div class="tier-item tier-item-anim" draggable="true"
+              const shineClass = (variant==='main' && i<=2) ? ' tier-item-shine' : '';
+              return `<div class="tier-item tier-item-anim${shineClass}" draggable="true"
                 style="${anim}"
                 data-malid="${t.mal_id}" data-type="${t.type}" data-tier="${i}"
                 ondragstart="tierDragStart(event,${t.mal_id},'${t.type}',${i},'${variant}')"
@@ -8150,6 +8386,37 @@ if('serviceWorker' in navigator){
     regs.forEach(r=>r.unregister());
   });
 }
+// ─── EFFET CARTE HOLOGRAPHIQUE (tilt 3D au survol) ───
+(function(){
+  let raf=null, activeEl=null;
+  document.addEventListener('mousemove', e=>{
+    const wrap=e.target.closest && e.target.closest('.cc-wrap');
+    if(!wrap){
+      if(activeEl){ activeEl.style.transform=''; activeEl=null; }
+      return;
+    }
+    activeEl=wrap;
+    if(raf) return;
+    raf=requestAnimationFrame(()=>{
+      raf=null;
+      if(!activeEl) return;
+      const rect=activeEl.getBoundingClientRect();
+      const x=(e.clientX-rect.left)/rect.width;
+      const y=(e.clientY-rect.top)/rect.height;
+      const rx=(0.5-y)*12, ry=(x-0.5)*12;
+      activeEl.style.transform=`perspective(700px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-6px) scale(1.03)`;
+      activeEl.style.setProperty('--shine-x',(x*100)+'%');
+      activeEl.style.setProperty('--shine-y',(y*100)+'%');
+    });
+  }, {passive:true});
+  document.addEventListener('mouseout', e=>{
+    if(e.target && e.target.classList && e.target.classList.contains('cc-wrap')){
+      e.target.style.transform='';
+      if(activeEl===e.target) activeEl=null;
+    }
+  }, true);
+})();
+
 load();
 addScrollToTop();
 renderCustomTops();
