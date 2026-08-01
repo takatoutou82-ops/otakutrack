@@ -205,12 +205,14 @@ body::after{
   transform:translateY(-6px) scale(1.02);
   box-shadow:0 20px 50px rgba(0,0,0,.7), 0 0 0 1px rgba(139,124,248,.18);
 }
-.cc-wrap::before{
+.cc-wrap::before,.work-cover-box::before{
   content:'';position:absolute;inset:0;z-index:5;pointer-events:none;
   background:radial-gradient(circle at var(--shine-x,50%) var(--shine-y,50%), rgba(255,255,255,.4), rgba(139,124,248,.12) 35%, transparent 65%);
   opacity:0;transition:opacity .25s;mix-blend-mode:overlay;
 }
-.cc:hover .cc-wrap::before{opacity:1}
+.cc:hover .cc-wrap::before,.work-cover-box:hover::before{opacity:1}
+.work-cover-box{transition:transform .28s cubic-bezier(.34,1.4,.64,1), box-shadow .28s}
+.work-cover-box:hover{box-shadow:0 20px 50px rgba(0,0,0,.7), 0 0 0 1px rgba(139,124,248,.18)}
 .cc-img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
 .cc:hover .cc-img{transform:scale(1.06)}
 .cc-overlay{
@@ -1015,6 +1017,7 @@ textarea.fi{resize:vertical;min-height:72px}
 .ctl-pool-add{width:160px;height:224px;border-radius:10px;border:1.5px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--t3);cursor:pointer;flex-shrink:0;transition:all .15s}
 .ctl-pool-add:hover{border-color:var(--acc);color:var(--acc)}
 .ctl-pool-empty{color:var(--t3);font-size:12.5px;font-style:italic}
+
 
 /* ── Roulette "Quoi lire/voir ensuite ?" ── */
 .roulette-window{position:relative;height:200px;border-radius:12px;overflow:hidden;background:var(--bg3);border:1px solid var(--border)}
@@ -1882,8 +1885,6 @@ textarea.fi{resize:vertical;min-height:72px}
     <div class="sh" style="margin-bottom:20px">
       <button class="btn btn-ghost" onclick="openEditProfile()" style="font-size:12px">✏️ Modifier le profil</button>
     </div>
-
-    <div id="mascot-section" style="margin-bottom:32px"></div>
     <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:32px;align-items:start">
 
       <!-- COLONNE GAUCHE : TOPS -->
@@ -3281,6 +3282,10 @@ function extractDominantColor(imgUrl, callback){
   try{
     const img=new Image();
     img.crossOrigin='anonymous';
+    // Les images Cloudinary autorisent déjà le CORS ; les autres (MyAnimeList...) non,
+    // donc on les fait passer par notre petit proxy image pour pouvoir lire leurs pixels.
+    const needsProxy = MAL_PROXY && !MAL_PROXY.includes('TON-PROJET') && !imgUrl.includes('cloudinary.com');
+    const loadUrl = needsProxy ? MAL_PROXY.replace('/api/mal','/api/imgproxy')+'?url='+encodeURIComponent(imgUrl) : imgUrl;
     img.onload=()=>{
       try{
         const size=24; // un petit échantillon suffit largement
@@ -3303,7 +3308,7 @@ function extractDominantColor(imgUrl, callback){
       }catch(e){ _ambianceCache[imgUrl]=null; callback(null); }
     };
     img.onerror=()=>{ _ambianceCache[imgUrl]=null; callback(null); };
-    img.src=imgUrl;
+    img.src=loadUrl;
   }catch(e){ callback(null); }
 }
 function applyWorkAmbiance(imgUrl){
@@ -4302,122 +4307,10 @@ function submitReview(){
   renderReviews(w, S.tracking[w.mal_id]);
 }
 
-// ─── PROFILE ───
-// ─── MASCOTTE ÉVOLUTIVE ───
-function renderMascot(){
-  const el=document.getElementById('mascot-section');
-  if(!el) return;
-
-  const completed=Object.values(S.tracking).filter(t=>t.status==='Terminé').length;
-  const physicalSeries=Object.values(S.collection||{}).filter(c=>c && c.volumes && Object.keys(c.volumes).length>0).length;
-  const cbzSeries=Object.values(S.collection||{}).filter(c=>c && (c.cbz||[]).length>0).length;
-
-  const hasBadge=completed>=20;
-  const hasCape=completed>=50;
-  const hasMedal=completed>=75;
-  const hasCrown=completed>=100;
-
-  const nextPalier = completed<20?20 : completed<50?50 : completed<75?75 : completed<100?100 : null;
-
-  // Pile de livres : un livre par série physique possédée (plafonné visuellement à 14 + un "+N")
-  const bookColors=['#8b7cf8','#f472b6','#fbbf24','#4ade80','#38bdf8','#ff8fab','#a78bfa'];
-  const maxBooksShown=14;
-  const booksToShow=Math.min(physicalSeries, maxBooksShown);
-  let bookStackHtml='';
-  for(let i=0;i<booksToShow;i++){
-    const c=bookColors[i%bookColors.length];
-    const w=34+((i*7)%10); // largeurs légèrement variables pour un effet "pile réelle"
-    bookStackHtml+=`<div style="width:${w}px;height:11px;background:${c};border-radius:2px;margin:0 auto;box-shadow:0 1px 3px rgba(0,0,0,.4);border-top:1px solid rgba(255,255,255,.25)"></div>`;
-  }
-
-  el.innerHTML=`
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
-
-      <div style="flex-shrink:0">${mascotSVG(hasBadge,hasCape,hasMedal,hasCrown)}</div>
-
-      <div style="display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;flex:1;min-width:200px">
-        <!-- Pile de livres (collection physique) -->
-        <div style="text-align:center">
-          <div style="display:flex;flex-direction:column-reverse;gap:1px;min-height:20px;justify-content:flex-start">
-            ${physicalSeries>0 ? bookStackHtml : ''}
-          </div>
-          ${physicalSeries>maxBooksShown?`<div style="font-size:9px;color:var(--t3);margin-top:2px">+${physicalSeries-maxBooksShown}</div>`:''}
-          <div style="font-size:10.5px;color:var(--t3);margin-top:6px;font-weight:700">📚 ${physicalSeries} série${physicalSeries!==1?'s':''}</div>
-        </div>
-
-        <!-- Tablette (collection CBZ) -->
-        ${cbzSeries>0 ? `
-        <div style="text-align:center">
-          <div style="width:38px;height:52px;border-radius:6px;background:linear-gradient(160deg,#2a2a35,#15151c);border:2px solid #444;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(0,0,0,.4)">
-            <div style="width:28px;height:38px;border-radius:2px;background:linear-gradient(135deg,#8b7cf8,#38bdf8);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;font-family:'Syne',sans-serif">${cbzSeries}</div>
-          </div>
-          <div style="font-size:10.5px;color:var(--t3);margin-top:6px;font-weight:700">📲 ${cbzSeries} CBZ</div>
-        </div>` : ''}
-      </div>
-
-      <div style="flex:1;min-width:220px">
-        <div style="font-family:'Syne',sans-serif;font-weight:900;font-size:16px;margin-bottom:4px">Ta mascotte</div>
-        <div style="font-size:12.5px;color:var(--t3);line-height:1.6">
-          ${completed} œuvre${completed!==1?'s':''} terminée${completed!==1?'s':''} (manga + animé)
-          ${nextPalier?`<br>Encore <strong style="color:var(--t2)">${nextPalier-completed}</strong> pour le prochain palier (${nextPalier})`:'<br>🏆 Tous les paliers débloqués !'}
-        </div>
-        <div style="display:flex;gap:5px;margin-top:10px;flex-wrap:wrap">
-          <span class="badge" style="background:${hasBadge?'rgba(139,124,248,.18);color:var(--acc)':'rgba(255,255,255,.05);color:var(--t4)'}">🎖 20</span>
-          <span class="badge" style="background:${hasCape?'rgba(244,114,182,.18);color:#f472b6':'rgba(255,255,255,.05);color:var(--t4)'}">🧣 50</span>
-          <span class="badge" style="background:${hasMedal?'rgba(251,191,36,.18);color:#fbbf24':'rgba(255,255,255,.05);color:var(--t4)'}">⭐ 75</span>
-          <span class="badge" style="background:${hasCrown?'linear-gradient(135deg,#ffd700,#ff8fab);color:#1a1600':'rgba(255,255,255,.05);color:var(--t4)'}">👑 100</span>
-        </div>
-      </div>
-    </div>`;
-}
-
-// Génère le SVG de la mascotte (hibou) avec ses accessoires débloqués
-function mascotSVG(hasBadge,hasCape,hasMedal,hasCrown){
-  return `<svg width="120" height="140" viewBox="0 0 120 140" style="overflow:visible">
-    ${hasCape?`<path d="M35 55 Q10 90 20 130 L60 100 L100 130 Q110 90 85 55 Z" fill="url(#capeGrad)" opacity="0.92"/>
-    <defs><linearGradient id="capeGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f472b6"/><stop offset="100%" stop-color="#8b7cf8"/></linearGradient></defs>`:''}
-
-    <!-- corps -->
-    <ellipse cx="60" cy="78" rx="34" ry="40" fill="#8b7cf8"/>
-    <ellipse cx="60" cy="86" rx="22" ry="27" fill="#efe9ff"/>
-
-    <!-- ailes -->
-    <ellipse cx="27" cy="80" rx="9" ry="20" fill="#7a68e0" transform="rotate(-12 27 80)"/>
-    <ellipse cx="93" cy="80" rx="9" ry="20" fill="#7a68e0" transform="rotate(12 93 80)"/>
-
-    <!-- pieds -->
-    <path d="M48 116 l-4 10 M48 116 l4 10 M72 116 l-4 10 M72 116 l4 10" stroke="#f5b942" stroke-width="3" stroke-linecap="round"/>
-
-    <!-- aigrettes -->
-    <path d="M42 40 L36 20 L50 34 Z" fill="#8b7cf8"/>
-    <path d="M78 40 L84 20 L70 34 Z" fill="#8b7cf8"/>
-
-    <!-- yeux -->
-    <circle cx="46" cy="62" r="14" fill="#fff"/>
-    <circle cx="74" cy="62" r="14" fill="#fff"/>
-    <circle cx="47" cy="63" r="7" fill="#2a2140"/>
-    <circle cx="75" cy="63" r="7" fill="#2a2140"/>
-    <circle cx="49" cy="60" r="2" fill="#fff"/>
-    <circle cx="77" cy="60" r="2" fill="#fff"/>
-
-    <!-- bec -->
-    <path d="M56 74 L64 74 L60 82 Z" fill="#f5b942"/>
-
-    ${hasBadge?`<circle cx="60" cy="98" r="8" fill="#fbbf24" stroke="#fff" stroke-width="1.5"/><path d="M60 93 l1.8 3.6 4 0.6 -2.9 2.8 0.7 4 -3.6-1.9 -3.6 1.9 0.7-4 -2.9-2.8 4-0.6z" fill="#fff"/>`:''}
-
-    ${hasMedal?`<path d="M52 96 L60 110 L68 96" stroke="#fbbf24" stroke-width="3" fill="none"/><circle cx="60" cy="112" r="9" fill="#fbbf24" stroke="#fff" stroke-width="2"/><circle cx="60" cy="112" r="4" fill="#fff8e1"/>`:''}
-
-    ${hasCrown?`<g transform="translate(60,18)">
-      <path d="M-18 10 L-18 -6 L-9 4 L0 -10 L9 4 L18 -6 L18 10 Z" fill="#ffd700" stroke="#e6b800" stroke-width="1"/>
-      <circle cx="-9" cy="-6" r="2.5" fill="#ff4d4d"/><circle cx="0" cy="-10" r="2.5" fill="#4ade80"/><circle cx="9" cy="-6" r="2.5" fill="#38bdf8"/>
-    </g>`:''}
-  </svg>`;
-}
-
 function renderProfile(){
   const emptyEl=document.getElementById('profile-banner-empty');
   if(emptyEl) emptyEl.style.display=S.bannerUrl?'none':'flex';
-  renderMascot();
+  // mascotte retirée
   renderCustomTops();
   renderTierList();
   if(_lowTierOpen) renderTierList('low');
@@ -4478,6 +4371,17 @@ function renderStats(){
   },0);
   const readTimeH=Math.round(totalCh*0.08+totalEp*0.37);
 
+  // Œuvres Terminé ou À jour + catégories de suivi entièrement Terminé/À jour (comptées comme 1 chacune)
+  const finishedStatuses=new Set(['Terminé','À jour']);
+  const catsComplete=(S.suiviCategories||[]).filter(c=>
+    c.items && c.items.length>0 &&
+    c.items.every(i=>{
+      const tr=S.tracking[i.mal_id];
+      return tr && finishedStatuses.has(tr.status);
+    })
+  ).length;
+  const finishedCount=all.filter(t=>finishedStatuses.has(t.status)).length + catsComplete;
+
   document.getElementById('stats-grid').innerHTML=`
     <div class="stat-card"><div class="stat-n" style="background:linear-gradient(135deg,var(--manga),#f9a8d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${mangas.length}</div><div class="stat-l">Mangas suivis</div></div>
     <div class="stat-card"><div class="stat-n" style="background:linear-gradient(135deg,var(--anime),#7dd3fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${animes.length}</div><div class="stat-l">Animés suivis</div></div>
@@ -4485,7 +4389,7 @@ function renderStats(){
     <div class="stat-card"><div class="stat-n" style="background:linear-gradient(135deg,var(--green),#86efac);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${totalEp}</div><div class="stat-l">Épisodes vus</div></div>
     <div class="stat-card"><div class="stat-n" style="background:linear-gradient(135deg,var(--yellow),#fde68a);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${avgR}</div><div class="stat-l">Note moyenne</div></div>
     <div class="stat-card"><div class="stat-n" style="background:linear-gradient(135deg,var(--orange),#fed7aa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${totalVols}</div><div class="stat-l">Tomes possédés</div></div>
-    <div class="stat-card"><div class="stat-n">${all.filter(t=>t.status==='Terminé').length}</div><div class="stat-l">Terminés</div></div>
+    <div class="stat-card"><div class="stat-n">${finishedCount}</div><div class="stat-l">Terminé / À jour</div></div>
     <div class="stat-card"><div class="stat-n">${readTimeH}h</div><div class="stat-l">Temps estimé</div></div>
   `;
 
@@ -8386,35 +8290,68 @@ if('serviceWorker' in navigator){
     regs.forEach(r=>r.unregister());
   });
 }
-// ─── EFFET CARTE HOLOGRAPHIQUE (tilt 3D au survol) ───
+// ─── EFFET CARTE HOLOGRAPHIQUE (tilt 3D au survol, souris + tactile) ───
 (function(){
+  const SEL='.cc-wrap, .work-cover-box';
   let raf=null, activeEl=null;
-  document.addEventListener('mousemove', e=>{
-    const wrap=e.target.closest && e.target.closest('.cc-wrap');
-    if(!wrap){
-      if(activeEl){ activeEl.style.transform=''; activeEl=null; }
-      return;
-    }
-    activeEl=wrap;
+
+  function applyTilt(el, clientX, clientY){
     if(raf) return;
     raf=requestAnimationFrame(()=>{
       raf=null;
       if(!activeEl) return;
       const rect=activeEl.getBoundingClientRect();
-      const x=(e.clientX-rect.left)/rect.width;
-      const y=(e.clientY-rect.top)/rect.height;
+      const x=(clientX-rect.left)/rect.width;
+      const y=(clientY-rect.top)/rect.height;
       const rx=(0.5-y)*12, ry=(x-0.5)*12;
       activeEl.style.transform=`perspective(700px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-6px) scale(1.03)`;
       activeEl.style.setProperty('--shine-x',(x*100)+'%');
       activeEl.style.setProperty('--shine-y',(y*100)+'%');
     });
+  }
+  function clearTilt(el){
+    if(el){ el.style.transform=''; el.style.removeProperty('--shine-x'); el.style.removeProperty('--shine-y'); }
+  }
+
+  // Souris (desktop)
+  document.addEventListener('mousemove', e=>{
+    const wrap=e.target.closest && e.target.closest(SEL);
+    if(!wrap){
+      if(activeEl){ clearTilt(activeEl); activeEl=null; }
+      return;
+    }
+    activeEl=wrap;
+    applyTilt(activeEl, e.clientX, e.clientY);
   }, {passive:true});
   document.addEventListener('mouseout', e=>{
-    if(e.target && e.target.classList && e.target.classList.contains('cc-wrap')){
-      e.target.style.transform='';
+    if(e.target && e.target.closest && e.target.closest(SEL)===e.target){
+      clearTilt(e.target);
       if(activeEl===e.target) activeEl=null;
     }
   }, true);
+
+  // Tactile (mobile) : le doigt qui passe sur une couverture déclenche le même effet
+  document.addEventListener('touchstart', e=>{
+    const t=e.touches[0];
+    const wrap=t && t.target.closest && t.target.closest(SEL);
+    if(wrap){ activeEl=wrap; applyTilt(activeEl, t.clientX, t.clientY); }
+  }, {passive:true});
+  document.addEventListener('touchmove', e=>{
+    const t=e.touches[0];
+    if(!t) return;
+    const elUnder=document.elementFromPoint(t.clientX, t.clientY);
+    const wrap=elUnder && elUnder.closest && elUnder.closest(SEL);
+    if(wrap){
+      if(activeEl && activeEl!==wrap) clearTilt(activeEl);
+      activeEl=wrap;
+      applyTilt(activeEl, t.clientX, t.clientY);
+    } else if(activeEl){
+      clearTilt(activeEl); activeEl=null;
+    }
+  }, {passive:true});
+  document.addEventListener('touchend', ()=>{
+    if(activeEl){ clearTilt(activeEl); activeEl=null; }
+  }, {passive:true});
 })();
 
 load();
