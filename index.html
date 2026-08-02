@@ -3655,6 +3655,13 @@ function renderWorkSidebar(w, t){
     </button>`).join('');
 
   const physCollData=S.collection[w.mal_id]||{};
+  const ownedCount = physCollData.volumes ? Object.keys(physCollData.volumes).length : 0;
+  const collSection = type==='manga' ? `
+    <div class="sidebar-box">
+      <div class="sb-title">📚 Ma collection</div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:4px">${ownedCount} tome(s) physique(s)</div>
+      <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px" onclick="nav('collection')">Gérer ma collection →</button>
+    </div>` : '';
 
   const listsSection=S.lists.map(l=>{
     const has=l.items.some(i=>i.id==w.mal_id);
