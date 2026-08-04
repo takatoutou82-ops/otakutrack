@@ -5127,27 +5127,39 @@ function toggleSAFGenreMulti(val, btn){
 }
 
 let _safTags=new Set();
+let _safNoTag=false;
+const SAF_NOTAG_VAL='__no_tag__';
 function populateSuiviTagFilter(){
   const wrap=document.getElementById('suivi-tag-pills');
   if(!wrap) return;
   // On liste TOUS les tags jamais créés (S.allTags), pas seulement ceux actuellement utilisés,
   // pour que la liste reste stable même si aucune œuvre n'a ce tag pour le moment.
   const sorted=[...(S.allTags||[])].sort();
-  if(!sorted.length){ wrap.innerHTML='<span style="font-size:11.5px;color:var(--t3);font-style:italic">Aucun tag créé pour l\'instant</span>'; return; }
-  if(wrap.children.length === sorted.length+1) return; // déjà peuplé
-  wrap.innerHTML='<button class="saf-pill on" data-tg="" onclick="toggleSAFTagMulti(\'\',this)">Tous</button>'
+  // +2 : bouton "Tous" + bouton "Sans tag", toujours affichés même sans tag créé
+  if(wrap.children.length === sorted.length+2) return; // déjà peuplé
+  wrap.innerHTML='<button class="saf-pill'+(!_safNoTag&&_safTags.size===0?' on':'')+'" data-tg="" onclick="toggleSAFTagMulti(\'\',this)">Tous</button>'
+    +'<button class="saf-pill'+(_safNoTag?' on':'')+'" data-tg="'+SAF_NOTAG_VAL+'" onclick="toggleSAFTagMulti(\''+SAF_NOTAG_VAL+'\',this)">Sans tag</button>'
     +sorted.map(g=>`<button class="saf-pill${_safTags.has(g)?' on':''}" data-tg="${esc(g)}" onclick="toggleSAFTagMulti('${esc(g).replace(/'/g,"\\'")}',this)">${esc(g)}</button>`).join('');
 }
 function toggleSAFTagMulti(val, btn){
   if(!val){
     _safTags.clear();
+    _safNoTag=false;
     document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.tg===''));
+  } else if(val===SAF_NOTAG_VAL){
+    // "Sans tag" est exclusif : il n'a pas de sens combiné avec des tags précis
+    _safNoTag=!_safNoTag;
+    _safTags.clear();
+    document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.tg===SAF_NOTAG_VAL?_safNoTag:false));
   } else {
+    _safNoTag=false;
     if(_safTags.has(val)) _safTags.delete(val);
     else _safTags.add(val);
-    const allBtn=document.querySelector('#suivi-tag-pills [data-tg=""]');
-    if(allBtn) allBtn.classList.toggle('on',_safTags.size===0);
-    document.querySelectorAll('#suivi-tag-pills [data-tg="'+val+'"]').forEach(b=>b.classList.toggle('on',_safTags.has(val)));
+    document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>{
+      if(b.dataset.tg==='') b.classList.toggle('on',_safTags.size===0&&!_safNoTag);
+      else if(b.dataset.tg===SAF_NOTAG_VAL) b.classList.toggle('on',false);
+      else if(b.dataset.tg===val) b.classList.toggle('on',_safTags.has(val));
+    });
   }
   renderSuivi();
 }
@@ -5223,7 +5235,7 @@ function renderSuivi(){
       t.type===type &&
       (!query||t.title.toLowerCase().includes(query)) &&
       (_safGenres.size===0||[..._safGenres].every(g=>(t._genres||[]).concat(t._themes||[]).includes(g))) &&
-      (_safTags.size===0||[..._safTags].every(g=>(t._tags||[]).includes(g))) &&
+      (_safNoTag?(!(t._tags||[]).length):(_safTags.size===0||[..._safTags].every(g=>(t._tags||[]).includes(g)))) &&
       (!_safDemo||(t._demographics||[]).some(d=>d===_safDemo)) &&
       (!_safStatus||(()=>{
         // Correspondance via _pubStatus normalisé (manga: "Finished"/"Publishing"/"On Hiatus",
@@ -7631,7 +7643,7 @@ function resetSAF(){
   document.getElementById('saf-serietomes-max').value = '';
   document.getElementById('saf-serietomes-row').style.display = 'none';
   _safGenres.clear(); document.querySelectorAll('#suivi-genre-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.g==='')); populateSuiviGenreFilter();
-  _safTags.clear(); document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.tg===''));
+  _safTags.clear(); _safNoTag=false; document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.tg===''));
   document.querySelectorAll('#suivi-adv-filters [data-demo]').forEach(b=>b.classList.toggle('on',b.dataset.demo===''));
   document.querySelectorAll('#saf-status-pills [data-st]').forEach(b=>b.classList.toggle('on',b.dataset.st===''));
   document.querySelectorAll('#saf-extra-genres [data-g]').forEach(b=>b.classList.toggle('on',b.dataset.g===''));
