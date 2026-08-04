@@ -529,6 +529,11 @@ body::after{
 }
 .list-card::before{content:'';position:absolute;inset:0;background:var(--grad-card);pointer-events:none}
 .list-card:hover{border-color:rgba(139,124,248,.3);transform:translateY(-3px);box-shadow:0 12px 36px rgba(0,0,0,.4), 0 0 0 1px rgba(139,124,248,.15)}
+.list-card{cursor:grab}
+.list-card.list-card-dragging{opacity:.4;cursor:grabbing}
+.list-card.list-card-dragover{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc)}
+.lc-drag-handle{position:absolute;top:8px;left:8px;font-size:14px;color:var(--t3);opacity:.5;line-height:1;z-index:2}
+.list-card:hover .lc-drag-handle{opacity:.9}
 .lc-covers{display:flex;gap:5px;margin-bottom:12px}
 .lc-cov{width:42px;height:60px;border-radius:6px;overflow:hidden;background:var(--bg4)}
 .lc-cov img{width:100%;height:100%;object-fit:cover}
@@ -3673,16 +3678,6 @@ function renderWorkSidebar(w, t){
     </div>`;
   }).join('');
 
-  // Section achat si manga planifié
-  const buySection = (type==='manga' && (t.status||'')==='Planifié') ? `
-    <div class="sidebar-box" id="sb-buy-section">
-      <div class="sb-title">🛒 Où acheter ?</div>
-      <div style="display:flex;gap:6px;margin-bottom:10px">
-        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="searchVinted('${esc(w.title)}')">🏷 Vinted</button>
-      </div>
-      <div id="sb-buy-results"></div>
-    </div>` : '';
-
   document.getElementById('work-sidebar').innerHTML=`
     <div class="sidebar-box"><div class="sb-title">Statut</div>${statusBtns}</div>
     <div class="sidebar-box">
@@ -3697,18 +3692,11 @@ function renderWorkSidebar(w, t){
       </div>
       <datalist id="all-tags-datalist">${(S.allTags||[]).map(tag=>`<option value="${esc(tag)}">`).join('')}</datalist>
     </div>
-    ${buySection}
     ${collSection}
     ${S.lists.length?`<div class="sidebar-box"><div class="sb-title">Mes listes</div>${listsSection}<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:10px" onclick="openM('m-createlist')">+ Créer une liste</button></div>`:''}
   `;
 }
 
-// ─── ACHAT MANGA ───
-
-function searchVinted(title){
-  const q=encodeURIComponent(title+' manga');
-  window.open(`https://www.vinted.fr/catalog?search_text=${q}`, '_blank');
-}
 function quickTrack(malId, type, title, cover){
   if(!S.tracking[malId]){
     S.tracking[malId]={mal_id:malId,type,title,cover,status:'Planifié',chapter:0,volume:0,episode:0,rating:0,reviews:[],_addedAt:Date.now()};
@@ -3864,13 +3852,56 @@ function renderLists(){
       : l.items.slice(0,4).map(i=>`<div class="lc-cov"><img src="${i.cover||''}" loading="lazy"></div>`).join('');
     const count = isImg ? (l.imageItems||[]).length : l.items.length;
     const typeBadge = isImg ? '<span style="font-size:9px;font-weight:800;background:rgba(251,146,60,.15);color:var(--orange);border:1px solid rgba(251,146,60,.25);border-radius:5px;padding:2px 6px;font-family:Syne,sans-serif;margin-left:6px">🖼 IMAGE</span>' : '';
-    return `<div class="list-card" onclick="openListDetail('${l.id}')">
+    return `<div class="list-card" draggable="true" data-list-id="${l.id}"
+      ondragstart="listCardDragStart(event,'${l.id}')"
+      ondragover="listCardDragOver(event)"
+      ondragleave="listCardDragLeave(event)"
+      ondrop="listCardDrop(event,'${l.id}')"
+      ondragend="listCardDragEnd(event)"
+      onclick="openListDetail('${l.id}')">
+      <div class="lc-drag-handle" title="Glisser pour réorganiser">⠿</div>
       <div class="lc-covers">${covers}</div>
       <div class="lc-title">${esc(l.title)}${typeBadge}</div>
       <div class="lc-meta">${esc(l.desc||'')} · ${count} élément${count!==1?'s':''}</div>
       <button onclick="event.stopPropagation();deleteList('${l.id}')" style="position:absolute;top:8px;right:8px;background:rgba(248,113,113,.15);border:none;border-radius:6px;padding:4px 8px;color:#f87171;font-size:11px;cursor:pointer;font-weight:700">🗑 Supprimer</button>
     </div>`;
   }).join('')}</div>`;
+}
+
+// ─── DRAG & DROP RÉORGANISATION DES LISTES ───
+let _listDragId=null;
+function listCardDragStart(e,id){
+  _listDragId=id;
+  e.currentTarget.classList.add('list-card-dragging');
+  e.dataTransfer.effectAllowed='move';
+  try{ e.dataTransfer.setData('text/plain',id); }catch(err){}
+}
+function listCardDragOver(e){
+  if(!_listDragId) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  const card=e.currentTarget;
+  if(card.dataset.listId!==_listDragId) card.classList.add('list-card-dragover');
+}
+function listCardDragLeave(e){
+  e.currentTarget.classList.remove('list-card-dragover');
+}
+function listCardDrop(e,targetId){
+  e.preventDefault();
+  e.currentTarget.classList.remove('list-card-dragover');
+  if(!_listDragId || _listDragId===targetId) return;
+  const fromIdx=S.lists.findIndex(l=>l.id===_listDragId);
+  const toIdx=S.lists.findIndex(l=>l.id===targetId);
+  if(fromIdx===-1||toIdx===-1) return;
+  const [moved]=S.lists.splice(fromIdx,1);
+  S.lists.splice(toIdx,0,moved);
+  save();
+  renderLists();
+}
+function listCardDragEnd(e){
+  e.currentTarget.classList.remove('list-card-dragging');
+  document.querySelectorAll('.list-card-dragover').forEach(el=>el.classList.remove('list-card-dragover'));
+  _listDragId=null;
 }
 
 function deleteList(id){
@@ -7196,7 +7227,7 @@ function renderScatViewItems(){
         <img src="${item.cover||''}" style="width:100%;height:100%;object-fit:cover" loading="lazy">
         ${item.rating?`<div class="cc-rating" style="position:absolute;top:4px;left:4px;z-index:2">★ ${item.rating}</div>`:''}
       </div>
-      <div style="font-size:11px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" ondblclick="renameScatItem(event,${item.mal_id},'${item.type}')" title="Double-clic pour renommer">${esc(item.displayName||item.title)}</div>
+      <div style="font-size:11px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();renameScatItem(event,${item.mal_id},'${item.type}')" title="Double-clic pour renommer">${esc(item.displayName||item.title)}</div>
     </div>`).join('')+`</div>`;
 }
 
