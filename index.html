@@ -1205,6 +1205,7 @@ textarea.fi{resize:vertical;min-height:72px}
 .saf-pill{padding:4px 11px;border-radius:7px;background:var(--bg4);border:1px solid var(--border);color:var(--t2);font-size:12px;font-weight:500;cursor:pointer;transition:all .12s}
 .saf-pill:hover{background:var(--surface);color:var(--text)}
 .saf-pill.on{background:var(--surface);color:var(--acc2);border-color:var(--acc)}
+.saf-pill.excl{background:rgba(248,113,113,.1);color:var(--red);border-color:var(--red);text-decoration:line-through;text-decoration-thickness:1.5px}
 .saf-range{display:flex;align-items:center;gap:8px}
 .saf-range input[type=range]{accent-color:var(--acc);width:120px}
 .saf-range span{font-size:12px;color:var(--t2);min-width:30px}
@@ -2394,6 +2395,8 @@ function malListItemToShape(item, type){
   w.score=item.mean||null;
   w.status=MAL_STATUS_MAP[item.status]||item.status||'';
   if(type==='manga'){
+    w.volumes=item.num_volumes||null;
+    w.chapters=item.num_chapters||null;
     w.authors=(item.authors||[]).map(a=>({name:[a.node?.last_name,a.node?.first_name].filter(Boolean).join(', ')}));
   }else{
     w.studios=(item.studios||[]).map(s=>({name:s.name}));
@@ -5095,8 +5098,9 @@ async function fetchMissingScores(){
 }
 
 // ─── SUIVI ───
-// Genres sélectionnés (multi)
+// Genres sélectionnés (multi) — inclusion et exclusion (3 états : neutre → inclure → exclure → neutre)
 let _safGenres=new Set();
+let _safGenresExcl=new Set();
 
 function populateSuiviGenreFilter(){
   const wrap=document.getElementById('suivi-genre-pills');
@@ -5108,25 +5112,37 @@ function populateSuiviGenreFilter(){
   });
   const sorted=[...genres].sort();
   if(wrap.children.length === sorted.length+1) return; // already populated
-  wrap.innerHTML='<button class="saf-pill on" data-g="" onclick="toggleSAFGenreMulti(\'\',this)">Tous</button>'
-    +sorted.map(g=>`<button class="saf-pill${_safGenres.has(g)?' on':''}" data-g="${g}" onclick="toggleSAFGenreMulti('${g}',this)">${g}</button>`).join('');
+  wrap.innerHTML='<button class="saf-pill'+(_safGenres.size===0&&_safGenresExcl.size===0?' on':'')+'" data-g="" onclick="toggleSAFGenreMulti(\'\',this)">Tous</button>'
+    +sorted.map(g=>`<button class="saf-pill${_safGenres.has(g)?' on':_safGenresExcl.has(g)?' excl':''}" data-g="${g}" onclick="toggleSAFGenreMulti('${g}',this)">${g}</button>`).join('');
 }
 
 function toggleSAFGenreMulti(val, btn){
   if(!val){
     _safGenres.clear();
-    document.querySelectorAll('#suivi-genre-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.g===''));
+    _safGenresExcl.clear();
+    document.querySelectorAll('#suivi-genre-pills .saf-pill').forEach(b=>{b.classList.toggle('on',b.dataset.g==='');b.classList.remove('excl');});
   } else {
-    if(_safGenres.has(val)) _safGenres.delete(val);
-    else _safGenres.add(val);
+    // Cycle : neutre → inclure → exclure → neutre
+    if(_safGenres.has(val)){
+      _safGenres.delete(val);
+      _safGenresExcl.add(val);
+    } else if(_safGenresExcl.has(val)){
+      _safGenresExcl.delete(val);
+    } else {
+      _safGenres.add(val);
+    }
     const allBtn=document.querySelector('#suivi-genre-pills [data-g=""]');
-    if(allBtn) allBtn.classList.toggle('on',_safGenres.size===0);
-    document.querySelectorAll('#suivi-genre-pills [data-g="'+val+'"]').forEach(b=>b.classList.toggle('on',_safGenres.has(val)));
+    if(allBtn) allBtn.classList.toggle('on',_safGenres.size===0&&_safGenresExcl.size===0);
+    document.querySelectorAll('#suivi-genre-pills [data-g="'+val+'"]').forEach(b=>{
+      b.classList.toggle('on',_safGenres.has(val));
+      b.classList.toggle('excl',_safGenresExcl.has(val));
+    });
   }
   renderSuivi();
 }
 
 let _safTags=new Set();
+let _safTagsExcl=new Set();
 let _safNoTag=false;
 const SAF_NOTAG_VAL='__no_tag__';
 function populateSuiviTagFilter(){
@@ -5137,28 +5153,37 @@ function populateSuiviTagFilter(){
   const sorted=[...(S.allTags||[])].sort();
   // +2 : bouton "Tous" + bouton "Sans tag", toujours affichés même sans tag créé
   if(wrap.children.length === sorted.length+2) return; // déjà peuplé
-  wrap.innerHTML='<button class="saf-pill'+(!_safNoTag&&_safTags.size===0?' on':'')+'" data-tg="" onclick="toggleSAFTagMulti(\'\',this)">Tous</button>'
+  wrap.innerHTML='<button class="saf-pill'+(!_safNoTag&&_safTags.size===0&&_safTagsExcl.size===0?' on':'')+'" data-tg="" onclick="toggleSAFTagMulti(\'\',this)">Tous</button>'
     +'<button class="saf-pill'+(_safNoTag?' on':'')+'" data-tg="'+SAF_NOTAG_VAL+'" onclick="toggleSAFTagMulti(\''+SAF_NOTAG_VAL+'\',this)">Sans tag</button>'
-    +sorted.map(g=>`<button class="saf-pill${_safTags.has(g)?' on':''}" data-tg="${esc(g)}" onclick="toggleSAFTagMulti('${esc(g).replace(/'/g,"\\'")}',this)">${esc(g)}</button>`).join('');
+    +sorted.map(g=>`<button class="saf-pill${_safTags.has(g)?' on':_safTagsExcl.has(g)?' excl':''}" data-tg="${esc(g)}" onclick="toggleSAFTagMulti('${esc(g).replace(/'/g,"\\'")}',this)">${esc(g)}</button>`).join('');
 }
 function toggleSAFTagMulti(val, btn){
   if(!val){
     _safTags.clear();
+    _safTagsExcl.clear();
     _safNoTag=false;
-    document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.tg===''));
+    document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>{b.classList.toggle('on',b.dataset.tg==='');b.classList.remove('excl');});
   } else if(val===SAF_NOTAG_VAL){
     // "Sans tag" est exclusif : il n'a pas de sens combiné avec des tags précis
     _safNoTag=!_safNoTag;
     _safTags.clear();
-    document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.tg===SAF_NOTAG_VAL?_safNoTag:false));
+    _safTagsExcl.clear();
+    document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>{b.classList.toggle('on',b.dataset.tg===SAF_NOTAG_VAL?_safNoTag:false);b.classList.remove('excl');});
   } else {
     _safNoTag=false;
-    if(_safTags.has(val)) _safTags.delete(val);
-    else _safTags.add(val);
+    // Cycle : neutre → inclure → exclure → neutre
+    if(_safTags.has(val)){
+      _safTags.delete(val);
+      _safTagsExcl.add(val);
+    } else if(_safTagsExcl.has(val)){
+      _safTagsExcl.delete(val);
+    } else {
+      _safTags.add(val);
+    }
     document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>{
-      if(b.dataset.tg==='') b.classList.toggle('on',_safTags.size===0&&!_safNoTag);
-      else if(b.dataset.tg===SAF_NOTAG_VAL) b.classList.toggle('on',false);
-      else if(b.dataset.tg===val) b.classList.toggle('on',_safTags.has(val));
+      if(b.dataset.tg===''){ b.classList.toggle('on',_safTags.size===0&&_safTagsExcl.size===0&&!_safNoTag); }
+      else if(b.dataset.tg===SAF_NOTAG_VAL){ b.classList.toggle('on',false); }
+      else if(b.dataset.tg===val){ b.classList.toggle('on',_safTags.has(val)); b.classList.toggle('excl',_safTagsExcl.has(val)); }
     });
   }
   renderSuivi();
@@ -5235,7 +5260,11 @@ function renderSuivi(){
       t.type===type &&
       (!query||t.title.toLowerCase().includes(query)) &&
       (_safGenres.size===0||[..._safGenres].every(g=>(t._genres||[]).concat(t._themes||[]).includes(g))) &&
-      (_safNoTag?(!(t._tags||[]).length):(_safTags.size===0||[..._safTags].every(g=>(t._tags||[]).includes(g)))) &&
+      (_safGenresExcl.size===0||[..._safGenresExcl].every(g=>!(t._genres||[]).concat(t._themes||[]).includes(g))) &&
+      (_safNoTag?(!(t._tags||[]).length):(
+        (_safTags.size===0||[..._safTags].every(g=>(t._tags||[]).includes(g))) &&
+        (_safTagsExcl.size===0||[..._safTagsExcl].every(g=>!(t._tags||[]).includes(g)))
+      )) &&
       (!_safDemo||(t._demographics||[]).some(d=>d===_safDemo)) &&
       (!_safStatus||(()=>{
         // Correspondance via _pubStatus normalisé (manga: "Finished"/"Publishing"/"On Hiatus",
@@ -6616,8 +6645,8 @@ async function searchForCollection(val,mode){
   _collSearchTimer=setTimeout(async()=>{
     el.innerHTML='<div class="loading" style="padding:12px"><div class="spin"></div></div>';
     try{
-      const d=await jikan('/manga?q='+encodeURIComponent(val)+'&limit=6&sfw');
-      el.innerHTML=(d.data||[]).map(item=>`
+      const items=await malSearch('manga', val, 6);
+      el.innerHTML=items.map(item=>`
         <div class="lib-search-item" onclick="selectCollItem(${item.mal_id},'${esc(item.title_english||item.title)}','${esc(item.images?.jpg?.image_url||'')}','${mode}',${item.volumes||0})">
           <img src="${item.images?.jpg?.image_url||''}" loading="lazy">
           <div>
@@ -7642,8 +7671,8 @@ function resetSAF(){
   document.getElementById('saf-serietomes-min').value = '';
   document.getElementById('saf-serietomes-max').value = '';
   document.getElementById('saf-serietomes-row').style.display = 'none';
-  _safGenres.clear(); document.querySelectorAll('#suivi-genre-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.g==='')); populateSuiviGenreFilter();
-  _safTags.clear(); _safNoTag=false; document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.tg===''));
+  _safGenres.clear(); _safGenresExcl.clear(); document.querySelectorAll('#suivi-genre-pills .saf-pill').forEach(b=>{b.classList.toggle('on',b.dataset.g==='');b.classList.remove('excl');}); populateSuiviGenreFilter();
+  _safTags.clear(); _safTagsExcl.clear(); _safNoTag=false; document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>{b.classList.toggle('on',b.dataset.tg==='');b.classList.remove('excl');});
   document.querySelectorAll('#suivi-adv-filters [data-demo]').forEach(b=>b.classList.toggle('on',b.dataset.demo===''));
   document.querySelectorAll('#saf-status-pills [data-st]').forEach(b=>b.classList.toggle('on',b.dataset.st===''));
   document.querySelectorAll('#saf-extra-genres [data-g]').forEach(b=>b.classList.toggle('on',b.dataset.g===''));
