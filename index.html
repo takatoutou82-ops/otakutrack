@@ -4833,6 +4833,7 @@ function renderCollection(){
         +catBadge
         +'<span class="shelf-owned-count">'+ownedCount+' / '+maxVol+(isOngoing?' (en cours)':'')+' tomes</span>'
         +'<button onclick="assignToCategory('+malId+',\''+esc(t.title||'')+'\')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;color:var(--t3);font-size:10px;cursor:pointer;margin-left:auto">📂 Catégorie</button>'
+        +'<button onclick="removePhysSeries('+malId+',\''+esc(t.title||'')+'\')" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);border-radius:6px;padding:2px 8px;color:var(--red);font-size:10px;cursor:pointer">🗑 Supprimer</button>'
         +'</div>'
         +'<div class="bookshelf-row">'+spines.join('')+'</div>'
         +'</div>';
@@ -5216,55 +5217,56 @@ function renderSuivi(){
   const all=Object.values(S.tracking);
   const statusMap={'Planifié':'watchlist','En cours':'ongoing','Terminé':'done','Abandonné':'dropped','À jour':'uptodate'};
 
+  function compareBySort(a,b){
+    if(sort==='title') return (a.title||'').localeCompare(b.title||'');
+    if(sort==='title-desc') return (b.title||'').localeCompare(a.title||'');
+
+    if(sort==='community-desc'){
+      const sa=a._communityScore||0, sb=b._communityScore||0;
+      if(sb!==sa) return sb-sa;
+      return (a.title||'').localeCompare(b.title||'');
+    }
+    if(sort==='community-asc'){
+      const sa=a._communityScore||0, sb=b._communityScore||0;
+      if(sa!==sb) return sa-sb;
+      return (a.title||'').localeCompare(b.title||'');
+    }
+
+    if(sort==='my-rating-desc'){
+      const ra=a.rating||0, rb=b.rating||0;
+      if(ra===0&&rb===0) return (b._communityScore||0)-(a._communityScore||0);
+      if(ra===0) return 1;
+      if(rb===0) return -1;
+      return rb-ra;
+    }
+    if(sort==='my-rating-asc'){
+      const ra=a.rating||0, rb=b.rating||0;
+      if(ra===0&&rb===0) return (a._communityScore||0)-(b._communityScore||0);
+      if(ra===0) return 1;
+      if(rb===0) return -1;
+      return ra-rb;
+    }
+
+    if(sort==='date-desc'){
+      const ta=a._addedAt||0, tb=b._addedAt||0;
+      return tb-ta;
+    }
+    if(sort==='date-asc'){
+      const ta=a._addedAt||0, tb=b._addedAt||0;
+      if(ta===0&&tb===0) return (a.title||'').localeCompare(b.title||'');
+      if(ta===0) return 1;
+      if(tb===0) return -1;
+      return ta-tb;
+    }
+    if(sort==='progress'){
+      const pa=a._progress||0, pb=b._progress||0;
+      return pb-pa;
+    }
+    return 0;
+  }
+
   function sortItems(arr){
-    return arr.slice().sort((a,b)=>{
-      if(sort==='title') return (a.title||'').localeCompare(b.title||'');
-      if(sort==='title-desc') return (b.title||'').localeCompare(a.title||'');
-
-      if(sort==='community-desc'){
-        const sa=a._communityScore||0, sb=b._communityScore||0;
-        if(sb!==sa) return sb-sa;
-        return (a.title||'').localeCompare(b.title||'');
-      }
-      if(sort==='community-asc'){
-        const sa=a._communityScore||0, sb=b._communityScore||0;
-        if(sa!==sb) return sa-sb;
-        return (a.title||'').localeCompare(b.title||'');
-      }
-
-      if(sort==='my-rating-desc'){
-        const ra=a.rating||0, rb=b.rating||0;
-        if(ra===0&&rb===0) return (b._communityScore||0)-(a._communityScore||0);
-        if(ra===0) return 1;
-        if(rb===0) return -1;
-        return rb-ra;
-      }
-      if(sort==='my-rating-asc'){
-        const ra=a.rating||0, rb=b.rating||0;
-        if(ra===0&&rb===0) return (a._communityScore||0)-(b._communityScore||0);
-        if(ra===0) return 1;
-        if(rb===0) return -1;
-        return ra-rb;
-      }
-
-      if(sort==='date-desc'){
-        const ta=a._addedAt||0, tb=b._addedAt||0;
-        return tb-ta;
-      }
-      if(sort==='date-asc'){
-        const ta=a._addedAt||0, tb=b._addedAt||0;
-        if(ta===0&&tb===0) return (a.title||'').localeCompare(b.title||'');
-        if(ta===0) return 1;
-        if(tb===0) return -1;
-        return ta-tb;
-      }
-      if(sort==='progress'){
-        const pa=a.type==='manga'?a.chapter||0:a.episode||0;
-        const pb=b.type==='manga'?b.chapter||0:b.episode||0;
-        return pb-pa;
-      }
-      return 0;
-    });
+    return arr.slice().sort(compareBySort);
   }
 
   ['manga','anime'].forEach(type=>{
@@ -5295,17 +5297,19 @@ function renderSuivi(){
       (serieTomesMax===null||(t._totalVolumes&&t._totalVolumes<=serieTomesMax))
     );
     ['watchlist','ongoing','done','dropped','uptodate'].forEach(tab=>{
-      const filtered=sortItems(items.filter(t=>(statusMap[t.status||'']||'watchlist')===tab));
+      const filtered=items.filter(t=>(statusMap[t.status||'']||'watchlist')===tab);
       const el=document.getElementById('tg-'+type+'-'+tab);
       if(!el)return;
 
-      // Afficher les catégories en haut pour tous les onglets
-      let catHtml='';
+      // Catégories affichées mêlées aux œuvres, triées selon le même critère (tri actif)
+      let cats=[];
       if(!query&&!_safStatus){
-        const cats=(S.suiviCategories||[]).filter(c=>(c.type===type||c.type==='mixed')&&c.tab===tab);
-        if(cats.length){
-          catHtml=cats.map(c=>`
-            <div class="cc" onclick="openSuiviCategory('${c.id}')">
+        cats=(S.suiviCategories||[]).filter(c=>(c.type===type||c.type==='mixed')&&c.tab===tab);
+      }
+
+      const catEntries=cats.map(c=>({
+        sk:{title:c.name||'',rating:c.rating||0,_communityScore:0,_addedAt:c._addedAt||0,_progress:0},
+        html:`<div class="cc" onclick="openSuiviCategory('${c.id}')">
               <div class="cc-wrap">
                 <img class="cc-img" src="${c.cover||''}" loading="lazy">
                 <div style="position:absolute;top:4px;left:4px;background:${c.type==='mixed'?'var(--acc)':'var(--acc3)'};border-radius:4px;font-size:8px;font-weight:900;color:#fff;padding:2px 5px;z-index:2">${c.type==='mixed'?'MIXTE':'CAT'}</div>
@@ -5319,17 +5323,18 @@ function renderSuivi(){
               </div>
               <div class="cc-title">${esc(c.name)}</div>
               <div class="cc-meta">${(c.items||[]).length} œuvre(s)${c.rating?' · ★'+c.rating:''}</div>
-            </div>`).join('');
-        }
-      }
+            </div>`
+      }));
 
-      const workCards=filtered.map(t=>{
+      const workEntries=filtered.map(t=>{
         const prog=type==='manga'?t.chapter||0:t.episode||0;
         const maxProg=type==='manga'?t._maxChapter||0:t._maxEpisode||0;
         const pct=maxProg>0?Math.min(100,Math.round((prog/maxProg)*100)):0;
         const progressBar=maxProg>0?`<div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(0,0,0,.5)"><div style="height:100%;width:${pct}%;background:var(--acc);transition:width .3s"></div></div>`:'';
         const ratingBadge=t.rating?'<div class="cc-rating" style="position:absolute;top:5px;left:5px;z-index:2">★ '+t.rating+'</div>':'';
-        return `<div class="cc" onclick="openWork(${t.mal_id},'${t.type}')">
+        return {
+          sk:{...t,_progress:prog},
+          html:`<div class="cc" onclick="openWork(${t.mal_id},'${t.type}')">
           <div class="cc-wrap">
             <img class="cc-img" src="${t.cover}" loading="lazy">
             <div class="status-dot ${statusClass(t.status)}"></div>
@@ -5343,15 +5348,18 @@ function renderSuivi(){
           </div>
           <div class="cc-title">${esc(t.title)}</div>
           <div class="cc-meta">${type==='manga'?'Ch.':'Ep.'} ${prog}${maxProg?' / '+maxProg:''}${t.volume?' · T.'+t.volume:''}${t.rating?' · ★'+t.rating:''}</div>
-        </div>`;
-      }).join('');
+        </div>`
+        };
+      });
 
-      if(!catHtml&&!filtered.length){
+      const combined=[...catEntries,...workEntries].sort((A,B)=>compareBySort(A.sk,B.sk));
+
+      if(!combined.length){
         el.innerHTML='<p style="color:var(--t3);font-size:13px;grid-column:1/-1;padding:8px 0">'
           +(query?'Aucun résultat pour "'+esc(query)+'"':'Aucune œuvre ici.')+'</p>';
         return;
       }
-      el.innerHTML=catHtml+workCards;
+      el.innerHTML=combined.map(x=>x.html).join('');
 
       // Bouton + Créer une catégorie (en bas de tous les onglets)
       {
@@ -6684,22 +6692,35 @@ async function selectCollItem(malId,title,cover,mode,maxVols){
     document.getElementById('phys-vol-picker').innerHTML='<div class="loading" style="padding:10px"><div class="spin"></div></div>';
 
     // Fetch real volume count from Jikan (handles ongoing series)
+    // Par défaut on considère qu'on ne connaît PAS le nombre de tomes (mode manuel/éditable),
+    // tant que l'API ne confirme pas explicitement une série terminée avec un nombre de tomes fixe.
+    // Ça évite de rester bloqué sur "1 tome" si l'appel échoue ou si la donnée est absente.
     let realMax=maxVols||0;
-    let isOngoing=false;
+    let isOngoing=true;
     try{
       const info=await jikan('/manga/'+malId);
       const data=info.data||{};
-      // For ongoing: volumes may be null but we can use chapters as proxy
-      // Use volumes if available, else estimate from chapters (~10 ch/vol)
-      realMax=data.volumes||Math.ceil((data.chapters||0)/10)||realMax||0;
-      isOngoing=!data.volumes;
+      const isFinished=data.status==='Finished';
+      if(isFinished&&data.volumes){
+        // Série terminée avec un nombre de tomes connu : on fige la liste
+        realMax=data.volumes;
+        isOngoing=false;
+      } else {
+        // En cours, statut inconnu, ou nombre de tomes non communiqué par MAL :
+        // on estime une valeur de départ mais on laisse la main à l'utilisateur
+        realMax=data.volumes||Math.ceil((data.chapters||0)/10)||realMax||0;
+        isOngoing=true;
+      }
       // Store on collectionMeta (not tracking) for later use in library
       if(!S.collectionMeta)S.collectionMeta={};
       if(!S.collectionMeta[malId])S.collectionMeta[malId]={mal_id:malId,type:'manga',title,cover};
       S.collectionMeta[malId]._knownVolumes=realMax;
       S.collectionMeta[malId]._isOngoing=isOngoing;
       save();
-    }catch(e){}
+    }catch(e){
+      // Échec réseau : on ne bloque pas l'utilisateur, il pourra indiquer le nombre de tomes lui-même
+      isOngoing=true;
+    }
 
     const coll=S.collection[malId]||{};
     const owned=coll.volumes||{};
@@ -6724,7 +6745,10 @@ async function selectCollItem(malId,title,cover,mode,maxVols){
         </div>
         <div id="phys-vol-buttons" style="display:flex;flex-wrap:wrap;gap:5px">${buildPhysPicker(displayMax)}</div>`;
     } else {
-      document.getElementById('phys-vol-picker').innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:5px">${buildPhysPicker(n||1)}</div>`;
+      document.getElementById('phys-vol-picker').innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:5px">${buildPhysPicker(n||1)}</div>
+        <div style="margin-top:10px">
+          <button type="button" onclick="physPickerForceManual(${malId})" style="background:none;border:none;color:var(--t3);font-size:11px;text-decoration:underline;cursor:pointer;padding:0">Nombre de tomes incorrect ? Corriger manuellement</button>
+        </div>`;
     }
   } else if(mode==='cbz'){
     document.getElementById('cbz-form-title').textContent=title;
@@ -6756,6 +6780,30 @@ function updatePhysPickerMax(malId,val){
   for(let i=1;i<=n;i++) html+='<button class="vp-num'+(owned[i]?' owned':'')+'" onclick="togglePhysPick('+malId+','+i+',this)">'+i+'</button>';
   const container=document.getElementById('phys-vol-buttons');
   if(container)container.innerHTML=html;
+}
+
+// Permet de repasser en mode "nombre de tomes modifiable" même quand MAL a déclaré
+// la série terminée, au cas où le chiffre récupéré serait faux ou obsolète.
+function physPickerForceManual(malId){
+  if(!S.collectionMeta)S.collectionMeta={};
+  if(!S.collectionMeta[malId])S.collectionMeta[malId]={};
+  const coll=S.collection[malId]||{};
+  const owned=coll.volumes||{};
+  const ownedMax=Object.keys(owned).map(Number).reduce((a,b)=>Math.max(a,b),0)||0;
+  const current=S.collectionMeta[malId]._customMax||S.collectionMeta[malId]._knownVolumes||ownedMax||1;
+  S.collectionMeta[malId]._customMax=current;
+  S.collectionMeta[malId]._isOngoing=true;
+  save();
+  let btnsHtml='';
+  for(let i=1;i<=current;i++) btnsHtml+='<button class="vp-num'+(owned[i]?' owned':'')+'" onclick="togglePhysPick('+malId+','+i+',this)">'+i+'</button>';
+  document.getElementById('phys-vol-picker').innerHTML=`
+    <div style="width:100%;margin-bottom:10px;display:flex;align-items:center;gap:8px;background:rgba(139,124,248,.08);border:1px solid rgba(139,124,248,.2);border-radius:8px;padding:8px 12px">
+      <span style="font-size:12px;color:var(--t2)">📖 Nombre de tomes :</span>
+      <input type="number" id="phys-ongoing-max" min="1" max="9999" value="${current}"
+        style="width:65px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:13px;outline:none;text-align:center"
+        oninput="updatePhysPickerMax(${malId},this.value)">
+    </div>
+    <div id="phys-vol-buttons" style="display:flex;flex-wrap:wrap;gap:5px">${btnsHtml}</div>`;
 }
 
 function confirmPhysAdd(){
@@ -7242,6 +7290,7 @@ function saveSuiviCategory(){
       type:_scatType,tab:_scatTab,
       name,rating,description,cover,
       reviews:[],
+      _addedAt:Date.now(),
       items:_scatItems.map((i,o)=>({...i,order:o}))
     });
   }
@@ -7759,6 +7808,22 @@ function deletePhysCat(catId){
   S.physCategories = (S.physCategories||[]).filter(c=>c.id!==catId);
   save(); renderCollection();
   toast('Catégorie supprimée','ok');
+}
+
+function removePhysSeries(malId,title){
+  if(!confirm('Supprimer "'+(title||'cette série')+'" de la bibliothèque physique ? Les tomes cochés seront perdus.')) return;
+  const c=S.collection[malId];
+  if(c){
+    delete c.volumes;
+    delete c.added;
+    if((!c.cbz||!c.cbz.length)&&(!c.online||!c.online.length)){
+      delete S.collection[malId];
+    }
+  }
+  (S.physCategories||[]).forEach(cat=>{ cat.seriesIds=(cat.seriesIds||[]).filter(id=>id!=malId); });
+  save();
+  renderCollection();
+  toast('Série retirée de la bibliothèque physique','ok');
 }
 
 
