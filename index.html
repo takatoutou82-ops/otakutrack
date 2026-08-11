@@ -29,6 +29,8 @@
   --orange:  #fb923c;
   --red:     #f87171;
   --yellow:  #fbbf24;
+  --manga-c: #5b8def;
+  --anime-c: #f78ca0;
   --text:    #f0f0fa;
   --t2:      #8888aa;
   --t3:      #3e3e5c;
@@ -2097,7 +2099,7 @@ textarea.fi{resize:vertical;min-height:72px}
 
 <!-- MODAL : Créer/Éditer catégorie suivi -->
 <div class="modal-bg" id="m-scat-create">
-  <div class="modal scat-modal">
+  <div class="modal scat-modal" style="max-height:90vh;overflow-y:auto">
     <div class="modal-title"><span id="scat-modal-title">Nouvelle catégorie</span><span class="modal-close" onclick="closeM('m-scat-create')">✕</span></div>
     <input id="scat-name-input" class="inp" placeholder="Nom de la catégorie (ex: Attaque des Titans)" style="margin-bottom:12px">
     <textarea id="scat-desc-input" class="inp" placeholder="Description (optionnelle)…" style="height:70px;resize:vertical;margin-bottom:12px"></textarea>
@@ -2105,11 +2107,17 @@ textarea.fi{resize:vertical;min-height:72px}
       <label style="font-size:12px;color:var(--t3);white-space:nowrap">Note globale</label>
       <select id="scat-rating-input" class="status-sel" style="margin-top:0;width:auto;flex:1"></select>
     </div>
+    <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Type de catégorie</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px" id="scat-type-selector">
+      <button type="button" class="btn btn-sm btn-secondary" id="scat-type-manga" onclick="setScatType('manga')" style="flex:1">📖 Manga</button>
+      <button type="button" class="btn btn-sm btn-secondary" id="scat-type-anime" onclick="setScatType('anime')" style="flex:1">🎬 Animé</button>
+      <button type="button" class="btn btn-sm btn-secondary" id="scat-type-mixed" onclick="setScatType('mixed')" style="flex:1">🔀 Mixte</button>
+    </div>
     <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Ajouter des œuvres</div>
-    <input id="scat-search-input" class="inp" placeholder="Rechercher dans mon suivi…" oninput="filterScatSearch()" style="margin-bottom:8px">
-    <div id="scat-search-results" style="max-height:180px;overflow-y:auto;margin-bottom:12px"></div>
+    <input id="scat-search-input" class="inp" placeholder="🔍 Rechercher un manga ou animé (MyAnimeList)…" oninput="scatSearchDebounce(this.value)" style="margin-bottom:8px">
+    <div id="scat-search-results" style="max-height:220px;overflow-y:auto;margin-bottom:12px"></div>
     <div style="font-size:11px;color:var(--t3);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Contenu de la catégorie <span id="scat-items-count" style="color:var(--acc)"></span></div>
-    <div id="scat-items-list" style="max-height:200px;overflow-y:auto;margin-bottom:16px"></div>
+    <div id="scat-items-list" style="max-height:260px;overflow-y:auto;margin-bottom:16px"></div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-scat-create')">Annuler</button>
       <button class="btn btn-primary" style="flex:1" onclick="saveSuiviCategory()">Enregistrer</button>
@@ -2148,7 +2156,7 @@ textarea.fi{resize:vertical;min-height:72px}
     </div>
     <!-- Œuvres -->
     <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Œuvres</div>
-    <div id="scat-view-items" style="max-height:220px;overflow-y:auto;margin-bottom:16px"></div>
+    <div id="scat-view-items" style="margin-bottom:16px"></div>
     <!-- Critiques -->
     <div style="border-top:1px solid var(--border);padding-top:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -4745,9 +4753,12 @@ function renderTopAuthors(all){
 // ─── COLLECTION ───
 function renderCollection(){
   // Build list of manga entries from collection — may or may not be in tracking
+  // Un malId compte comme "dans la collection" dès qu'une entrée existe (même sans
+  // tome coché, ex: série ajoutée mais pas encore de tome pointé), pour éviter
+  // qu'une série ajoutée disparaisse silencieusement de l'affichage.
   const collMalIds=Object.keys(S.collection).filter(id=>{
     const c=S.collection[id];
-    return c&&(Object.keys(c.volumes||{}).length>0||(c.cbz||[]).length>0||(c.online||[]).length>0);
+    return c&&(c.volumes!==undefined||c.added||(c.cbz||[]).length>0||(c.online||[]).length>0);
   });
 
   function getMeta(malId){
@@ -4761,9 +4772,10 @@ function renderCollection(){
   if(!physEl)return;
   const physMalIds=collMalIds.filter(id=>{
     const c=S.collection[id];
-    return c&&Object.keys(c.volumes||{}).length>0;
+    return c&&(c.volumes!==undefined||c.added);
   });
-  if(!physMalIds.length){if(physEl)physEl.innerHTML='';physEmpty.style.display='block';}
+  const hasPhysCats=(S.physCategories||[]).length>0;
+  if(!physMalIds.length&&!hasPhysCats){if(physEl)physEl.innerHTML='';physEmpty.style.display='block';}
   else{
     physEmpty.style.display='none';
 
@@ -5290,13 +5302,13 @@ function renderSuivi(){
       // Afficher les catégories en haut pour tous les onglets
       let catHtml='';
       if(!query&&!_safStatus){
-        const cats=(S.suiviCategories||[]).filter(c=>c.type===type&&c.tab===tab);
+        const cats=(S.suiviCategories||[]).filter(c=>(c.type===type||c.type==='mixed')&&c.tab===tab);
         if(cats.length){
           catHtml=cats.map(c=>`
             <div class="cc" onclick="openSuiviCategory('${c.id}')">
               <div class="cc-wrap">
                 <img class="cc-img" src="${c.cover||''}" loading="lazy">
-                <div style="position:absolute;top:4px;left:4px;background:var(--acc3);border-radius:4px;font-size:8px;font-weight:900;color:#fff;padding:2px 5px;z-index:2">CAT</div>
+                <div style="position:absolute;top:4px;left:4px;background:${c.type==='mixed'?'var(--acc)':'var(--acc3)'};border-radius:4px;font-size:8px;font-weight:900;color:#fff;padding:2px 5px;z-index:2">${c.type==='mixed'?'MIXTE':'CAT'}</div>
                 ${c.rating?`<div class="cc-rating" style="position:absolute;top:4px;right:4px;z-index:2">★ ${c.rating}</div>`:''}
                 <div class="cc-overlay">
                   <div class="cc-ov-btns">
@@ -6747,11 +6759,18 @@ function updatePhysPickerMax(malId,val){
 }
 
 function confirmPhysAdd(){
+  const {malId}=_collPickTarget||{};
+  if(malId){
+    if(!S.collection[malId]) S.collection[malId]={volumes:{},cbz:[],online:[]};
+    if(!S.collection[malId].volumes) S.collection[malId].volumes={};
+    S.collection[malId].added=true; // marque la série comme ajoutée à la bibliothèque, même sans tome coché
+    save();
+  }
   closeM('m-add-phys');
   document.getElementById('phys-picker-area').style.display='none';
   document.getElementById('phys-search-input').value='';
   renderCollection();
-  toast('Collection mise à jour','ok');
+  toast('Collection mise à jour ✓','ok');
 }
 
 function confirmCbzAdd(){
@@ -7046,17 +7065,29 @@ let _scatType='manga';
 let _scatTab='done';
 let _scatItems=[]; // [{mal_id,type,title,cover,rating,order}]
 
+function setScatType(type){
+  _scatType=type;
+  ['manga','anime','mixed'].forEach(t=>{
+    const b=document.getElementById('scat-type-'+t);
+    if(!b)return;
+    b.classList.toggle('btn-primary',t===type);
+    b.classList.toggle('btn-secondary',t!==type);
+  });
+  const input=document.getElementById('scat-search-input');
+  if(input) input.value='';
+  const results=document.getElementById('scat-search-results');
+  if(results) results.innerHTML='';
+}
+
 function openCreateSuiviCategory(type,tab){
   _scatEditing=null;
-  _scatType=type;
   _scatTab=tab;
   _scatItems=[];
   document.getElementById('scat-modal-title').textContent='Nouvelle catégorie';
   document.getElementById('scat-name-input').value='';
   document.getElementById('scat-desc-input').value='';
   document.getElementById('scat-rating-input').innerHTML=buildRatingOptions(0,'— Non notée');
-  document.getElementById('scat-search-input').value='';
-  renderScatSearch('');
+  setScatType(type);
   renderScatItems();
   openM('m-scat-create');
 }
@@ -7065,64 +7096,78 @@ function editSuiviCategory(id){
   const cat=(S.suiviCategories||[]).find(c=>c.id===id);
   if(!cat)return;
   _scatEditing=id;
-  _scatType=cat.type;
   _scatTab=cat.tab;
   _scatItems=(cat.items||[]).map(i=>({...i}));
   document.getElementById('scat-modal-title').textContent='Modifier la catégorie';
   document.getElementById('scat-name-input').value=cat.name||'';
   document.getElementById('scat-desc-input').value=cat.description||'';
   document.getElementById('scat-rating-input').innerHTML=buildRatingOptions(cat.rating||0,'— Non notée');
-  document.getElementById('scat-search-input').value='';
-  renderScatSearch('');
+  setScatType(cat.type||'manga');
   renderScatItems();
   openM('m-scat-create');
 }
 
-function filterScatSearch(){
-  const q=document.getElementById('scat-search-input').value;
-  renderScatSearch(q);
-}
-
-function renderScatSearch(query){
-  const q=(query||'').toLowerCase().trim();
-  const already=new Set(_scatItems.map(i=>i.mal_id+'_'+i.type));
-  const candidates=Object.values(S.tracking).filter(t=>
-    t.type===_scatType &&
-    (!q||t.title.toLowerCase().includes(q)) &&
-    !already.has(t.mal_id+'_'+t.type)
-  ).slice(0,15);
+// ─── Recherche directe sur MyAnimeList (ne pioche plus dans le suivi) ───
+let _scatSearchTimer=null;
+function scatSearchDebounce(q){
+  clearTimeout(_scatSearchTimer);
   const el=document.getElementById('scat-search-results');
-  if(!candidates.length){
-    el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Aucun résultat</p>';
-    return;
-  }
-  el.innerHTML=candidates.map(t=>`
-    <div class="scat-item-row" style="cursor:pointer" onclick="scatAddItem(${t.mal_id},'${t.type}')">
-      <img class="scat-item-cover" src="${t.cover||''}">
-      <div class="scat-item-title">${esc(t.title)}</div>
-      <div style="font-size:11px;color:var(--t3);flex-shrink:0">${t.status||''}</div>
-      <button style="background:var(--acc);color:#fff;border:none;border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer;flex-shrink:0">＋</button>
-    </div>`).join('');
+  if(!q.trim()){ el.innerHTML=''; return; }
+  el.innerHTML='<div class="loading"><div class="spin"></div></div>';
+  _scatSearchTimer=setTimeout(()=>scatDoSearch(q),450);
 }
 
-function scatAddItem(malId,type){
-  const t=S.tracking[malId];
-  if(!t)return;
+async function scatDoSearch(q){
+  const el=document.getElementById('scat-search-results');
+  try{
+    let results=[];
+    if(_scatType==='mixed'){
+      const [mangas,animes]=await Promise.allSettled([
+        malSearch('manga',q,8), malSearch('anime',q,8)
+      ]).then(rs=>rs.map(r=>r.status==='fulfilled'?r.value:[]));
+      results=[...mangas,...animes];
+    } else {
+      results=await malSearch(_scatType,q,15);
+    }
+    const already=new Set(_scatItems.map(i=>i.mal_id+'_'+i.type));
+    results=results.filter(r=>!already.has(r.mal_id+'_'+r._type));
+    if(!results.length){
+      el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Aucun résultat</p>';
+      return;
+    }
+    el.innerHTML=results.map(item=>{
+      const cover=item.images?.jpg?.image_url||'';
+      const safeCover=cover.replace(/'/g,'&#39;');
+      const safeTitle=esc(item.title||'').replace(/'/g,'&#39;');
+      return `<div class="scat-item-row" style="cursor:pointer" onclick='scatAddItem(${item.mal_id},"${item._type}","${safeTitle}","${safeCover}")'>
+        <img class="scat-item-cover" src="${cover}">
+        <div class="scat-item-title">${esc(item.title||'')}</div>
+        <div style="font-size:10px;font-weight:800;flex-shrink:0;color:${item._type==='manga'?'var(--manga-c)':'var(--anime-c)'}">${item._type==='manga'?'📖 Manga':'🎬 Animé'}</div>
+        <button style="background:var(--acc);color:#fff;border:none;border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer;flex-shrink:0">＋</button>
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Erreur de recherche.</p>';
+  }
+}
+
+function scatAddItem(malId,type,title,cover){
   if(_scatItems.some(i=>i.mal_id===malId&&i.type===type))return;
   _scatItems.push({
     mal_id:malId,type,
-    title:t.title,cover:t.cover||'',
-    rating:t.rating||0,
+    title:title||('#'+malId),cover:cover||'',
+    rating:0,
     order:_scatItems.length
   });
   renderScatItems();
-  renderScatSearch(document.getElementById('scat-search-input').value);
+  scatDoSearch(document.getElementById('scat-search-input').value);
 }
 
 function scatRemoveItem(malId,type){
   _scatItems=_scatItems.filter(i=>!(i.mal_id===malId&&i.type===type));
   renderScatItems();
-  renderScatSearch(document.getElementById('scat-search-input').value);
+  const q=document.getElementById('scat-search-input').value;
+  if(q.trim()) scatDoSearch(q);
 }
 
 function scatSetItemRating(malId,type,val){
@@ -7144,6 +7189,7 @@ function renderScatItems(){
       <span class="scat-drag-handle">⠿</span>
       <img class="scat-item-cover" src="${item.cover||''}">
       <div class="scat-item-title">${esc(item.title)}</div>
+      <span style="font-size:9px;font-weight:800;flex-shrink:0;color:${item.type==='manga'?'var(--manga-c)':'var(--anime-c)'}">${item.type==='manga'?'📖':'🎬'}</span>
       <select onchange="scatSetItemRating(${item.mal_id},'${item.type}',this.value)"
         style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 5px;color:var(--text);font-size:11px;outline:none;flex-shrink:0">
         ${buildRatingOptions(item.rating||0,'—')}
@@ -7222,7 +7268,8 @@ function openSuiviCategory(id){
   if(!cat)return;
   document.getElementById('scat-view-title').textContent=cat.name;
   document.getElementById('scat-view-cover').src=cat.cover||'';
-  document.getElementById('scat-view-meta').textContent=(cat.items||[]).length+' œuvre(s) · '+(cat.type==='manga'?'📖 Manga':'🎬 Animé');
+  const typeLabel=cat.type==='manga'?'📖 Manga':cat.type==='anime'?'🎬 Animé':'🔀 Mixte';
+  document.getElementById('scat-view-meta').textContent=(cat.items||[]).length+' œuvre(s) · '+typeLabel;
   document.getElementById('scat-view-rating').textContent=cat.rating?'★ '+cat.rating+' / 20':'Non notée';
   document.getElementById('scat-view-sort').value='manual';
   // Description
@@ -7266,7 +7313,8 @@ function renderScatViewItems(){
     <div onclick="closeM('m-scat-view');openWork(${item.mal_id},'${item.type}')" style="cursor:pointer">
       <div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:2/3;margin-bottom:4px;background:var(--bg4)">
         <img src="${item.cover||''}" style="width:100%;height:100%;object-fit:cover" loading="lazy">
-        ${item.rating?`<div class="cc-rating" style="position:absolute;top:4px;left:4px;z-index:2">★ ${item.rating}</div>`:''}
+        <div title="${item.type==='manga'?'Manga':'Animé'}" style="position:absolute;top:4px;left:4px;z-index:2;background:${item.type==='manga'?'var(--manga-c)':'var(--anime-c)'};color:#fff;font-size:9px;font-weight:900;border-radius:5px;padding:2px 5px;box-shadow:0 1px 4px rgba(0,0,0,.4)">${item.type==='manga'?'📖':'🎬'}</div>
+        ${item.rating?`<div class="cc-rating" style="position:absolute;top:4px;right:4px;z-index:2">★ ${item.rating}</div>`:''}
       </div>
       <div style="font-size:11px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();renameScatItem(event,${item.mal_id},'${item.type}')" title="Double-clic pour renommer">${esc(item.displayName||item.title)}</div>
     </div>`).join('')+`</div>`;
