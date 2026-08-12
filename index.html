@@ -1223,6 +1223,26 @@ textarea.fi{resize:vertical;min-height:72px}
 .phys-cat-input input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:7px 11px;color:var(--text);font-size:13px;outline:none}
 .phys-cat-input input:focus{border-color:var(--acc)}
 
+/* ── COLLECTION CATÉGORIES : grosses cartes ── */
+.phys-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:20px;margin-bottom:24px}
+.phys-cat-card{position:relative;cursor:pointer;border-radius:16px;overflow:hidden;background:var(--bg4);border:1px solid var(--border);transition:transform .18s,box-shadow .18s}
+.phys-cat-card:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,.35)}
+.phys-cat-card-covers{width:100%;aspect-ratio:16/10;background:var(--bg3);overflow:hidden}
+.phys-cat-collage{display:grid;width:100%;height:100%;gap:2px}
+.phys-cat-collage.n1{grid-template-columns:1fr}
+.phys-cat-collage.n2{grid-template-columns:1fr 1fr}
+.phys-cat-collage.n3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.phys-cat-collage.n3>div:first-child{grid-row:1/3}
+.phys-cat-collage.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.phys-cat-collage>div{background-size:cover;background-position:center}
+.phys-cat-card-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:13px;font-weight:700;background:repeating-linear-gradient(135deg,var(--bg3),var(--bg3) 10px,var(--bg4) 10px,var(--bg4) 20px)}
+.phys-cat-card-info{padding:14px 16px}
+.phys-cat-card-name{font-family:'Syne',sans-serif;font-weight:800;font-size:19px;line-height:1.15;margin-bottom:4px}
+.phys-cat-card-count{font-size:12px;color:var(--t3)}
+.phys-cat-card-del{position:absolute;top:8px;right:8px;z-index:3;background:rgba(0,0,0,.55);border:1px solid rgba(248,113,113,.4);color:var(--red);border-radius:7px;width:28px;height:28px;font-size:13px;cursor:pointer;opacity:0;transition:opacity .15s}
+.phys-cat-card:hover .phys-cat-card-del{opacity:1}
+.phys-cat-detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:14px}
+
 
 @media(max-width:768px){
   .suivi-adv-filters{padding:10px 12px}
@@ -1465,6 +1485,18 @@ textarea.fi{resize:vertical;min-height:72px}
       <div class="vol-picker" id="phys-vol-picker"></div>
       <button class="btn btn-primary" style="width:100%;margin-top:14px" onclick="confirmPhysAdd()">Confirmer</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL: CATÉGORIE PHYSIQUE — DÉTAIL -->
+<div class="modal-bg" id="m-phys-cat">
+  <div class="modal" style="max-width:640px;width:100%;max-height:90vh;overflow-y:auto">
+    <div class="modal-title"><span id="phys-cat-view-name">Catégorie</span><span class="modal-close" onclick="closeM('m-phys-cat')">✕</span></div>
+    <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Ajouter des œuvres</div>
+    <input id="phys-cat-search-input" class="inp" placeholder="🔍 Rechercher un manga (MyAnimeList)…" oninput="physCatSearchDebounce(this.value)" style="margin-bottom:8px">
+    <div id="phys-cat-search-results" style="max-height:220px;overflow-y:auto;margin-bottom:16px"></div>
+    <div style="font-size:11px;color:var(--t3);margin-bottom:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Œuvres <span id="phys-cat-view-count" style="color:var(--acc)"></span></div>
+    <div id="phys-cat-view-grid" class="phys-cat-detail-grid"></div>
   </div>
 </div>
 
@@ -2155,7 +2187,6 @@ textarea.fi{resize:vertical;min-height:72px}
       <div id="scat-view-desc" style="font-size:13px;color:var(--t2);line-height:1.65;background:var(--bg3);border-radius:8px;padding:10px 12px"></div>
     </div>
     <!-- Œuvres -->
-    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Œuvres</div>
     <div id="scat-view-items" style="margin-bottom:16px"></div>
     <!-- Critiques -->
     <div style="border-top:1px solid var(--border);padding-top:14px">
@@ -4845,23 +4876,21 @@ function renderCollection(){
     let html = '';
 
     if(cats.length){
-      // Pour chaque catégorie
-      cats.forEach(cat=>{
+      html += `<div class="phys-cat-grid">`+cats.map(cat=>{
         const catIds = physMalIds.filter(id=>cat.seriesIds.includes(parseInt(id)));
-        html += `<div class="phys-cat-header" onclick="togglePhysCat('${cat.id}')">
-          <div class="phys-cat-title">
-            <span>📂 ${esc(cat.name)}</span>
-            <span class="phys-cat-count">${catIds.length} série${catIds.length>1?'s':''}</span>
+        const covers = catIds.slice(0,4).map(id=>(getMeta(parseInt(id)).cover||'')).filter(Boolean);
+        const collage = covers.length
+          ? `<div class="phys-cat-collage n${covers.length}">${covers.map(c=>`<div style="background-image:url('${c.replace(/'/g,"\\'")}')"></div>`).join('')}</div>`
+          : `<div class="phys-cat-card-empty">＋ Ajouter des œuvres</div>`;
+        return `<div class="phys-cat-card" onclick="openPhysCategory('${cat.id}')">
+          <button class="phys-cat-card-del" onclick="event.stopPropagation();deletePhysCat('${cat.id}')" title="Supprimer">🗑</button>
+          <div class="phys-cat-card-covers">${collage}</div>
+          <div class="phys-cat-card-info">
+            <div class="phys-cat-card-name">${esc(cat.name)}</div>
+            <div class="phys-cat-card-count">${catIds.length} série${catIds.length>1?'s':''}</div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <button onclick="event.stopPropagation();deletePhysCat('${cat.id}')" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);border-radius:6px;padding:2px 8px;color:var(--red);font-size:11px;cursor:pointer">🗑 Supprimer</button>
-            <span style="color:var(--t3)">▾</span>
-          </div>
-        </div>
-        <div class="phys-cat-body" id="phys-cat-body-${cat.id}">
-          ${catIds.length ? buildBookshelves(catIds) : '<p style="color:var(--t3);font-size:13px;padding:8px 0">Aucune série dans cette catégorie.</p>'}
         </div>`;
-      });
+      }).join('')+`</div>`;
       // Sans catégorie
       const uncatIds = physMalIds.filter(id=>!cats.some(c=>c.seriesIds.includes(parseInt(id))));
       if(uncatIds.length){
@@ -5301,10 +5330,12 @@ function renderSuivi(){
       const el=document.getElementById('tg-'+type+'-'+tab);
       if(!el)return;
 
-      // Catégories affichées mêlées aux œuvres, triées selon le même critère (tri actif)
+      // Catégories affichées mêlées aux œuvres, triées selon le même critère (tri actif).
+      // Une catégorie ne s'affiche que dans l'onglet (manga/anime) où elle a été créée,
+      // quel que soit son type de contenu (y compris si mixte) — voir "section".
       let cats=[];
       if(!query&&!_safStatus){
-        cats=(S.suiviCategories||[]).filter(c=>(c.type===type||c.type==='mixed')&&c.tab===tab);
+        cats=(S.suiviCategories||[]).filter(c=>(c.section||c.type)===type&&c.tab===tab);
       }
 
       const catEntries=cats.map(c=>({
@@ -7110,8 +7141,9 @@ document.addEventListener('click',e=>{
 // ─── CATÉGORIES SUIVI ───
 let _scatEditing=null; // id de la catégorie en cours d'édition
 let _scatType='manga';
+let _scatSection='manga'; // onglet (manga/anime) où la catégorie est rangée — fixé à la création, indépendant du type de contenu
 let _scatTab='done';
-let _scatItems=[]; // [{mal_id,type,title,cover,rating,order}]
+let _scatItems=[]; // [{mal_id,type,title,cover,rating,order,bucket:'main'|'linked'}]
 
 function setScatType(type){
   _scatType=type;
@@ -7129,6 +7161,7 @@ function setScatType(type){
 
 function openCreateSuiviCategory(type,tab){
   _scatEditing=null;
+  _scatSection=type; // fixe l'onglet d'affichage (manga ou anime), indépendant du type de contenu choisi ensuite
   _scatTab=tab;
   _scatItems=[];
   document.getElementById('scat-modal-title').textContent='Nouvelle catégorie';
@@ -7144,8 +7177,9 @@ function editSuiviCategory(id){
   const cat=(S.suiviCategories||[]).find(c=>c.id===id);
   if(!cat)return;
   _scatEditing=id;
+  _scatSection=cat.section||cat.type||'manga'; // conserve l'onglet d'origine (compat catégories créées avant ce champ)
   _scatTab=cat.tab;
-  _scatItems=(cat.items||[]).map(i=>({...i}));
+  _scatItems=(cat.items||[]).map(i=>({...i,bucket:i.bucket==='linked'?'linked':'main'}));
   document.getElementById('scat-modal-title').textContent='Modifier la catégorie';
   document.getElementById('scat-name-input').value=cat.name||'';
   document.getElementById('scat-desc-input').value=cat.description||'';
@@ -7204,7 +7238,7 @@ function scatAddItem(malId,type,title,cover){
   _scatItems.push({
     mal_id:malId,type,
     title:title||('#'+malId),cover:cover||'',
-    rating:0,
+    rating:0,bucket:'main',
     order:_scatItems.length
   });
   renderScatItems();
@@ -7223,16 +7257,23 @@ function scatSetItemRating(malId,type,val){
   if(item) item.rating=parseFloat(val)||0;
 }
 
+function scatToggleBucket(malId,type){
+  const item=_scatItems.find(i=>i.mal_id===malId&&i.type===type);
+  if(!item)return;
+  item.bucket=(item.bucket==='linked')?'main':'linked';
+  renderScatItems();
+}
+
 function renderScatItems(){
   const el=document.getElementById('scat-items-list');
   const cnt=document.getElementById('scat-items-count');
   cnt.textContent=_scatItems.length?'('+_scatItems.length+')':'';
-  if(!_scatItems.length){
-    el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Aucune œuvre ajoutée</p>';
-    return;
-  }
-  el.innerHTML=_scatItems.map((item,idx)=>`
-    <div class="scat-item-row" id="scat-item-${item.mal_id}_${item.type}" draggable="true"
+  const main=_scatItems.filter(i=>(i.bucket||'main')!=='linked');
+  const linked=_scatItems.filter(i=>i.bucket==='linked');
+  function row(item){
+    const idx=_scatItems.indexOf(item);
+    const isLinked=item.bucket==='linked';
+    return `<div class="scat-item-row" id="scat-item-${item.mal_id}_${item.type}" draggable="true"
       ondragstart="_scatDrag=${idx}" ondragover="event.preventDefault()" ondrop="scatDrop(${idx})">
       <span class="scat-drag-handle">⠿</span>
       <img class="scat-item-cover" src="${item.cover||''}">
@@ -7242,9 +7283,18 @@ function renderScatItems(){
         style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 5px;color:var(--text);font-size:11px;outline:none;flex-shrink:0">
         ${buildRatingOptions(item.rating||0,'—')}
       </select>
+      <button onclick="scatToggleBucket(${item.mal_id},'${item.type}')" title="${isLinked?'Déplacer vers Œuvres':'Déplacer vers Œuvres liées'}"
+        style="background:rgba(139,124,248,.12);border:none;border-radius:5px;padding:2px 7px;color:var(--acc2);font-size:11px;cursor:pointer;flex-shrink:0">${isLinked?'⇦':'🔗'}</button>
       <button onclick="scatRemoveItem(${item.mal_id},'${item.type}')"
         style="background:rgba(248,113,113,.15);border:none;border-radius:5px;padding:2px 7px;color:var(--red);font-size:11px;cursor:pointer;flex-shrink:0">✕</button>
-    </div>`).join('');
+    </div>`;
+  }
+  el.innerHTML=`
+    <div style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 4px">Œuvres (${main.length})</div>
+    ${main.length?main.map(row).join(''):'<p style="color:var(--t3);font-size:12px;padding:4px 0">Aucune œuvre — utilise la recherche ci-dessus.</p>'}
+    <div style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 4px">Œuvres liées (${linked.length})</div>
+    ${linked.length?linked.map(row).join(''):'<p style="color:var(--t3);font-size:12px;padding:4px 0">Aucune œuvre liée — clique sur 🔗 pour en déplacer une ici.</p>'}
+  `;
 }
 
 let _scatDrag=-1;
@@ -7282,12 +7332,12 @@ function saveSuiviCategory(){
           }
         });
       }
-      S.suiviCategories[idx]={...S.suiviCategories[idx],name,rating,description,cover,items:_scatItems.map((i,o)=>({...i,order:o}))};
+      S.suiviCategories[idx]={...S.suiviCategories[idx],name,rating,description,cover,type:_scatType,section:_scatSection,items:_scatItems.map((i,o)=>({...i,order:o}))};
     }
   } else {
     S.suiviCategories.push({
       id:'scat_'+Date.now(),
-      type:_scatType,tab:_scatTab,
+      type:_scatType,section:_scatSection,tab:_scatTab,
       name,rating,description,cover,
       reviews:[],
       _addedAt:Date.now(),
@@ -7347,18 +7397,23 @@ function renderScatViewItems(){
   const cat=(S.suiviCategories||[]).find(c=>c.id===id);
   if(!cat)return;
   const sort=document.getElementById('scat-view-sort').value;
-  let items=[...(cat.items||[])];
-  if(sort==='manual') items.sort((a,b)=>(a.order||0)-(b.order||0));
-  else if(sort==='rating-desc') items.sort((a,b)=>(b.rating||0)-(a.rating||0));
-  else if(sort==='rating-asc') items.sort((a,b)=>(a.rating||0)-(b.rating||0));
-  else if(sort==='title') items.sort((a,b)=>(a.title||'').localeCompare(b.title||''));
-  else if(sort==='title-desc') items.sort((a,b)=>(b.title||'').localeCompare(a.title||''));
-  const el=document.getElementById('scat-view-items');
-  if(!items.length){
-    el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:8px 0">Aucune œuvre dans cette catégorie.</p>';
-    return;
+  function sortList(list){
+    list=[...list];
+    if(sort==='manual') list.sort((a,b)=>(a.order||0)-(b.order||0));
+    else if(sort==='rating-desc') list.sort((a,b)=>(b.rating||0)-(a.rating||0));
+    else if(sort==='rating-asc') list.sort((a,b)=>(a.rating||0)-(b.rating||0));
+    else if(sort==='title') list.sort((a,b)=>(a.title||'').localeCompare(b.title||''));
+    else if(sort==='title-desc') list.sort((a,b)=>(b.title||'').localeCompare(a.title||''));
+    return list;
   }
-  el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:4px 0">`+items.map(item=>`
+  const all=(cat.items||[]);
+  const main=sortList(all.filter(i=>(i.bucket||'main')!=='linked'));
+  const linked=sortList(all.filter(i=>i.bucket==='linked'));
+  const el=document.getElementById('scat-view-items');
+
+  function cardGrid(items){
+    if(!items.length) return '<p style="color:var(--t3);font-size:13px;padding:0 0 14px">Aucune œuvre ici.</p>';
+    return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:4px 0 14px">`+items.map(item=>`
     <div onclick="closeM('m-scat-view');openWork(${item.mal_id},'${item.type}')" style="cursor:pointer">
       <div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:2/3;margin-bottom:4px;background:var(--bg4)">
         <img src="${item.cover||''}" style="width:100%;height:100%;object-fit:cover" loading="lazy">
@@ -7367,6 +7422,13 @@ function renderScatViewItems(){
       </div>
       <div style="font-size:11px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();renameScatItem(event,${item.mal_id},'${item.type}')" title="Double-clic pour renommer">${esc(item.displayName||item.title)}</div>
     </div>`).join('')+`</div>`;
+  }
+
+  el.innerHTML=
+    `<div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Œuvres (${main.length})</div>`
+    +cardGrid(main)
+    +`<div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Œuvres liées (${linked.length})</div>`
+    +cardGrid(linked);
 }
 
 function renameScatItem(e, malId, type){
@@ -7824,6 +7886,120 @@ function removePhysSeries(malId,title){
   save();
   renderCollection();
   toast('Série retirée de la bibliothèque physique','ok');
+}
+
+// ─── COLLECTION PHYSIQUE : vue détail d'une catégorie ───
+function getCollMeta(malId){
+  return S.tracking[malId]||S.collectionMeta?.[malId]||{mal_id:malId,type:'manga',title:'Série #'+malId,cover:''};
+}
+
+let _physCatOpenId=null;
+
+function openPhysCategory(catId){
+  const cat=(S.physCategories||[]).find(c=>c.id===catId);
+  if(!cat)return;
+  _physCatOpenId=catId;
+  document.getElementById('phys-cat-view-name').textContent=cat.name;
+  document.getElementById('phys-cat-search-input').value='';
+  document.getElementById('phys-cat-search-results').innerHTML='';
+  renderPhysCatDetail();
+  openM('m-phys-cat');
+  // Catégorie vide : direction directe vers la recherche pour ajouter une œuvre
+  if(!(cat.seriesIds||[]).length){
+    setTimeout(()=>document.getElementById('phys-cat-search-input')?.focus(),150);
+  }
+}
+
+function renderPhysCatDetail(){
+  const cat=(S.physCategories||[]).find(c=>c.id===_physCatOpenId);
+  const grid=document.getElementById('phys-cat-view-grid');
+  if(!cat||!grid)return;
+  const ids=(cat.seriesIds||[]);
+  document.getElementById('phys-cat-view-count').textContent=ids.length+' série(s)';
+  if(!ids.length){
+    grid.innerHTML='<p style="color:var(--t3);font-size:12px;grid-column:1/-1;padding:4px 0">Aucune œuvre pour l\'instant — utilise la recherche ci-dessus pour en ajouter.</p>';
+    return;
+  }
+  grid.innerHTML=ids.map(id=>{
+    const malId=parseInt(id);
+    const t=getCollMeta(malId);
+    const coll=S.collection[malId]||{};
+    const owned=Object.keys(coll.volumes||{}).length;
+    return `<div class="cc">
+      <div class="cc-wrap" onclick="closeM('m-phys-cat');openEditPhysCollection(${malId})">
+        <img class="cc-img" src="${t.cover||''}" loading="lazy">
+        <div class="cc-overlay">
+          <div class="cc-ov-btns">
+            <div class="cc-ov-btn" onclick="event.stopPropagation();removeFromPhysCat(${malId})" title="Retirer de la catégorie" style="font-size:11px">✕</div>
+          </div>
+        </div>
+      </div>
+      <div class="cc-title">${esc(t.title||'Série #'+malId)}</div>
+      <div class="cc-meta">${owned} tome(s)</div>
+    </div>`;
+  }).join('');
+}
+
+function removeFromPhysCat(malId){
+  const cat=(S.physCategories||[]).find(c=>c.id===_physCatOpenId);
+  if(!cat)return;
+  cat.seriesIds=(cat.seriesIds||[]).filter(id=>id!=malId);
+  save();
+  renderPhysCatDetail();
+  renderCollection();
+}
+
+let _physCatSearchTimer=null;
+function physCatSearchDebounce(q){
+  clearTimeout(_physCatSearchTimer);
+  const el=document.getElementById('phys-cat-search-results');
+  if(!q.trim()){ el.innerHTML=''; return; }
+  el.innerHTML='<div class="loading"><div class="spin"></div></div>';
+  _physCatSearchTimer=setTimeout(()=>physCatDoSearch(q),450);
+}
+
+async function physCatDoSearch(q){
+  const el=document.getElementById('phys-cat-search-results');
+  const cat=(S.physCategories||[]).find(c=>c.id===_physCatOpenId);
+  if(!cat)return;
+  try{
+    const results=await malSearch('manga',q,15);
+    const already=new Set((cat.seriesIds||[]).map(String));
+    const filteredResults=results.filter(r=>!already.has(String(r.mal_id)));
+    if(!filteredResults.length){
+      el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Aucun résultat</p>';
+      return;
+    }
+    el.innerHTML=filteredResults.map(item=>{
+      const cover=item.images?.jpg?.image_url||'';
+      const safeCover=cover.replace(/'/g,'&#39;');
+      const safeTitle=esc(item.title||'').replace(/'/g,'&#39;');
+      return `<div class="scat-item-row" style="cursor:pointer" onclick='physCatAddWork(${item.mal_id},"${safeTitle}","${safeCover}")'>
+        <img class="scat-item-cover" src="${cover}">
+        <div class="scat-item-title">${esc(item.title||'')}</div>
+        <button style="background:var(--acc);color:#fff;border:none;border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer;flex-shrink:0">＋</button>
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Erreur de recherche.</p>';
+  }
+}
+
+function physCatAddWork(malId,title,cover){
+  const cat=(S.physCategories||[]).find(c=>c.id===_physCatOpenId);
+  if(!cat)return;
+  if(!S.collection[malId]) S.collection[malId]={volumes:{},cbz:[],online:[]};
+  if(!S.collection[malId].volumes) S.collection[malId].volumes={};
+  S.collection[malId].added=true;
+  if(!S.collectionMeta) S.collectionMeta={};
+  if(!S.collectionMeta[malId]) S.collectionMeta[malId]={mal_id:malId,type:'manga',title:title||('#'+malId),cover:cover||''};
+  if(!cat.seriesIds) cat.seriesIds=[];
+  if(!cat.seriesIds.includes(malId)) cat.seriesIds.push(malId);
+  save();
+  renderPhysCatDetail();
+  physCatDoSearch(document.getElementById('phys-cat-search-input').value);
+  renderCollection();
+  toast('Ajoutée à la catégorie ✓','ok');
 }
 
 
