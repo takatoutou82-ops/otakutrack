@@ -2222,6 +2222,28 @@ textarea.fi{resize:vertical;min-height:72px}
   </div>
 </div>
 
+<!-- MODAL : choix fiche / critique pour une œuvre d'une catégorie -->
+<div class="modal-bg" id="m-scat-item-choice">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-title"><span id="scat-item-choice-title">Œuvre</span><span class="modal-close" onclick="closeM('m-scat-item-choice')">✕</span></div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-secondary" style="width:100%" onclick="scatItemChoiceGoWork()">📄 Voir la fiche</button>
+      <button class="btn btn-primary" style="width:100%" onclick="scatItemChoiceGoReview()">📝 Voir la critique</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL : critiques individuelles d'une œuvre dans une catégorie -->
+<div class="modal-bg" id="m-scat-item-reviews">
+  <div class="modal" style="max-width:520px;max-height:85vh;overflow-y:auto">
+    <div class="modal-title"><span id="scat-item-rv-title">Critique</span><span class="modal-close" onclick="closeM('m-scat-item-reviews')">✕</span></div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button id="scat-item-rv-addbtn" class="btn btn-ghost btn-sm" onclick="openScatItemReviewEditor()" style="font-size:11px">+ Écrire</button>
+    </div>
+    <div id="scat-item-rv-list"></div>
+  </div>
+</div>
+
 <div class="cover-lightbox" id="cover-lightbox">
   <button class="clb-close" onclick="document.getElementById('cover-lightbox').classList.remove('on')">✕</button>
   <img class="cover-lightbox-img" id="cover-lightbox-img" src="" alt="">
@@ -7414,7 +7436,7 @@ function renderScatViewItems(){
   function cardGrid(items){
     if(!items.length) return '<p style="color:var(--t3);font-size:13px;padding:0 0 14px">Aucune œuvre ici.</p>';
     return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:4px 0 14px">`+items.map(item=>`
-    <div onclick="closeM('m-scat-view');openWork(${item.mal_id},'${item.type}')" style="cursor:pointer">
+    <div onclick="scatItemClick(${item.mal_id},'${item.type}')" style="cursor:pointer">
       <div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:2/3;margin-bottom:4px;background:var(--bg4)">
         <img src="${item.cover||''}" style="width:100%;height:100%;object-fit:cover" loading="lazy">
         <div title="${item.type==='manga'?'Manga':'Animé'}" style="position:absolute;top:4px;left:4px;z-index:2;background:${item.type==='manga'?'var(--manga-c)':'var(--anime-c)'};color:#fff;font-size:9px;font-weight:900;border-radius:5px;padding:2px 5px;box-shadow:0 1px 4px rgba(0,0,0,.4)">${item.type==='manga'?'📖':'🎬'}</div>
@@ -7454,9 +7476,96 @@ function renameScatItem(e, malId, type){
   input.onkeydown=ev=>{ if(ev.key==='Enter') input.blur(); if(ev.key==='Escape'){ input.value=current; input.blur(); } };
 }
 
+// ─── Choix fiche / critique en cliquant sur une œuvre d'une catégorie ───
+let _scatItemChoice=null; // {malId,type}
+
+function scatItemClick(malId,type){
+  const catId=document.getElementById('m-scat-view').dataset.catId;
+  const cat=(S.suiviCategories||[]).find(c=>c.id===catId);
+  const item=cat&&(cat.items||[]).find(i=>i.mal_id===malId&&i.type===type);
+  _scatItemChoice={malId,type};
+  document.getElementById('scat-item-choice-title').textContent=item?(item.displayName||item.title):'Œuvre';
+  openM('m-scat-item-choice');
+}
+
+function scatItemChoiceGoWork(){
+  const {malId,type}=_scatItemChoice||{};
+  closeM('m-scat-item-choice');
+  closeM('m-scat-view');
+  openWork(malId,type);
+}
+
+function scatItemChoiceGoReview(){
+  closeM('m-scat-item-choice');
+  renderScatItemReview();
+  openM('m-scat-item-reviews');
+}
+
+// ─── Critique individuelle d'une œuvre au sein d'une catégorie (une seule par œuvre) ───
+function renderScatItemReview(){
+  const {malId,type}=_scatItemChoice||{};
+  const catId=document.getElementById('m-scat-view').dataset.catId;
+  const cat=(S.suiviCategories||[]).find(c=>c.id===catId);
+  const item=cat&&(cat.items||[]).find(i=>i.mal_id===malId&&i.type===type);
+  if(!item)return;
+  document.getElementById('scat-item-rv-title').textContent=(item.displayName||item.title||'Œuvre')+' — Critique';
+  const addBtn=document.getElementById('scat-item-rv-addbtn');
+  const listEl=document.getElementById('scat-item-rv-list');
+  const r=item.review;
+  if(addBtn) addBtn.style.display=r?'none':'';
+  if(!r){
+    listEl.innerHTML='<p style="color:var(--t3);font-size:13px">Aucune critique pour cette œuvre.</p>';
+    return;
+  }
+  listEl.innerHTML=`
+    <div class="review-card" style="position:relative;margin-bottom:12px">
+      <div class="rv-head" style="margin-bottom:6px">
+        <div class="rv-user">
+          <div class="rv-avatar">${(S.profile.name||'?')[0].toUpperCase()}</div>
+          <span style="font-weight:700;font-size:13px">${esc(S.profile.name||'Moi')}</span>
+          ${r.date?`<span style="font-size:11px;color:var(--t4);margin-left:6px">${r.date}</span>`:''}
+        </div>
+        <div style="display:flex;gap:6px">
+          <button onclick="openScatItemReviewEditor()" style="background:rgba(139,124,248,.15);border:none;border-radius:6px;padding:3px 10px;color:var(--acc);font-size:11px;cursor:pointer;font-weight:700">✏</button>
+          <button onclick="deleteScatItemReview()" style="background:rgba(248,113,113,.15);border:none;border-radius:6px;padding:3px 10px;color:#f87171;font-size:11px;cursor:pointer;font-weight:700">🗑</button>
+        </div>
+      </div>
+      <div style="color:var(--yellow);font-size:16px;letter-spacing:2px;margin-bottom:8px">${'★'.repeat(r.rating||0)}${'☆'.repeat(5-(r.rating||0))}</div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.7;white-space:pre-wrap">${esc(r.text||'')}</div>
+    </div>`;
+}
+
+function openScatItemReviewEditor(){
+  const {malId,type}=_scatItemChoice||{};
+  const catId=document.getElementById('m-scat-view').dataset.catId;
+  const cat=(S.suiviCategories||[]).find(c=>c.id===catId);
+  const item=cat&&(cat.items||[]).find(i=>i.mal_id===malId&&i.type===type);
+  if(!item)return;
+  _scatRvMode='item';
+  _scatRvEditIdx=-1;
+  _scatRvRating=(item.review&&item.review.rating)||3;
+  document.getElementById('scat-review-title').textContent=item.review?'Modifier la critique':'Nouvelle critique';
+  document.getElementById('scat-rv-text').value=(item.review&&item.review.text)||'';
+  updateScatRvStars(_scatRvRating);
+  openM('m-scat-review');
+}
+
+function deleteScatItemReview(){
+  const {malId,type}=_scatItemChoice||{};
+  const catId=document.getElementById('m-scat-view').dataset.catId;
+  const cat=(S.suiviCategories||[]).find(c=>c.id===catId);
+  const item=cat&&(cat.items||[]).find(i=>i.mal_id===malId&&i.type===type);
+  if(!item)return;
+  delete item.review;
+  save();
+  renderScatItemReview();
+  toast('Critique supprimée','ok');
+}
+
 // ─── CRITIQUES DE CATÉGORIES ───
 let _scatRvRating=3;
 let _scatRvEditIdx=-1;
+let _scatRvMode='cat'; // 'cat' = critique globale de la catégorie, 'item' = critique d'une œuvre dans la catégorie
 
 function renderScatReviews(id){
   const cat=(S.suiviCategories||[]).find(c=>c.id===id);
@@ -7486,6 +7595,7 @@ function renderScatReviews(id){
 }
 
 function openScatReview(){
+  _scatRvMode='cat';
   _scatRvEditIdx=-1;
   _scatRvRating=3;
   document.getElementById('scat-review-title').textContent='Nouvelle critique';
@@ -7500,6 +7610,7 @@ function editScatReview(idx){
   if(!cat)return;
   const r=(cat.reviews||[])[idx];
   if(!r)return;
+  _scatRvMode='cat';
   _scatRvEditIdx=idx;
   _scatRvRating=r.rating||3;
   document.getElementById('scat-review-title').textContent='Modifier la critique';
@@ -7534,6 +7645,19 @@ function updateScatRvStars(n){
 function saveScatReview(){
   const text=document.getElementById('scat-rv-text').value.trim();
   if(!text){toast('Écris quelque chose !','err');return;}
+  if(_scatRvMode==='item'){
+    const {malId,type}=_scatItemChoice||{};
+    const catId=document.getElementById('m-scat-view').dataset.catId;
+    const cat=(S.suiviCategories||[]).find(c=>c.id===catId);
+    const item=cat&&(cat.items||[]).find(i=>i.mal_id===malId&&i.type===type);
+    if(!item)return;
+    item.review={rating:_scatRvRating,text,date:new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'})};
+    save();
+    closeM('m-scat-review');
+    renderScatItemReview();
+    toast('Critique enregistrée ✓','ok');
+    return;
+  }
   const id=document.getElementById('m-scat-view').dataset.catId;
   const catIdx=(S.suiviCategories||[]).findIndex(c=>c.id===id);
   if(catIdx===-1)return;
