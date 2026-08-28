@@ -5607,6 +5607,7 @@ function ctopSearchDebounce(q){
   el.innerHTML='<div class="loading"><div class="spin"></div></div>';
   _ctopSearchTimer=setTimeout(()=>ctopDoSearch(q),450);
 }
+let _ctopSearchResultsCache=[];
 async function ctopDoSearch(q){
   const el=document.getElementById('ctop-search-results');
   try{
@@ -5616,10 +5617,9 @@ async function ctopDoSearch(q){
     ]).then(rs=>rs.map(r=>r.status==='fulfilled'?r.value:[]));
     const results=[...mangas,...animes];
     if(!results.length){ el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:10px">Aucun résultat.</p>'; return; }
-    el.innerHTML=results.map(item=>{
-      const safeTitle=esc(item.title).replace(/'/g,'&#39;');
-      const safeCover=(item.images?.jpg?.image_url||'').replace(/'/g,'&#39;');
-      return `<div class="lib-search-item" onclick='ctopSelectSearchResult(${item.mal_id},"${item._type}","${safeTitle}","${safeCover}")'>
+    _ctopSearchResultsCache=results;
+    el.innerHTML=results.map((item,idx)=>{
+      return `<div class="lib-search-item" onclick="ctopSelectSearchResultFromCache(${idx})">
         <img src="${item.images?.jpg?.image_url||''}" loading="lazy">
         <div>
           <div style="font-size:13px;font-weight:700;font-family:'Syne',sans-serif">${esc(item.title)}</div>
@@ -5628,6 +5628,12 @@ async function ctopDoSearch(q){
       </div>`;
     }).join('');
   }catch(e){ el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:10px">Erreur de recherche.</p>'; }
+}
+function ctopSelectSearchResultFromCache(idx){
+  const item=_ctopSearchResultsCache[idx];
+  if(!item)return;
+  const cover=item.images?.jpg?.image_url||'';
+  ctopSelectSearchResult(item.mal_id,item._type,item.title,cover);
 }
 function ctopSelectSearchResult(malId,type,title,cover){
   _ctopData={malId,type,cover,name:title,source:'search'};
@@ -7221,6 +7227,8 @@ function scatSearchDebounce(q){
   _scatSearchTimer=setTimeout(()=>scatDoSearch(q),450);
 }
 
+let _scatSearchResultsCache=[];
+
 async function scatDoSearch(q){
   const el=document.getElementById('scat-search-results');
   try{
@@ -7239,11 +7247,10 @@ async function scatDoSearch(q){
       el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Aucun résultat</p>';
       return;
     }
-    el.innerHTML=results.map(item=>{
+    _scatSearchResultsCache=results;
+    el.innerHTML=results.map((item,idx)=>{
       const cover=item.images?.jpg?.image_url||'';
-      const safeCover=cover.replace(/'/g,'&#39;');
-      const safeTitle=esc(item.title||'').replace(/'/g,'&#39;');
-      return `<div class="scat-item-row" style="cursor:pointer" onclick='scatAddItem(${item.mal_id},"${item._type}","${safeTitle}","${safeCover}")'>
+      return `<div class="scat-item-row" style="cursor:pointer" onclick="scatAddItemFromResult(${idx})">
         <img class="scat-item-cover" src="${cover}">
         <div class="scat-item-title">${esc(item.title||'')}</div>
         <div style="font-size:10px;font-weight:800;flex-shrink:0;color:${item._type==='manga'?'var(--manga-c)':'var(--anime-c)'}">${item._type==='manga'?'📖 Manga':'🎬 Animé'}</div>
@@ -7253,6 +7260,13 @@ async function scatDoSearch(q){
   }catch(e){
     el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Erreur de recherche.</p>';
   }
+}
+
+function scatAddItemFromResult(idx){
+  const item=_scatSearchResultsCache[idx];
+  if(!item)return;
+  const cover=item.images?.jpg?.image_url||'';
+  scatAddItem(item.mal_id,item._type,item.title||('#'+item.mal_id),cover);
 }
 
 function scatAddItem(malId,type,title,cover){
@@ -8082,6 +8096,8 @@ function physCatSearchDebounce(q){
   _physCatSearchTimer=setTimeout(()=>physCatDoSearch(q),450);
 }
 
+let _physCatSearchResultsCache=[];
+
 async function physCatDoSearch(q){
   const el=document.getElementById('phys-cat-search-results');
   const cat=(S.physCategories||[]).find(c=>c.id===_physCatOpenId);
@@ -8094,11 +8110,10 @@ async function physCatDoSearch(q){
       el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Aucun résultat</p>';
       return;
     }
-    el.innerHTML=filteredResults.map(item=>{
+    _physCatSearchResultsCache=filteredResults;
+    el.innerHTML=filteredResults.map((item,idx)=>{
       const cover=item.images?.jpg?.image_url||'';
-      const safeCover=cover.replace(/'/g,'&#39;');
-      const safeTitle=esc(item.title||'').replace(/'/g,'&#39;');
-      return `<div class="scat-item-row" style="cursor:pointer" onclick='physCatAddWork(${item.mal_id},"${safeTitle}","${safeCover}")'>
+      return `<div class="scat-item-row" style="cursor:pointer" onclick="physCatAddWorkFromResult(${idx})">
         <img class="scat-item-cover" src="${cover}">
         <div class="scat-item-title">${esc(item.title||'')}</div>
         <button style="background:var(--acc);color:#fff;border:none;border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer;flex-shrink:0">＋</button>
@@ -8107,6 +8122,13 @@ async function physCatDoSearch(q){
   }catch(e){
     el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Erreur de recherche.</p>';
   }
+}
+
+function physCatAddWorkFromResult(idx){
+  const item=_physCatSearchResultsCache[idx];
+  if(!item)return;
+  const cover=item.images?.jpg?.image_url||'';
+  physCatAddWork(item.mal_id,item.title||('#'+item.mal_id),cover);
 }
 
 function physCatAddWork(malId,title,cover){
