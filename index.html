@@ -7192,6 +7192,7 @@ function openCreateSuiviCategory(type,tab){
   _scatSection=type; // fixe l'onglet d'affichage (manga ou anime), indépendant du type de contenu choisi ensuite
   _scatTab=tab;
   _scatItems=[];
+  _scatCoverKey='';
   document.getElementById('scat-modal-title').textContent='Nouvelle catégorie';
   document.getElementById('scat-name-input').value='';
   document.getElementById('scat-desc-input').value='';
@@ -7207,7 +7208,9 @@ function editSuiviCategory(id){
   _scatEditing=id;
   _scatSection=cat.section||cat.type||'manga'; // conserve l'onglet d'origine (compat catégories créées avant ce champ)
   _scatTab=cat.tab;
-  _scatItems=(cat.items||[]).map(i=>({...i,bucket:i.bucket==='linked'?'linked':'main'}));
+  _scatItems=(cat.items||[]).map(i=>({...i,bucket:i.bucket==='linked'?'linked':'main',important:!!i.important}));
+  // Retrouve l'œuvre choisie comme couverture (compat catégories créées avant ce champ : on retombe sur la 1ère œuvre)
+  _scatCoverKey=cat.coverKey || (_scatItems.length?(_scatItems[0].mal_id+'_'+_scatItems[0].type):'');
   document.getElementById('scat-modal-title').textContent='Modifier la catégorie';
   document.getElementById('scat-name-input').value=cat.name||'';
   document.getElementById('scat-desc-input').value=cat.description||'';
@@ -7274,7 +7277,7 @@ function scatAddItem(malId,type,title,cover){
   _scatItems.push({
     mal_id:malId,type,
     title:title||('#'+malId),cover:cover||'',
-    rating:0,bucket:'main',
+    rating:0,bucket:'main',important:false,
     order:_scatItems.length
   });
   renderScatItems();
@@ -7300,25 +7303,37 @@ function scatToggleBucket(malId,type){
   renderScatItems();
 }
 
+let _scatCoverKey=''; // 'malId_type' de l'œuvre choisie comme couverture de la catégorie
+
 function renderScatItems(){
   const el=document.getElementById('scat-items-list');
   const cnt=document.getElementById('scat-items-count');
   cnt.textContent=_scatItems.length?'('+_scatItems.length+')':'';
+  // Si aucune couverture n'a encore été choisie explicitement, on retombe sur la 1ère œuvre (comportement historique)
+  if(!_scatCoverKey && _scatItems.length) _scatCoverKey=_scatItems[0].mal_id+'_'+_scatItems[0].type;
   const main=_scatItems.filter(i=>(i.bucket||'main')!=='linked');
   const linked=_scatItems.filter(i=>i.bucket==='linked');
   function row(item){
     const idx=_scatItems.indexOf(item);
     const isLinked=item.bucket==='linked';
+    const key=item.mal_id+'_'+item.type;
+    const isCover=_scatCoverKey===key;
+    const isImportant=!!item.important;
     return `<div class="scat-item-row" id="scat-item-${item.mal_id}_${item.type}" draggable="true"
-      ondragstart="_scatDrag=${idx}" ondragover="event.preventDefault()" ondrop="scatDrop(${idx})">
+      ondragstart="_scatDrag=${idx}" ondragover="event.preventDefault()" ondrop="scatDrop(${idx})"
+      style="${isImportant?'border:1px solid rgba(250,204,21,.4);background:rgba(250,204,21,.06)':''}">
       <span class="scat-drag-handle">⠿</span>
       <img class="scat-item-cover" src="${item.cover||''}">
-      <div class="scat-item-title">${esc(item.title)}</div>
+      <div class="scat-item-title">${esc(item.title)}${isImportant?' <span style="color:#facc15">⭐</span>':''}</div>
       <span style="font-size:9px;font-weight:800;flex-shrink:0;color:${item.type==='manga'?'var(--manga-c)':'var(--anime-c)'}">${item.type==='manga'?'📖':'🎬'}</span>
       <select onchange="scatSetItemRating(${item.mal_id},'${item.type}',this.value)"
         style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 5px;color:var(--text);font-size:11px;outline:none;flex-shrink:0">
         ${buildRatingOptions(item.rating||0,'—')}
       </select>
+      <button onclick="scatToggleImportant(${item.mal_id},'${item.type}')" title="${isImportant?"Retirer l'importance":'Marquer comme importante'}"
+        style="background:${isImportant?'#facc15':'rgba(250,204,21,.12)'};border:none;border-radius:5px;padding:2px 7px;color:${isImportant?'#1a1a1a':'#facc15'};font-size:11px;cursor:pointer;flex-shrink:0;font-weight:700">⭐</button>
+      <button onclick="scatSetCover(${item.mal_id},'${item.type}')" title="${isCover?'Couverture actuelle de la catégorie':'Utiliser comme couverture de la catégorie'}"
+        style="background:${isCover?'var(--acc)':'rgba(139,124,248,.12)'};border:none;border-radius:5px;padding:2px 7px;color:${isCover?'#fff':'var(--acc2)'};font-size:11px;cursor:pointer;flex-shrink:0">🖼</button>
       <button onclick="scatToggleBucket(${item.mal_id},'${item.type}')" title="${isLinked?'Déplacer vers Œuvres':'Déplacer vers Œuvres liées'}"
         style="background:rgba(139,124,248,.12);border:none;border-radius:5px;padding:2px 7px;color:var(--acc2);font-size:11px;cursor:pointer;flex-shrink:0">${isLinked?'⇦':'🔗'}</button>
       <button onclick="scatRemoveItem(${item.mal_id},'${item.type}')"
@@ -7331,6 +7346,18 @@ function renderScatItems(){
     <div style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 4px">Œuvres liées (${linked.length})</div>
     ${linked.length?linked.map(row).join(''):'<p style="color:var(--t3);font-size:12px;padding:4px 0">Aucune œuvre liée — clique sur 🔗 pour en déplacer une ici.</p>'}
   `;
+}
+
+function scatToggleImportant(malId,type){
+  const item=_scatItems.find(i=>i.mal_id===malId&&i.type===type);
+  if(!item)return;
+  item.important=!item.important;
+  renderScatItems();
+}
+
+function scatSetCover(malId,type){
+  _scatCoverKey=malId+'_'+type;
+  renderScatItems();
 }
 
 let _scatDrag=-1;
@@ -7348,7 +7375,9 @@ function saveSuiviCategory(){
   if(!name){toast('Donne un nom à la catégorie','err');return;}
   const rating=parseFloat(document.getElementById('scat-rating-input').value)||0;
   const description=document.getElementById('scat-desc-input').value.trim();
-  const cover=_scatItems.length?(_scatItems[0].cover||''):'';
+  const chosenCoverItem=_scatItems.find(i=>(i.mal_id+'_'+i.type)===_scatCoverKey);
+  const cover=chosenCoverItem?(chosenCoverItem.cover||''):(_scatItems.length?(_scatItems[0].cover||''):'');
+  const coverKey=chosenCoverItem?_scatCoverKey:(_scatItems.length?(_scatItems[0].mal_id+'_'+_scatItems[0].type):'');
   if(!S.suiviCategories) S.suiviCategories=[];
   if(_scatEditing){
     const idx=S.suiviCategories.findIndex(c=>c.id===_scatEditing);
@@ -7368,13 +7397,13 @@ function saveSuiviCategory(){
           }
         });
       }
-      S.suiviCategories[idx]={...S.suiviCategories[idx],name,rating,description,cover,type:_scatType,section:_scatSection,items:_scatItems.map((i,o)=>({...i,order:o}))};
+      S.suiviCategories[idx]={...S.suiviCategories[idx],name,rating,description,cover,coverKey,type:_scatType,section:_scatSection,items:_scatItems.map((i,o)=>({...i,order:o}))};
     }
   } else {
     S.suiviCategories.push({
       id:'scat_'+Date.now(),
       type:_scatType,section:_scatSection,tab:_scatTab,
-      name,rating,description,cover,
+      name,rating,description,cover,coverKey,
       reviews:[],
       _addedAt:Date.now(),
       items:_scatItems.map((i,o)=>({...i,order:o}))
@@ -7449,15 +7478,18 @@ function renderScatViewItems(){
 
   function cardGrid(items){
     if(!items.length) return '<p style="color:var(--t3);font-size:13px;padding:0 0 14px">Aucune œuvre ici.</p>';
-    return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:4px 0 14px">`+items.map(item=>`
-    <div onclick="scatItemClick(${item.mal_id},'${item.type}')" style="cursor:pointer">
-      <div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:2/3;margin-bottom:4px;background:var(--bg4)">
+    return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:4px 0 14px">`+items.map(item=>{
+      const imp=!!item.important;
+      return `
+    <div onclick="scatItemClick(${item.mal_id},'${item.type}')" style="cursor:pointer${imp?';grid-column:span 2':''}">
+      <div style="position:relative;border-radius:${imp?'12px':'8px'};overflow:hidden;aspect-ratio:2/3;margin-bottom:4px;background:var(--bg4);${imp?'box-shadow:0 0 0 3px #facc15,0 8px 22px rgba(250,204,21,.35)':''}">
         <img src="${item.cover||''}" style="width:100%;height:100%;object-fit:cover" loading="lazy">
         <div title="${item.type==='manga'?'Manga':'Animé'}" style="position:absolute;top:4px;left:4px;z-index:2;background:${item.type==='manga'?'var(--manga-c)':'var(--anime-c)'};color:#fff;font-size:9px;font-weight:900;border-radius:5px;padding:2px 5px;box-shadow:0 1px 4px rgba(0,0,0,.4)">${item.type==='manga'?'📖':'🎬'}</div>
-        ${item.rating?`<div class="cc-rating" style="position:absolute;top:4px;right:4px;z-index:2">★ ${item.rating}</div>`:''}
+        ${imp?`<div style="position:absolute;top:4px;right:4px;z-index:2;background:#facc15;color:#1a1a1a;font-size:10px;font-weight:900;border-radius:5px;padding:2px 6px;box-shadow:0 1px 4px rgba(0,0,0,.4)">⭐ Importante</div>`:(item.rating?`<div class="cc-rating" style="position:absolute;top:4px;right:4px;z-index:2">★ ${item.rating}</div>`:'')}
       </div>
-      <div style="font-size:11px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();renameScatItem(event,${item.mal_id},'${item.type}')" title="Double-clic pour renommer">${esc(item.displayName||item.title)}</div>
-    </div>`).join('')+`</div>`;
+      <div style="font-size:${imp?'13px':'11px'};font-weight:${imp?'800':'700'};color:${imp?'#facc15':'inherit'};font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();renameScatItem(event,${item.mal_id},'${item.type}')" title="Double-clic pour renommer">${esc(item.displayName||item.title)}</div>
+    </div>`;
+    }).join('')+`</div>`;
   }
 
   el.innerHTML=
