@@ -1243,6 +1243,40 @@ textarea.fi{resize:vertical;min-height:72px}
 .phys-cat-card:hover .phys-cat-card-del{opacity:1}
 .phys-cat-detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:14px}
 
+/* ── CALENDRIER ── */
+.cal-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.cal-toggle{display:flex;background:var(--bg4);border-radius:10px;padding:3px;gap:2px}
+.cal-toggle button{background:none;border:none;color:var(--t3);font-weight:700;font-size:13px;padding:7px 16px;border-radius:8px;cursor:pointer;transition:all .15s}
+.cal-toggle button.on{background:var(--acc);color:#fff}
+.cal-month-nav{display:flex;align-items:center;gap:10px}
+.cal-month-nav button{background:var(--bg4);border:1px solid var(--border);color:var(--text);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:14px}
+.cal-month-nav button:hover{background:var(--surface)}
+.cal-month-label{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;min-width:150px;text-align:center}
+.cal-view-toggle{display:flex;background:var(--bg4);border-radius:10px;padding:3px;gap:2px}
+.cal-view-toggle button{background:none;border:none;color:var(--t3);font-weight:700;font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer}
+.cal-view-toggle button.on{background:var(--acc2);color:#fff}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal-dow{font-size:11px;font-weight:800;color:var(--t3);text-align:center;padding-bottom:6px;text-transform:uppercase}
+.cal-cell{background:var(--surface);border:1px solid var(--border);border-radius:10px;min-height:78px;padding:6px;cursor:pointer;transition:border-color .15s;display:flex;flex-direction:column;gap:3px}
+.cal-cell:hover{border-color:var(--acc)}
+.cal-cell.empty{background:none;border:none;cursor:default}
+.cal-cell.today{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.cal-cell-day{font-size:11px;font-weight:700;color:var(--t3)}
+.cal-cell-thumbs{display:flex;flex-wrap:wrap;gap:2px}
+.cal-cell-thumb{width:16px;height:22px;border-radius:3px;object-fit:cover;background:var(--bg4)}
+.cal-cell-more{font-size:9px;color:var(--t3);font-weight:700}
+.cal-upcoming-list{display:flex;flex-direction:column;gap:10px}
+.cal-item-row{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;transition:border-color .15s}
+.cal-item-row:hover{border-color:var(--acc)}
+.cal-item-cover{width:42px;height:60px;border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg4)}
+.cal-item-info{flex:1;min-width:0}
+.cal-item-title{font-family:'Syne',sans-serif;font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-item-meta{font-size:11.5px;color:var(--t3);margin-top:2px}
+.cal-item-date{font-size:11px;font-weight:800;color:var(--acc);flex-shrink:0;text-align:right;white-space:nowrap}
+.cal-filter-chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg4);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer}
+.cal-filter-chip.on{background:rgba(139,124,248,.15);border-color:var(--acc);color:var(--acc)}
+
+
 
 @media(max-width:768px){
   .suivi-adv-filters{padding:10px 12px}
@@ -1267,6 +1301,7 @@ textarea.fi{resize:vertical;min-height:72px}
     <div class="nl anime-nl" data-page="anime" onclick="nav('anime')">Animé</div>
     <div class="nl" data-page="collection" onclick="nav('collection')">Collection</div>
     <div class="nl" data-page="stats" onclick="nav('stats')">Stats</div>
+    <div class="nl" data-page="calendar" onclick="nav('calendar')">Calendrier</div>
   </div>
   <div class="nav-r">
     <div class="nav-searchbox" style="position:relative">
@@ -2080,7 +2115,47 @@ textarea.fi{resize:vertical;min-height:72px}
 </div>
 
 <!-- ═══════════════════════════════════════════ -->
-<!-- PAGE: COLLECTION -->
+<!-- PAGE: CALENDRIER -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="pg" id="pg-calendar">
+  <div class="wrap pt32 pb40">
+    <div class="sh" style="margin-bottom:20px">
+      <h1 class="sh-title" style="font-size:22px">Calendrier des sorties</h1>
+    </div>
+
+    <div class="cal-toolbar">
+      <div class="cal-toggle">
+        <button id="cal-toggle-anime" onclick="calSetType('anime')">🎬 Animé</button>
+        <button id="cal-toggle-manga" onclick="calSetType('manga')">📖 Manga</button>
+      </div>
+      <div class="cal-month-nav" id="cal-month-nav">
+        <button onclick="calPrevMonth()">‹</button>
+        <span class="cal-month-label" id="cal-month-label"></span>
+        <button onclick="calNextMonth()">›</button>
+      </div>
+      <div class="cal-view-toggle">
+        <button id="cal-view-month" onclick="calSetView('month')">Mois</button>
+        <button id="cal-view-upcoming" onclick="calSetView('upcoming')">À venir</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
+      <div class="cal-filter-chip on" id="cal-filter-all" onclick="calSetFilter('all')">Toutes les œuvres</div>
+      <div class="cal-filter-chip" id="cal-filter-suivi" onclick="calSetFilter('suivi')">Mon Suivi uniquement</div>
+    </div>
+
+    <div id="cal-status" style="color:var(--t3);font-size:13px;margin-bottom:12px"></div>
+    <div id="cal-content"></div>
+  </div>
+</div>
+
+<!-- MODAL : détail d'un jour du calendrier -->
+<div class="modal-bg" id="m-cal-day">
+  <div class="modal" style="max-width:480px;max-height:80vh;overflow-y:auto">
+    <div class="modal-title"><span id="cal-day-title">Sorties</span><span class="modal-close" onclick="closeM('m-cal-day')">✕</span></div>
+    <div id="cal-day-list" class="cal-upcoming-list"></div>
+  </div>
+</div>
 <!-- ═══════════════════════════════════════════ -->
 <div class="pg" id="pg-collection">
   <div class="wrap pt32 pb40">
@@ -2657,6 +2732,7 @@ function _afterNav(page){
   if(page==='collection')renderCollection();
   if(page==='suivi'){renderSuivi();populateSuiviGenreFilter();fetchMissingScores();}
   if(page==='tierlists')renderTierListsGallery();
+  if(page==='calendar')renderCalendar();
 }
 
 function activate(el){
@@ -2683,7 +2759,7 @@ window.addEventListener('popstate', e=>{
     return;
   }
   const page=state?.page || hash || 'home';
-  const validPages=['home','manga','anime','profile','lists','suivi','stats','collection','listdetail','tierlists','tierlistdetail'];
+  const validPages=['home','manga','anime','profile','lists','suivi','stats','collection','listdetail','tierlists','tierlistdetail','calendar'];
   nav(validPages.includes(page)?page:'home', false);
 });
 
@@ -4376,6 +4452,296 @@ function saveProfile(){
   closeM('m-profile');
   renderProfile();
   toast('Profil mis à jour ✓','ok');
+}
+
+// ─── CALENDRIER DES SORTIES ───
+let _calType='anime';       // 'anime' | 'manga'
+let _calView='month';       // 'month' | 'upcoming'
+let _calFilter='all';       // 'all' | 'suivi'
+let _calDate=new Date();    // mois affiché (jour ignoré, on utilise juste année/mois)
+let _calAnimeCache={};      // 'YYYY-MM' -> [{malId,title,cover,date,episode}]
+let _calMangaCache={};      // 'YYYY-MM' -> [{title,cover,date,editor,author,link}] | 'error'
+let _calLoadToken=0;        // pour ignorer les réponses obsolètes si on change vite de mois
+
+function calSetType(type){
+  _calType=type;
+  renderCalendar();
+}
+function calSetView(view){
+  _calView=view;
+  renderCalendar();
+}
+function calSetFilter(filter){
+  _calFilter=filter;
+  renderCalendar();
+}
+function calPrevMonth(){
+  _calDate.setMonth(_calDate.getMonth()-1);
+  renderCalendar();
+}
+function calNextMonth(){
+  _calDate.setMonth(_calDate.getMonth()+1);
+  renderCalendar();
+}
+
+const CAL_MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+async function renderCalendar(){
+  document.getElementById('cal-toggle-anime').classList.toggle('on',_calType==='anime');
+  document.getElementById('cal-toggle-manga').classList.toggle('on',_calType==='manga');
+  document.getElementById('cal-view-month').classList.toggle('on',_calView==='month');
+  document.getElementById('cal-view-upcoming').classList.toggle('on',_calView==='upcoming');
+  document.getElementById('cal-filter-all').classList.toggle('on',_calFilter==='all');
+  document.getElementById('cal-filter-suivi').classList.toggle('on',_calFilter==='suivi');
+  document.getElementById('cal-month-nav').style.visibility=_calView==='month'?'visible':'hidden';
+  document.getElementById('cal-month-label').textContent=CAL_MOIS[_calDate.getMonth()]+' '+_calDate.getFullYear();
+
+  const statusEl=document.getElementById('cal-status');
+  const contentEl=document.getElementById('cal-content');
+  const myToken=++_calLoadToken;
+  statusEl.textContent='Chargement…';
+  contentEl.innerHTML='';
+
+  let items;
+  try{
+    if(_calView==='month'){
+      items=_calType==='anime'
+        ? await calGetAnimeMonth(_calDate.getFullYear(), _calDate.getMonth()+1)
+        : await calGetMangaMonth(_calDate.getFullYear(), _calDate.getMonth()+1);
+    } else {
+      // Mode "à venir" : mois courant + les 2 suivants
+      items=[];
+      let d=new Date();
+      for(let i=0;i<3;i++){
+        const y=d.getFullYear(), m=d.getMonth()+1;
+        const monthItems=_calType==='anime' ? await calGetAnimeMonth(y,m) : await calGetMangaMonth(y,m);
+        if(monthItems==='error'){ items='error'; break; }
+        items=items.concat(monthItems);
+        d.setMonth(d.getMonth()+1);
+      }
+    }
+  }catch(e){ items='error'; }
+
+  if(myToken!==_calLoadToken) return; // un autre chargement plus récent est en cours
+
+  if(items==='error'){
+    statusEl.textContent='';
+    contentEl.innerHTML=`<p style="color:var(--t3);font-size:13px;padding:20px;text-align:center">
+      ${_calType==='manga'
+        ? "Impossible de charger les sorties manga pour le moment (la source externe est indisponible ou a changé). Réessaie plus tard."
+        : "Impossible de charger le calendrier animé pour le moment. Réessaie plus tard."}
+    </p>`;
+    return;
+  }
+
+  // Filtre "Mon Suivi"
+  if(_calFilter==='suivi'){
+    items=items.filter(it=>{
+      if(_calType==='anime') return it.malId && S.tracking[it.malId];
+      // Pour le manga (pas de mal_id fiable), on matche par titre approximatif avec le Suivi manga
+      const t=(it.title||'').toLowerCase();
+      return Object.values(S.tracking).some(w=>w.type==='manga' && t.includes((w.title||'').toLowerCase().split(' ')[0]||'###'));
+    });
+  }
+
+  statusEl.textContent=items.length?'':'Aucune sortie trouvée pour cette période.';
+
+  if(_calView==='upcoming'){
+    contentEl.innerHTML=calRenderUpcomingList(items);
+  } else {
+    contentEl.innerHTML=calRenderMonthGrid(items,_calDate.getFullYear(),_calDate.getMonth());
+  }
+}
+
+function calDateKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function calRenderMonthGrid(items,year,month){
+  const byDay={};
+  items.forEach(it=>{ const k=calDateKey(it.date); (byDay[k]=byDay[k]||[]).push(it); });
+  const first=new Date(year,month,1);
+  const startOffset=first.getDay(); // 0=dimanche
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const todayKey=calDateKey(new Date());
+  let html=`<div class="cal-grid">`;
+  ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'].forEach(d=>html+=`<div class="cal-dow">${d}</div>`);
+  for(let i=0;i<startOffset;i++) html+=`<div class="cal-cell empty"></div>`;
+  for(let day=1;day<=daysInMonth;day++){
+    const dateObj=new Date(year,month,day);
+    const key=calDateKey(dateObj);
+    const dayItems=byDay[key]||[];
+    const isToday=key===todayKey;
+    html+=`<div class="cal-cell${isToday?' today':''}" onclick='calOpenDay("${key}")'>
+      <div class="cal-cell-day">${day}</div>
+      <div class="cal-cell-thumbs">
+        ${dayItems.slice(0,4).map(it=>`<img class="cal-cell-thumb" src="${it.cover||''}" loading="lazy">`).join('')}
+      </div>
+      ${dayItems.length>4?`<div class="cal-cell-more">+${dayItems.length-4}</div>`:''}
+    </div>`;
+  }
+  html+=`</div>`;
+  return html;
+}
+
+function calRenderUpcomingList(items){
+  const now=new Date();
+  const upcoming=items.filter(it=>it.date>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((a,b)=>a.date-b.date);
+  if(!upcoming.length) return '';
+  return `<div class="cal-upcoming-list">`+upcoming.map(it=>calItemRowHtml(it)).join('')+`</div>`;
+}
+
+function calItemRowHtml(it){
+  const dateStr=it.date.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+  const timeStr=_calType==='anime'?it.date.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'';
+  const meta=_calType==='anime'
+    ? (it.episode?`Épisode ${it.episode}`:'')
+    : [it.author,it.editor].filter(Boolean).join(' · ');
+  const onclick=_calType==='anime'
+    ? (it.malId?`openWork(${it.malId},'anime')`:'')
+    : (it.link?`window.open('${it.link.replace(/'/g,"\\'")}','_blank')`:'');
+  return `<div class="cal-item-row" onclick="${onclick}">
+    <img class="cal-item-cover" src="${it.cover||''}" loading="lazy">
+    <div class="cal-item-info">
+      <div class="cal-item-title">${esc(it.title||'')}</div>
+      <div class="cal-item-meta">${esc(meta)}</div>
+    </div>
+    <div class="cal-item-date">${dateStr}${timeStr?'<br>'+timeStr:''}</div>
+  </div>`;
+}
+
+function calOpenDay(key){
+  const [y,m,d]=key.split('-').map(Number);
+  const cacheKey=y+'-'+String(m).padStart(2,'0');
+  const cache=_calType==='anime'?_calAnimeCache:_calMangaCache;
+  const monthItems=cache[cacheKey];
+  if(!monthItems||monthItems==='error')return;
+  const dayItems=monthItems.filter(it=>calDateKey(it.date)===key).sort((a,b)=>a.date-b.date);
+  document.getElementById('cal-day-title').textContent=new Date(y,m-1,d).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('cal-day-list').innerHTML=dayItems.length
+    ? dayItems.map(it=>calItemRowHtml(it)).join('')
+    : '<p style="color:var(--t3);font-size:13px">Aucune sortie ce jour-là.</p>';
+  openM('m-cal-day');
+}
+
+// ─── Animé : AniList (airingSchedules) ───
+async function calGetAnimeMonth(year,month){
+  const key=year+'-'+String(month).padStart(2,'0');
+  if(_calAnimeCache[key]) return _calAnimeCache[key];
+  const start=Math.floor(new Date(year,month-1,1).getTime()/1000);
+  const end=Math.floor(new Date(year,month,1).getTime()/1000);
+  try{
+    const items=await calFetchAiringSchedules(start,end);
+    _calAnimeCache[key]=items;
+    return items;
+  }catch(e){
+    _calAnimeCache[key]='error';
+    return 'error';
+  }
+}
+
+async function calFetchAiringSchedules(startTs,endTs){
+  const query=`query($start:Int,$end:Int,$page:Int){
+    Page(page:$page, perPage:50){
+      pageInfo{hasNextPage}
+      airingSchedules(airingAt_greater:$start, airingAt_lesser:$end, sort:TIME){
+        episode
+        airingAt
+        media{ idMal coverImage{large} title{romaji english} }
+      }
+    }
+  }`;
+  let page=1, all=[], hasNext=true;
+  while(hasNext && page<=15){
+    const res=await fetch('https://graphql.anilist.co',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({query,variables:{start:startTs,end:endTs,page}})
+    });
+    if(!res.ok) throw new Error('AniList HTTP '+res.status);
+    const data=await res.json();
+    const pageData=data?.data?.Page;
+    if(!pageData) break;
+    (pageData.airingSchedules||[]).forEach(s=>{
+      if(!s.media) return;
+      all.push({
+        malId:s.media.idMal,
+        title:s.media.title?.romaji||s.media.title?.english||'?',
+        cover:s.media.coverImage?.large||'',
+        date:new Date(s.airingAt*1000),
+        episode:s.episode
+      });
+    });
+    hasNext=!!pageData.pageInfo?.hasNextPage;
+    page++;
+  }
+  return all;
+}
+
+// ─── Manga : manga-news.com (planning FR), via proxy CORS ───
+// ⚠️ Ce n'est pas une API officielle : si manga-news.com change la structure de sa page,
+// ou si le proxy CORS tombe en panne, cette fonction échouera proprement (voir catch plus bas).
+async function calGetMangaMonth(year,month){
+  const key=year+'-'+String(month).padStart(2,'0');
+  if(_calMangaCache[key]) return _calMangaCache[key];
+  try{
+    const items=await calFetchMangaNewsPlanning(year,month);
+    _calMangaCache[key]=items;
+    return items;
+  }catch(e){
+    _calMangaCache[key]='error';
+    return 'error';
+  }
+}
+
+async function calFetchMangaNewsPlanning(year,month){
+  const results=[];
+  const maxPages=8;
+  for(let page=1;page<=maxPages;page++){
+    const target=`https://www.manga-news.com/index.php/planning?p_year=${year}&p_month=${month}&p_editor=`+(page>1?`&page=${page}`:'');
+    const proxied='https://api.allorigins.win/raw?url='+encodeURIComponent(target);
+    const res=await fetch(proxied);
+    if(!res.ok) throw new Error('proxy HTTP '+res.status);
+    const html=await res.text();
+    const pageItems=calParseMangaNewsHtml(html,year,month);
+    if(!pageItems.length) break; // plus de résultats, on arrête la pagination
+    results.push(...pageItems);
+    if(pageItems.length<15) break; // dernière page probable
+  }
+  return results;
+}
+
+function calParseMangaNewsHtml(html,year,month){
+  const items=[];
+  // On repère chaque bloc de sortie via le marqueur "Sortie le DD/MM/YYYY" et on regarde
+  // le contexte proche (avant = image/titre, après = auteur/éditeur).
+  const re=/Sortie le (\d{2})\/(\d{2})\/(\d{4})/g;
+  let match;
+  while((match=re.exec(html))){
+    const idx=match.index;
+    const before=html.slice(Math.max(0,idx-1200),idx);
+    const after=html.slice(idx,idx+400);
+    const imgMatch=/<img[^>]+src="([^"]+)"[^>]*>/g;
+    let lastImg=null,m2;
+    while((m2=imgMatch.exec(before))){ lastImg=m2[1]; }
+    // Titre : dernier lien texte visible avant "Sortie le"
+    const linkRe=/<a[^>]+href="([^"]+)"[^>]*>([^<]{2,120})<\/a>/g;
+    let lastLink=null,m3;
+    while((m3=linkRe.exec(before))){ lastLink={href:m3[1],text:m3[2].trim()}; }
+    const authorMatch=/Auteur\(s\)\s*:\s*(?:<[^>]*>)?\s*([^<]{2,80})/.exec(after);
+    const editorMatch=/Editeur\s*:\s*(?:<[^>]*>)?\s*([^<]{2,60})/.exec(after);
+    const day=parseInt(match[1]),mm=parseInt(match[2]),yy=parseInt(match[3]);
+    if(!lastLink || mm!==month || yy!==year) continue;
+    items.push({
+      title:lastLink.text.replace(/&#?\w+;/g,' ').trim(),
+      link:lastLink.href.startsWith('http')?lastLink.href:'https://www.manga-news.com'+lastLink.href,
+      cover:lastImg||'',
+      date:new Date(year,month-1,day),
+      author:authorMatch?authorMatch[1].trim():'',
+      editor:editorMatch?editorMatch[1].trim():''
+    });
+  }
+  return items;
 }
 
 // ─── STATS ───
@@ -7481,13 +7847,13 @@ function renderScatViewItems(){
     return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:4px 0 14px">`+items.map(item=>{
       const imp=!!item.important;
       return `
-    <div onclick="scatItemClick(${item.mal_id},'${item.type}')" style="cursor:pointer${imp?';grid-column:span 2':''}">
-      <div style="position:relative;border-radius:${imp?'12px':'8px'};overflow:hidden;aspect-ratio:2/3;margin-bottom:4px;background:var(--bg4);${imp?'box-shadow:0 0 0 3px #facc15,0 8px 22px rgba(250,204,21,.35)':''}">
+    <div onclick="scatItemClick(${item.mal_id},'${item.type}')" style="cursor:pointer">
+      <div style="position:relative;border-radius:${imp?'12px':'8px'};overflow:hidden;aspect-ratio:2/3;margin-bottom:4px;background:var(--bg4);${imp?'box-shadow:0 0 0 3px #facc15,0 6px 16px rgba(250,204,21,.35)':''}">
         <img src="${item.cover||''}" style="width:100%;height:100%;object-fit:cover" loading="lazy">
         <div title="${item.type==='manga'?'Manga':'Animé'}" style="position:absolute;top:4px;left:4px;z-index:2;background:${item.type==='manga'?'var(--manga-c)':'var(--anime-c)'};color:#fff;font-size:9px;font-weight:900;border-radius:5px;padding:2px 5px;box-shadow:0 1px 4px rgba(0,0,0,.4)">${item.type==='manga'?'📖':'🎬'}</div>
-        ${imp?`<div style="position:absolute;top:4px;right:4px;z-index:2;background:#facc15;color:#1a1a1a;font-size:10px;font-weight:900;border-radius:5px;padding:2px 6px;box-shadow:0 1px 4px rgba(0,0,0,.4)">⭐ Importante</div>`:(item.rating?`<div class="cc-rating" style="position:absolute;top:4px;right:4px;z-index:2">★ ${item.rating}</div>`:'')}
+        ${imp?`<div style="position:absolute;top:4px;right:4px;z-index:2;background:#facc15;color:#1a1a1a;font-size:9px;font-weight:900;border-radius:5px;padding:2px 5px;box-shadow:0 1px 4px rgba(0,0,0,.4)">⭐</div>`:(item.rating?`<div class="cc-rating" style="position:absolute;top:4px;right:4px;z-index:2">★ ${item.rating}</div>`:'')}
       </div>
-      <div style="font-size:${imp?'13px':'11px'};font-weight:${imp?'800':'700'};color:${imp?'#facc15':'inherit'};font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();renameScatItem(event,${item.mal_id},'${item.type}')" title="Double-clic pour renommer">${esc(item.displayName||item.title)}</div>
+      <div style="font-size:11px;font-weight:${imp?'800':'700'};color:${imp?'#facc15':'inherit'};font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();renameScatItem(event,${item.mal_id},'${item.type}')" title="Double-clic pour renommer">${esc(item.displayName||item.title)}</div>
     </div>`;
     }).join('')+`</div>`;
   }
