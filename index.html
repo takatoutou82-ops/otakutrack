@@ -289,6 +289,7 @@ body::after{
 .sd-ongoing{background:var(--green);box-shadow:0 0 8px var(--green)}
 .sd-done{background:var(--acc2);box-shadow:0 0 6px rgba(184,172,255,.5)}
 .sd-dropped{background:var(--red);box-shadow:0 0 6px rgba(248,113,113,.4)}
+.sd-notcontinued{background:var(--orange);box-shadow:0 0 6px rgba(251,146,60,.4)}
 .sd-planned{background:var(--t3)}
 .sd-uptodate{background:#00d4ff;box-shadow:0 0 8px rgba(0,212,255,.6)}
 
@@ -1921,7 +1922,13 @@ textarea.fi{resize:vertical;min-height:72px}
         <div class="tracking-section on" id="ts-manga-watchlist"><div class="track-grid" id="tg-manga-watchlist"></div></div>
         <div class="tracking-section" id="ts-manga-ongoing"><div class="track-grid" id="tg-manga-ongoing"></div></div>
         <div class="tracking-section" id="ts-manga-done"><div class="track-grid" id="tg-manga-done"></div></div>
-        <div class="tracking-section" id="ts-manga-dropped"><div class="track-grid" id="tg-manga-dropped"></div></div>
+        <div class="tracking-section" id="ts-manga-dropped">
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <button class="btn btn-primary btn-sm drop-subfilter-btn" style="font-size:11px;padding:4px 10px" onclick="setDropSubFilter('manga','abandonne',this)">Abandonné</button>
+            <button class="btn btn-ghost btn-sm drop-subfilter-btn" style="font-size:11px;padding:4px 10px" onclick="setDropSubFilter('manga','noncontinue',this)">Non continué</button>
+          </div>
+          <div class="track-grid" id="tg-manga-dropped"></div>
+        </div>
         <div class="tracking-section" id="ts-manga-uptodate"><div class="track-grid" id="tg-manga-uptodate"></div></div>
       </div>
 
@@ -1941,7 +1948,13 @@ textarea.fi{resize:vertical;min-height:72px}
         <div class="tracking-section on" id="ts-anime-watchlist"><div class="track-grid" id="tg-anime-watchlist"></div></div>
         <div class="tracking-section" id="ts-anime-ongoing"><div class="track-grid" id="tg-anime-ongoing"></div></div>
         <div class="tracking-section" id="ts-anime-done"><div class="track-grid" id="tg-anime-done"></div></div>
-        <div class="tracking-section" id="ts-anime-dropped"><div class="track-grid" id="tg-anime-dropped"></div></div>
+        <div class="tracking-section" id="ts-anime-dropped">
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <button class="btn btn-primary btn-sm drop-subfilter-btn" style="font-size:11px;padding:4px 10px" onclick="setDropSubFilter('anime','abandonne',this)">Abandonné</button>
+            <button class="btn btn-ghost btn-sm drop-subfilter-btn" style="font-size:11px;padding:4px 10px" onclick="setDropSubFilter('anime','noncontinue',this)">Non continué</button>
+          </div>
+          <div class="track-grid" id="tg-anime-dropped"></div>
+        </div>
         <div class="tracking-section" id="ts-anime-uptodate"><div class="track-grid" id="tg-anime-uptodate"></div></div>
       </div>
     </div>
@@ -2853,6 +2866,7 @@ function statusClass(s){
   if(s==='En cours')return 'sd-ongoing';
   if(s==='Terminé')return 'sd-done';
   if(s==='Abandonné')return 'sd-dropped';
+  if(s==='Non continué')return 'sd-notcontinued';
   if(s==='À jour')return 'sd-uptodate';
   return 'sd-planned';
 }
@@ -3593,7 +3607,7 @@ function renderProgressSection(w, t){
   const cur=type==='manga'?(t.chapter||0):(t.episode||0);
   const vol=t.volume||0;
   const pct=knownMax?Math.min(100,Math.round(cur/knownMax*100)):0;
-  const statOpts=['En cours','Terminé','Abandonné','Planifié','À jour'].map(s=>`<option${(t.status||'')==s?' selected':''}>${s}</option>`).join('');
+  const statOpts=['En cours','Terminé','Abandonné','Non continué','Planifié','À jour'].map(s=>`<option${(t.status||'')==s?' selected':''}>${s}</option>`).join('');
   const maxLabel=isOngoing?'∞ (en cours)':knownMax;
   const volMax=w.volumes||null;
   const volLabel=volMax||'?';
@@ -3793,10 +3807,10 @@ function removeWorkTag(malId, type, tag){
 
 function renderWorkSidebar(w, t){
   const type=w._type;
-  const statusBtns=['En cours','Terminé','Abandonné','Planifié','À jour'].map(s=>`
+  const statusBtns=['En cours','Terminé','Abandonné','Non continué','Planifié','À jour'].map(s=>`
     <button class="btn ${(t.status||'')==s?'btn-primary':'btn-ghost'} btn-sm" style="justify-content:flex-start;width:100%;margin-bottom:5px"
       onclick="updateStatus(${w.mal_id},'${type}','${s}','${esc(w.title)}','${esc(w.images?.jpg?.image_url||'')}')">
-      <span style="width:8px;height:8px;border-radius:50%;background:${s==='En cours'?'var(--green)':s==='Terminé'?'var(--acc2)':s==='Abandonné'?'var(--red)':s==='À jour'?'#00d4ff':'var(--t3)'}"></span> ${s}
+      <span style="width:8px;height:8px;border-radius:50%;background:${s==='En cours'?'var(--green)':s==='Terminé'?'var(--acc2)':s==='Abandonné'?'var(--red)':s==='Non continué'?'var(--orange)':s==='À jour'?'#00d4ff':'var(--t3)'}"></span> ${s}
     </button>`).join('');
 
   const physCollData=S.collection[w.mal_id]||{};
@@ -4689,9 +4703,36 @@ async function calGetMangaMonth(year,month){
     _calMangaCache[key]=items;
     return items;
   }catch(e){
+    console.error('Calendrier manga: échec du chargement',e);
     _calMangaCache[key]='error';
     return 'error';
   }
+}
+
+// Plusieurs proxies CORS gratuits, essayés dans l'ordre : allorigins.win est souvent en
+// panne / rate-limité (timeouts, 403/429 fréquents), ce qui faisait échouer le calendrier
+// manga quasi à chaque fois. On bascule sur un autre proxy dès qu'un échoue.
+const CAL_CORS_PROXIES=[
+  url=>'https://api.allorigins.win/raw?url='+encodeURIComponent(url),
+  url=>'https://corsproxy.io/?url='+encodeURIComponent(url),
+  url=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url),
+];
+
+async function calFetchViaProxy(target){
+  let lastErr=null;
+  for(const buildProxyUrl of CAL_CORS_PROXIES){
+    try{
+      const ctrl=new AbortController();
+      const t=setTimeout(()=>ctrl.abort(),12000);
+      const res=await fetch(buildProxyUrl(target),{signal:ctrl.signal});
+      clearTimeout(t);
+      if(!res.ok) throw new Error('proxy HTTP '+res.status);
+      const html=await res.text();
+      if(!html || html.length<200) throw new Error('réponse proxy vide/trop courte');
+      return html;
+    }catch(e){ lastErr=e; /* on tente le proxy suivant */ }
+  }
+  throw lastErr||new Error('tous les proxies CORS ont échoué');
 }
 
 async function calFetchMangaNewsPlanning(year,month){
@@ -4699,10 +4740,7 @@ async function calFetchMangaNewsPlanning(year,month){
   const maxPages=8;
   for(let page=1;page<=maxPages;page++){
     const target=`https://www.manga-news.com/index.php/planning?p_year=${year}&p_month=${month}&p_editor=`+(page>1?`&page=${page}`:'');
-    const proxied='https://api.allorigins.win/raw?url='+encodeURIComponent(target);
-    const res=await fetch(proxied);
-    if(!res.ok) throw new Error('proxy HTTP '+res.status);
-    const html=await res.text();
+    const html=await calFetchViaProxy(target);
     const pageItems=calParseMangaNewsHtml(html,year,month);
     if(!pageItems.length) break; // plus de résultats, on arrête la pagination
     results.push(...pageItems);
@@ -4812,8 +4850,8 @@ function renderStats(){
   }
 
   // ── Donut statuts ──
-  const statuses=['Planifié','En cours','Terminé','Abandonné','À jour'];
-  const statusColors=['#8b7cf8','#4ade80','#60a5fa','#f87171','#00d4ff'];
+  const statuses=['Planifié','En cours','Terminé','Abandonné','Non continué','À jour'];
+  const statusColors=['#8b7cf8','#4ade80','#60a5fa','#f87171','#fb923c','#00d4ff'];
   const statusCounts=statuses.map(s=>all.filter(t=>t.status===s).length);
   const total=all.length||1;
   let offset=0;
@@ -5531,6 +5569,15 @@ async function fetchMissingScores(){
 // Genres sélectionnés (multi) — inclusion et exclusion (3 états : neutre → inclure → exclure → neutre)
 let _safGenres=new Set();
 let _safGenresExcl=new Set();
+// Sous-filtre de l'onglet "Abandonné" du Suivi : 'abandonne' (défaut, inchangé) ou 'noncontinue'
+let _dropSubFilter={manga:'abandonne',anime:'abandonne'};
+function setDropSubFilter(type,val,btn){
+  _dropSubFilter[type]=val;
+  const wrap=btn.parentElement;
+  if(wrap) wrap.querySelectorAll('.drop-subfilter-btn').forEach(b=>b.classList.toggle('btn-primary',b===btn));
+  if(wrap) wrap.querySelectorAll('.drop-subfilter-btn').forEach(b=>b.classList.toggle('btn-ghost',b!==btn));
+  renderSuivi();
+}
 
 function populateSuiviGenreFilter(){
   const wrap=document.getElementById('suivi-genre-pills');
@@ -5632,7 +5679,7 @@ function renderSuivi(){
   const serieTomesMin = serieTomesMinRaw!==''?parseInt(serieTomesMinRaw):null;
   const serieTomesMax = serieTomesMaxRaw!==''?parseInt(serieTomesMaxRaw):null;
   const all=Object.values(S.tracking);
-  const statusMap={'Planifié':'watchlist','En cours':'ongoing','Terminé':'done','Abandonné':'dropped','À jour':'uptodate'};
+  const statusMap={'Planifié':'watchlist','En cours':'ongoing','Terminé':'done','Abandonné':'dropped','Non continué':'dropped','À jour':'uptodate'};
 
   function compareBySort(a,b){
     if(sort==='title') return (a.title||'').localeCompare(b.title||'');
@@ -5714,15 +5761,22 @@ function renderSuivi(){
       (serieTomesMax===null||(t._totalVolumes&&t._totalVolumes<=serieTomesMax))
     );
     ['watchlist','ongoing','done','dropped','uptodate'].forEach(tab=>{
-      const filtered=items.filter(t=>(statusMap[t.status||'']||'watchlist')===tab);
+      let filtered=items.filter(t=>(statusMap[t.status||'']||'watchlist')===tab);
+      // Sous-filtre de l'onglet "Abandonné" : "Abandonné" (défaut) vs "Non continué"
+      // (lu jusqu'à un certain point mais pas repris, sans être définitivement abandonné).
+      if(tab==='dropped'){
+        const wantStatus=_dropSubFilter[type]==='noncontinue' ? 'Non continué' : 'Abandonné';
+        filtered=filtered.filter(t=>t.status===wantStatus);
+      }
       const el=document.getElementById('tg-'+type+'-'+tab);
       if(!el)return;
 
       // Catégories affichées mêlées aux œuvres, triées selon le même critère (tri actif).
       // Une catégorie ne s'affiche que dans l'onglet (manga/anime) où elle a été créée,
       // quel que soit son type de contenu (y compris si mixte) — voir "section".
+      // Dans l'onglet Abandonné, elles restent rattachées au sous-filtre "Abandonné" par défaut.
       let cats=[];
-      if(!query&&!_safStatus){
+      if(!query&&!_safStatus&&(tab!=='dropped'||_dropSubFilter[type]!=='noncontinue')){
         cats=(S.suiviCategories||[]).filter(c=>(c.section||c.type)===type&&c.tab===tab);
       }
 
@@ -6181,6 +6235,10 @@ function toggleLowTierList(){
 }
 
 let _tierFilter='all';
+// Doit être initialisé dès le chargement : sinon, tant qu'aucun drag n'a eu lieu,
+// _tierDragging n'existe pas encore et tierItemClick() plante silencieusement
+// à la ligne "if(_tierDragging.malId)", empêchant le popup "Œuvres liées" de s'ouvrir.
+let _tierDragging={malId:null,type:null,fromTier:null,variant:'main'};
 
 
 function setTierFilter(f){
@@ -6213,7 +6271,7 @@ function renderTierList(variant='main'){
 
   // Statuts autorisés dans la tierlist : seulement Terminé et À jour
   const ALLOWED_STATUSES = new Set(['Terminé','À jour']);
-  if(_showAbandoned) ALLOWED_STATUSES.add('Abandonné');
+  if(_showAbandoned){ ALLOWED_STATUSES.add('Abandonné'); ALLOWED_STATUSES.add('Non continué'); }
 
   // Catégories de suivi qui ont une note → apparaissent comme éléments
   const cats=(S.suiviCategories||[]).filter(c=>
