@@ -3568,7 +3568,7 @@ function renderWorkPage(w){
       <p class="synopsis">${esc((w.synopsis||'Aucun synopsis disponible.').replace('[Written by MAL Rewrite]','').trim())}</p>
       <div class="work-actions">
         <div class="your-rating-box"><div class="yr-label">Ma note</div>${ratingHtml}</div>
-        <button class="btn btn-primary btn-sm" onclick="quickTrack(${w.mal_id},'${type}','${esc(displayTitle)}','${esc(w.images?.jpg?.image_url||'')}')">+ Suivre</button>
+        <button class="btn btn-primary btn-sm" onclick="quickTrack(${w.mal_id},'${type}','${esc(displayTitle).replace(/'/g,"\\'")}','${esc(w.images?.jpg?.image_url||'')}')">+ Suivre</button>
         ${tracked?`<button class="btn btn-danger btn-sm" onclick="removeTracking(${w.mal_id})">✕ Retirer</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="openListModal(${w.mal_id})">☰ Liste</button>
         <div class="read-dropdown" id="rd-${w.mal_id}">
@@ -3584,7 +3584,7 @@ function renderWorkPage(w){
             `}
           </div>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="openNautiljon('${esc(searchTitle)}','${type}')" style="color:#60a5fa;border-color:rgba(96,165,250,.3)">🔍 Nautiljon</button>
+        <button class="btn btn-ghost btn-sm" onclick="openNautiljon('${esc(searchTitle).replace(/'/g,"\\'")}','${type}')" style="color:#60a5fa;border-color:rgba(96,165,250,.3)">🔍 Nautiljon</button>
       </div>
     </div>
   `;
@@ -6284,8 +6284,12 @@ function renderTierList(variant='main'){
     if(!ALLOWED_STATUSES.has(t.status)) return false; // En cours et Abandonné exclus
     if(filter!=='all'&&t.type!==filter) return false;
     if(linkedSrcs.has(String(t.mal_id)+'_'+t.type)) return false;
-    // Si cette œuvre est dans une catégorie, ne pas l'afficher individuellement
-    const inCat=(S.suiviCategories||[]).some(c=>c.items&&c.items.some(i=>i.mal_id===t.mal_id&&i.type===t.type));
+    // Si cette œuvre est dans une catégorie ET que cette catégorie a une note (donc qu'elle
+    // s'affiche elle-même comme tuile dans la tierlist), ne pas afficher l'œuvre en double.
+    // Avant ce correctif, on vérifiait ça sur TOUTES les catégories (notées ou non), donc une
+    // œuvre notée individuellement mais rangée dans une catégorie non notée disparaissait :
+    // ni l'œuvre (masquée car "dans une catégorie") ni la catégorie (pas de note) ne s'affichaient.
+    const inCat=cats.some(c=>c.items&&c.items.some(i=>i.mal_id===t.mal_id&&i.type===t.type));
     if(inCat) return false;
     return true;
   });
