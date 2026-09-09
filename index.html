@@ -3832,8 +3832,23 @@ function renderWorkSidebar(w, t){
     </div>`;
   }).join('');
 
+  const READ_FORMATS=[
+    {v:'ebook', label:'Ebook'},
+    {v:'physique_biblio', label:'Physique (dans ma bibliothèque)'},
+    {v:'physique_emprunte', label:'Physique (emprunté, pas dans ma bibliothèque)'}
+  ];
+  const readFormatSection=['À jour','Terminé','Abandonné','Non continué'].includes(t.status||'') ? `
+    <div class="sidebar-box">
+      <div class="sb-title">📍 Où je l'ai lu</div>
+      <select class="fi" style="width:100%;font-size:12.5px" onchange="setReadFormat(${w.mal_id},'${type}',this.value)">
+        <option value=""${!t.readFormat?' selected':''}>— Non précisé —</option>
+        ${READ_FORMATS.map(f=>`<option value="${f.v}"${t.readFormat===f.v?' selected':''}>${f.label}</option>`).join('')}
+      </select>
+    </div>` : '';
+
   document.getElementById('work-sidebar').innerHTML=`
     <div class="sidebar-box"><div class="sb-title">Statut</div>${statusBtns}</div>
+    ${readFormatSection}
     <div class="sidebar-box">
       <div class="sb-title">🏷 Tags</div>
       <div id="work-tags-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
@@ -3849,6 +3864,13 @@ function renderWorkSidebar(w, t){
     ${collSection}
     ${S.lists.length?`<div class="sidebar-box"><div class="sb-title">Mes listes</div>${listsSection}<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:10px" onclick="openM('m-createlist')">+ Créer une liste</button></div>`:''}
   `;
+}
+
+function setReadFormat(malId, type, format){
+  if(!S.tracking[malId]) return;
+  S.tracking[malId].readFormat = format || null;
+  save();
+  toast(format?'Format enregistré':'Format retiré','ok');
 }
 
 function quickTrack(malId, type, title, cover){
