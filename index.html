@@ -403,6 +403,16 @@ body::after{
 }
 .gtag:hover{border-color:var(--acc);color:var(--acc2);background:rgba(139,124,248,.1)}
 .synopsis{color:var(--t2);line-height:1.8;font-size:13.5px;max-width:580px;margin-bottom:22px}
+
+.work-nav-arrow{position:fixed;top:50%;transform:translateY(-50%);z-index:50;width:44px;height:44px;border-radius:50%;background:rgba(20,20,28,.65);backdrop-filter:blur(6px);border:1px solid var(--border);color:#fff;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .15s}
+.work-nav-arrow:hover{background:var(--acc);transform:translateY(-50%) scale(1.08)}
+.work-nav-prev{left:14px}
+.work-nav-next{right:14px}
+@media (max-width:820px){
+  .work-nav-arrow{width:36px;height:36px;font-size:18px}
+  .work-nav-prev{left:6px}
+  .work-nav-next{right:6px}
+}
 .work-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
 
 /* ── RATING /20 ── */
@@ -1797,6 +1807,8 @@ textarea.fi{resize:vertical;min-height:72px}
 <!-- PAGE: WORK DETAIL -->
 <!-- ═══════════════════════════════════════════ -->
 <div class="pg" id="pg-work">
+  <button class="work-nav-arrow work-nav-prev" id="work-nav-prev" onclick="navWork(-1)" style="display:none" title="Œuvre précédente">‹</button>
+  <button class="work-nav-arrow work-nav-next" id="work-nav-next" onclick="navWork(1)" style="display:none" title="Œuvre suivante">›</button>
   <div class="work-hero">
     <div class="work-bg" id="work-bg"></div>
     <div class="work-tint" id="work-tint"></div>
@@ -2761,7 +2773,7 @@ function goBack(){
 window.addEventListener('popstate', e=>{
   const state=e.state;
   if(state?.page==='work' && state.malId){
-    openWork(state.malId, state.type||'manga');
+    openWork(state.malId, state.type||'manga', state.navOrigin||null);
     return;
   }
   // Gérer le hash pour les fiches (ex: #work-manga-1234)
@@ -3404,11 +3416,12 @@ function navSearch(val){
 }
 
 // ─── WORK PAGE ───
-async function openWork(malId, type='manga'){
+async function openWork(malId, type='manga', navOrigin=null){
   S.prevPage = document.querySelector('.pg.on')?.id.replace('pg-','')||'home';
+  _currentNavOrigin = navOrigin;
   nav('work', false);
   // Pousser dans l'historique avec les infos de l'œuvre
-  history.pushState({page:'work', malId, type}, '', `#work-${type}-${malId}`);
+  history.pushState({page:'work', malId, type, navOrigin}, '', `#work-${type}-${malId}`);
   document.getElementById('work-layout').innerHTML='<div class="loading" style="grid-column:1/-1"><div class="spin"></div> Chargement…</div>';
   document.getElementById('work-bg').style.backgroundImage='';
 
@@ -3595,6 +3608,33 @@ function renderWorkPage(w){
   loadRelations(w);
   renderWorkSidebar(w, t);
   window._currentMalId = w.mal_id;
+  updateWorkNavArrows(w, type);
+}
+
+// ─── NAVIGATION PRÉCÉDENT/SUIVANT DEPUIS LE SUIVI ───
+// Affiche/masque les flèches ‹ › selon la position de l'œuvre dans la liste d'où l'on vient
+// (un onglet précis du Suivi, ex: "anime_done") ; pas de flèches si l'œuvre a été ouverte
+// depuis ailleurs (recherche, tierlist, catalogue...).
+function updateWorkNavArrows(w, type){
+  const prevBtn=document.getElementById('work-nav-prev');
+  const nextBtn=document.getElementById('work-nav-next');
+  if(!prevBtn||!nextBtn) return;
+  const list=_currentNavOrigin ? _suiviListOrder[_currentNavOrigin] : null;
+  if(!list || !list.length){ prevBtn.style.display='none'; nextBtn.style.display='none'; return; }
+  const idx=list.findIndex(x=>x.malId===w.mal_id && x.type===type);
+  if(idx===-1){ prevBtn.style.display='none'; nextBtn.style.display='none'; return; }
+  prevBtn.style.display = idx>0 ? 'flex' : 'none';
+  nextBtn.style.display = idx<list.length-1 ? 'flex' : 'none';
+}
+
+function navWork(dir){
+  if(!_currentNavOrigin || !S.currentWork) return;
+  const list=_suiviListOrder[_currentNavOrigin];
+  if(!list) return;
+  const idx=list.findIndex(x=>x.malId===S.currentWork.mal_id && x.type===S.currentWork._type);
+  const target=list[idx+dir];
+  if(!target) return;
+  openWork(target.malId, target.type, _currentNavOrigin);
 }
 
 function renderProgressSection(w, t){
@@ -3832,23 +3872,8 @@ function renderWorkSidebar(w, t){
     </div>`;
   }).join('');
 
-  const READ_FORMATS=[
-    {v:'ebook', label:'Ebook'},
-    {v:'physique_biblio', label:'Physique (dans ma bibliothèque)'},
-    {v:'physique_emprunte', label:'Physique (emprunté, pas dans ma bibliothèque)'}
-  ];
-  const readFormatSection=['À jour','Terminé','Abandonné','Non continué'].includes(t.status||'') ? `
-    <div class="sidebar-box">
-      <div class="sb-title">📍 Où je l'ai lu</div>
-      <select class="fi" style="width:100%;font-size:12.5px" onchange="setReadFormat(${w.mal_id},'${type}',this.value)">
-        <option value=""${!t.readFormat?' selected':''}>— Non précisé —</option>
-        ${READ_FORMATS.map(f=>`<option value="${f.v}"${t.readFormat===f.v?' selected':''}>${f.label}</option>`).join('')}
-      </select>
-    </div>` : '';
-
   document.getElementById('work-sidebar').innerHTML=`
     <div class="sidebar-box"><div class="sb-title">Statut</div>${statusBtns}</div>
-    ${readFormatSection}
     <div class="sidebar-box">
       <div class="sb-title">🏷 Tags</div>
       <div id="work-tags-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
@@ -3864,13 +3889,6 @@ function renderWorkSidebar(w, t){
     ${collSection}
     ${S.lists.length?`<div class="sidebar-box"><div class="sb-title">Mes listes</div>${listsSection}<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:10px" onclick="openM('m-createlist')">+ Créer une liste</button></div>`:''}
   `;
-}
-
-function setReadFormat(malId, type, format){
-  if(!S.tracking[malId]) return;
-  S.tracking[malId].readFormat = format || null;
-  save();
-  toast(format?'Format enregistré':'Format retiré','ok');
 }
 
 function quickTrack(malId, type, title, cover){
@@ -5591,6 +5609,10 @@ async function fetchMissingScores(){
 // Genres sélectionnés (multi) — inclusion et exclusion (3 états : neutre → inclure → exclure → neutre)
 let _safGenres=new Set();
 let _safGenresExcl=new Set();
+// Mémorise, pour chaque onglet du Suivi ("manga_watchlist", "anime_done", ...), l'ordre exact
+// des œuvres affichées — sert à la navigation précédent/suivant sur la fiche d'une œuvre.
+let _suiviListOrder={};
+let _currentNavOrigin=null;
 // Sous-filtre de l'onglet "Abandonné" du Suivi : 'abandonne' (défaut, inchangé) ou 'noncontinue'
 let _dropSubFilter={manga:'abandonne',anime:'abandonne'};
 function setDropSubFilter(type,val,btn){
@@ -5829,7 +5851,7 @@ function renderSuivi(){
         const ratingBadge=t.rating?'<div class="cc-rating" style="position:absolute;top:5px;left:5px;z-index:2">★ '+t.rating+'</div>':'';
         return {
           sk:{...t,_progress:prog},
-          html:`<div class="cc" onclick="openWork(${t.mal_id},'${t.type}')">
+          html:`<div class="cc" onclick="openWork(${t.mal_id},'${t.type}','${type}_${tab}')">
           <div class="cc-wrap">
             <img class="cc-img" src="${t.cover}" loading="lazy">
             <div class="status-dot ${statusClass(t.status)}"></div>
@@ -5848,6 +5870,10 @@ function renderSuivi(){
       });
 
       const combined=[...catEntries,...workEntries].sort((A,B)=>compareBySort(A.sk,B.sk));
+
+      // Mémorise l'ordre exact affiché (œuvres uniquement, pas les catégories) pour permettre
+      // la navigation précédent/suivant depuis la fiche d'une œuvre, propre à cet onglet précis.
+      _suiviListOrder[type+'_'+tab]=combined.filter(x=>x.sk&&x.sk.mal_id!==undefined).map(x=>({malId:x.sk.mal_id,type:x.sk.type}));
 
       if(!combined.length){
         el.innerHTML='<p style="color:var(--t3);font-size:13px;grid-column:1/-1;padding:8px 0">'
