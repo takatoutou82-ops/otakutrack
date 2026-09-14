@@ -404,6 +404,14 @@ body::after{
 .gtag:hover{border-color:var(--acc);color:var(--acc2);background:rgba(139,124,248,.1)}
 .synopsis{color:var(--t2);line-height:1.8;font-size:13.5px;max-width:580px;margin-bottom:22px}
 
+.score-stats-list{display:flex;flex-direction:column;gap:7px;margin-top:6px}
+.score-stats-row{display:flex;align-items:center;gap:8px;font-size:12px}
+.ssr-n{width:34px;flex-shrink:0;font-weight:700;color:var(--text)}
+.ssr-bar-wrap{flex:1;height:14px;background:var(--bg3);border-radius:5px;overflow:hidden}
+.ssr-bar{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:5px;transition:width .4s}
+.ssr-pct{width:42px;flex-shrink:0;text-align:right;color:var(--t2);font-weight:600}
+.ssr-votes{width:82px;flex-shrink:0;text-align:right;color:var(--t3);font-size:10.5px}
+
 .work-nav-arrow{position:fixed;top:50%;transform:translateY(-50%);z-index:50;width:44px;height:44px;border-radius:50%;background:rgba(20,20,28,.65);backdrop-filter:blur(6px);border:1px solid var(--border);color:#fff;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .15s}
 .work-nav-arrow:hover{background:var(--acc);transform:translateY(-50%) scale(1.08)}
 .work-nav-prev{left:14px}
@@ -2182,6 +2190,13 @@ textarea.fi{resize:vertical;min-height:72px}
   </div>
 </div>
 <!-- ═══════════════════════════════════════════ -->
+<div class="modal-bg" id="m-score-stats">
+  <div class="modal" style="max-width:420px;max-height:80vh;overflow-y:auto">
+    <div class="modal-title"><span>Répartition des notes</span><span class="modal-close" onclick="closeM('m-score-stats')">✕</span></div>
+    <div id="score-stats-body"></div>
+  </div>
+</div>
+<!-- ═══════════════════════════════════════════ -->
 <div class="pg" id="pg-collection">
   <div class="wrap pt32 pb40">
     <div class="sh" style="margin-bottom:20px">
@@ -3543,14 +3558,14 @@ function renderWorkPage(w){
     <div class="wm-item"><span class="wm-label">Chapitres</span><span class="wm-value">${w.chapters||'?'}</span></div>
     <div class="wm-item"><span class="wm-label">Publication</span><span class="wm-value">${({'Finished':'Terminée','Publishing':'En cours','On Hiatus':'En pause','Discontinued':'Arrêtée'}[w.status]||w.status||'—')}</span></div>
     <div class="wm-item"><span class="wm-label">Parution</span><span class="wm-value">${w.published?.string||'—'}</span></div>
-    <div class="wm-item"><span class="wm-label"><span class="score-display"><span class="score-val">★ ${w.score||'?'}</span></span></span><span class="wm-value" style="font-size:11px;color:var(--t3)">${w.scored_by?w.scored_by.toLocaleString()+' votes':''}</span></div>
+    <div class="wm-item"><span class="wm-label"><span class="score-display" onclick="openScoreStats(${w.mal_id},'${type}')" style="cursor:pointer"><span class="score-val">★ ${w.score||'?'}</span><span style="font-size:9px;color:var(--t3);margin-left:3px">▾</span></span></span><span class="wm-value" style="font-size:11px;color:var(--t3)">${w.scored_by?w.scored_by.toLocaleString()+' votes':''}</span></div>
   ` : `
     <div class="wm-item"><span class="wm-label">Studio</span><span class="wm-value">${(w.studios||[]).map(s=>`<a href="https://www.nautiljon.com/people/?q=${encodeURIComponent(s.name)}" target="_blank" rel="noopener" style="color:var(--acc);text-decoration:none;border-bottom:1px dashed var(--acc)">${esc(s.name)}</a>`).join(', ')||'—'}</span></div>
     <div class="wm-item"><span class="wm-label">Épisodes</span><span class="wm-value">${w.episodes||'?'}</span></div>
     <div class="wm-item"><span class="wm-label">Durée ep.</span><span class="wm-value">${w.duration||'—'}</span></div>
     <div class="wm-item"><span class="wm-label">Publication</span><span class="wm-value">${({'Finished':'Terminée','Publishing':'En cours','On Hiatus':'En pause','Discontinued':'Arrêtée'}[w.status]||w.status||'—')}</span></div>
     <div class="wm-item"><span class="wm-label">Diffusion</span><span class="wm-value">${w.aired?.string||'—'}</span></div>
-    <div class="wm-item"><span class="wm-label"><span class="score-display"><span class="score-val">★ ${w.score||'?'}</span></span></span><span class="wm-value" style="font-size:11px;color:var(--t3)">${w.scored_by?w.scored_by.toLocaleString()+' votes':''}</span></div>
+    <div class="wm-item"><span class="wm-label"><span class="score-display" onclick="openScoreStats(${w.mal_id},'${type}')" style="cursor:pointer"><span class="score-val">★ ${w.score||'?'}</span><span style="font-size:9px;color:var(--t3);margin-left:3px">▾</span></span></span><span class="wm-value" style="font-size:11px;color:var(--t3)">${w.scored_by?w.scored_by.toLocaleString()+' votes':''}</span></div>
   `;
 
   // French title logic
@@ -8190,6 +8205,35 @@ function saveScatReview(){
   closeM('m-scat-review');
   renderScatReviews(id);
   toast('Critique enregistrée ✓','ok');
+}
+
+// ─── RÉPARTITION DES NOTES (comme sur MyAnimeList) ───
+async function openScoreStats(malId, type){
+  openM('m-score-stats');
+  const body=document.getElementById('score-stats-body');
+  body.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div></div>';
+  try{
+    const d=await jikan(`/${type}/${malId}/statistics`);
+    const scores=d?.data?.scores;
+    if(!scores) throw new Error('no stats');
+    const maxPct=Math.max(...Object.values(scores).map(s=>s.percentage||0),1);
+    let html='<div class="score-stats-list">';
+    for(let n=10;n>=1;n--){
+      const s=scores[n]||{votes:0,percentage:0};
+      const barPct=maxPct>0?(s.percentage/maxPct)*100:0;
+      html+=`<div class="score-stats-row">
+        <span class="ssr-n">${n} ★</span>
+        <div class="ssr-bar-wrap"><div class="ssr-bar" style="width:${barPct}%"></div></div>
+        <span class="ssr-pct">${s.percentage||0}%</span>
+        <span class="ssr-votes">${(s.votes||0).toLocaleString()} votes</span>
+      </div>`;
+    }
+    html+='</div>';
+    if(d.data.total) html+=`<p style="color:var(--t3);font-size:12px;margin-top:14px;text-align:center">${d.data.total.toLocaleString()} votes au total</p>`;
+    body.innerHTML=html;
+  }catch(e){
+    body.innerHTML='<p style="color:var(--t3);font-size:13px;padding:16px 0;text-align:center">Répartition des notes indisponible pour cette œuvre.</p>';
+  }
 }
 
 function openM(id){document.getElementById(id).classList.add('on')}
