@@ -8214,12 +8214,20 @@ async function openScoreStats(malId, type){
   body.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div></div>';
   try{
     const d=await jikan(`/${type}/${malId}/statistics`);
-    const scores=d?.data?.scores;
-    if(!scores) throw new Error('no stats');
-    const maxPct=Math.max(...Object.values(scores).map(s=>s.percentage||0),1);
+    const raw=d?.data?.scores;
+    if(!raw) throw new Error('no stats in response');
+    // Jikan v4 renvoie "scores" comme un TABLEAU [{score,votes,percentage}, ...] et non un
+    // objet indexé par note — on normalise ici pour couvrir aussi l'autre forme au cas où.
+    const byScore={};
+    if(Array.isArray(raw)){
+      raw.forEach(s=>{ if(s&&s.score!=null) byScore[s.score]={votes:s.votes||0, percentage:s.percentage||0}; });
+    } else {
+      Object.entries(raw).forEach(([k,s])=>{ byScore[k]={votes:s.votes||0, percentage:s.percentage||0}; });
+    }
+    const maxPct=Math.max(...Object.values(byScore).map(s=>s.percentage||0),1);
     let html='<div class="score-stats-list">';
     for(let n=10;n>=1;n--){
-      const s=scores[n]||{votes:0,percentage:0};
+      const s=byScore[n]||{votes:0,percentage:0};
       const barPct=maxPct>0?(s.percentage/maxPct)*100:0;
       html+=`<div class="score-stats-row">
         <span class="ssr-n">${n} ★</span>
@@ -8232,6 +8240,7 @@ async function openScoreStats(malId, type){
     if(d.data.total) html+=`<p style="color:var(--t3);font-size:12px;margin-top:14px;text-align:center">${d.data.total.toLocaleString()} votes au total</p>`;
     body.innerHTML=html;
   }catch(e){
+    console.error('openScoreStats a échoué:', e);
     body.innerHTML='<p style="color:var(--t3);font-size:13px;padding:16px 0;text-align:center">Répartition des notes indisponible pour cette œuvre.</p>';
   }
 }
