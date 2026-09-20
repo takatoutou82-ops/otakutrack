@@ -2021,8 +2021,10 @@ textarea.fi{resize:vertical;min-height:72px}
             <button class="btn btn-ghost" id="tl-filter-manga" onclick="setTierFilter('manga')" style="font-size:11px;padding:4px 10px;color:var(--manga)">Manga</button>
             <button class="btn btn-ghost" id="tl-filter-anime" onclick="setTierFilter('anime')" style="font-size:11px;padding:4px 10px;color:var(--anime)">Animé</button>
             <button class="btn btn-ghost" id="tl-show-abandoned" style="font-size:11px" onclick="toggleShowAbandoned(this)">👁 Afficher les abandonnés</button>
+            <button class="btn btn-ghost" id="tl-tags-btn" style="font-size:11px" onclick="toggleTLTagPanel()">🏷 Tags</button>
           </div>
         </div>
+        <div id="tl-tag-pills-wrap" style="display:none;flex-wrap:wrap;gap:5px;margin:-6px 0 14px"></div>
         <div style="display:flex;gap:8px;align-items:stretch">
           <div id="tier-list-wrap" style="flex:1;min-width:0"></div>
           <div id="tier-meta-main" class="tier-meta-col"></div>
@@ -2582,6 +2584,21 @@ function malListItemToShape(item, type){
 }
 // Recherche texte via MAL officiel (fallback Jikan si proxy indispo). Retourne un tableau format Jikan.
 async function malSearch(type, q, limit=8){
+  const titleResults = await malSearchByTitle(type, q, limit);
+  // En plus de la recherche par titre : si le texte tapé correspond à un auteur (manga)
+  // ou un studio (animé), on ajoute aussi leurs œuvres aux résultats.
+  let creatorResults = [];
+  try{ creatorResults = await malSearchByCreator(type, q, limit); }catch(e){ /* pas grave, on garde juste le titre */ }
+  const seen = new Set(titleResults.map(x=>x.mal_id));
+  const uniqueCreatorResults = creatorResults.filter(x=>x && x.mal_id && !seen.has(x.mal_id));
+  // On réserve toujours un peu de place aux résultats "par créateur" (auteur/studio) pour
+  // qu'ils ne soient pas noyés si la recherche par titre remplit déjà tous les emplacements.
+  const titleSlots = uniqueCreatorResults.length ? Math.max(limit - 3, Math.ceil(limit/2)) : limit;
+  const merged = titleResults.slice(0, titleSlots).concat(uniqueCreatorResults);
+  return merged.slice(0, limit);
+}
+
+async function malSearchByTitle(type, q, limit=8){
   if(MAL_PROXY && !MAL_PROXY.includes('TON-PROJET')){
     try{
       const controller=new AbortController();
@@ -2596,6 +2613,32 @@ async function malSearch(type, q, limit=8){
   }
   const d=await jikan(`/${type}?q=${encodeURIComponent(q)}&limit=${limit}&sfw`);
   return (d.data||[]).map(x=>{x._type=type;return x});
+}
+
+// Recherche par créateur : auteur du manga (mangaka) ou studio d'animation.
+// Passe par Jikan (les auteurs/studios ne sont pas gérés par le proxy MAL) :
+// 1) on cherche la personne/le studio par son nom, 2) on récupère ses œuvres.
+async function malSearchByCreator(type, q, limit=8){
+  if(!q || q.trim().length<2) return [];
+  if(type==='manga'){
+    const pd=await jikan(`/people?q=${encodeURIComponent(q)}&limit=3`);
+    const person=(pd.data||[])[0];
+    if(!person) return [];
+    const md=await jikan(`/people/${person.mal_id}/manga`);
+    return (md.data||[]).slice(0,limit).map(x=>{
+      const m=x.manga||x;
+      m._type='manga';
+      m._matchedCreator=person.name;
+      return m;
+    });
+  } else {
+    const pd=await jikan(`/producers?q=${encodeURIComponent(q)}&limit=3`);
+    const studio=(pd.data||[])[0];
+    if(!studio) return [];
+    const studioName=(studio.titles||[]).find(t=>t.type==='Default')?.title || (studio.titles||[])[0]?.title || q;
+    const ad=await jikan(`/anime?producers=${studio.mal_id}&limit=${limit}&order_by=popularity&sort=asc`);
+    return (ad.data||[]).map(x=>{ x._type='anime'; x._matchedCreator=studioName; return x; });
+  }
 }
 // Classement (top/popularité) via MAL officiel (fallback Jikan). rankingType: 'all'|'bypopularity'|...
 async function malRanking(type, rankingType, limit=8){
@@ -2868,7 +2911,7 @@ function coverCard(item, showTypePill=false){
       </div>
     </div>
     <div class="cc-title">${esc(item.title)}</div>
-    <div class="cc-meta">${item.year||item.published?.prop?.from?.year||item.aired?.prop?.from?.year||''}</div>
+    <div class="cc-meta">${item._matchedCreator?`✎ ${esc(item._matchedCreator)}`:(item.year||item.published?.prop?.from?.year||item.aired?.prop?.from?.year||'')}</div>
   </div>`;
 }
 
@@ -3461,6 +3504,11 @@ async function openWork(malId, type='manga', navOrigin=null){
       // Sauvegarder le score communauté pour le tri
       const communityScore=w.score||0;
       if(communityScore) S.tracking[malId]._communityScore=communityScore;
+      // Auteurs (manga) / Studios (anime) — pour la recherche et le "Top auteurs/studios"
+      const authorNames=(w.authors||[]).map(a=>a.name).filter(Boolean);
+      if(authorNames.length) S.tracking[malId]._authors=authorNames;
+      const studioNames=(w.studios||[]).map(s=>s.name).filter(Boolean);
+      if(studioNames.length) S.tracking[malId]._studios=studioNames;
       save();
     }
     renderWorkPage(w);
@@ -3920,6 +3968,10 @@ function quickTrack(malId, type, title, cover){
       if(genreNames.length){ S.tracking[malId]._genres=genreNames; changed=true; }
       if(w.status){ S.tracking[malId]._pubStatus=w.status; changed=true; }
       if(w.score){ S.tracking[malId]._communityScore=w.score; changed=true; }
+      const authorNames=(w.authors||[]).map(a=>a.name).filter(Boolean);
+      if(authorNames.length){ S.tracking[malId]._authors=authorNames; changed=true; }
+      const studioNames=(w.studios||[]).map(s=>s.name).filter(Boolean);
+      if(studioNames.length){ S.tracking[malId]._studios=studioNames; changed=true; }
       if(type==='manga' && w.volumes){ S.tracking[malId]._totalVolumes=w.volumes; changed=true; }
       if(changed){ save(); renderSuivi(); }
     }).catch(()=>{});
@@ -5795,7 +5847,7 @@ function renderSuivi(){
   ['manga','anime'].forEach(type=>{
     const items=all.filter(t=>
       t.type===type &&
-      (!query||t.title.toLowerCase().includes(query)) &&
+      (!query||t.title.toLowerCase().includes(query)||(t._authors||[]).some(a=>a.toLowerCase().includes(query))||(t._studios||[]).some(s=>s.toLowerCase().includes(query))) &&
       (_safGenres.size===0||[..._safGenres].every(g=>(t._genres||[]).concat(t._themes||[]).includes(g))) &&
       (_safGenresExcl.size===0||[..._safGenresExcl].every(g=>!(t._genres||[]).concat(t._themes||[]).includes(g))) &&
       (_safNoTag?(!(t._tags||[]).length):(
@@ -6281,6 +6333,34 @@ function getTierIndexLow(rating){
 }
 let _lowTierOpen=false;
 let _showAbandoned=false;
+let _tlTags=new Set();
+function toggleTLTagPanel(){
+  const wrap=document.getElementById('tl-tag-pills-wrap');
+  const open=wrap.style.display==='none'||!wrap.style.display;
+  wrap.style.display=open?'flex':'none';
+  document.getElementById('tl-tags-btn').classList.toggle('btn-primary', open);
+  document.getElementById('tl-tags-btn').classList.toggle('btn-ghost', !open);
+  if(open) renderTLTagPills();
+}
+function renderTLTagPills(){
+  const wrap=document.getElementById('tl-tag-pills-wrap');
+  const sorted=[...(S.allTags||[])].sort();
+  if(!sorted.length){ wrap.innerHTML='<span style="font-size:11.5px;color:var(--t3);font-style:italic">Aucun tag créé pour le moment.</span>'; return; }
+  wrap.innerHTML='<button class="saf-pill'+(_tlTags.size===0?' on':'')+'" onclick="clearTLTags()">Tous</button>'
+    +sorted.map(g=>`<button class="saf-pill${_tlTags.has(g)?' on':''}" onclick="toggleTLTag('${esc(g).replace(/'/g,"\\'")}',this)">${esc(g)}</button>`).join('');
+}
+function toggleTLTag(tag, btn){
+  if(_tlTags.has(tag)) _tlTags.delete(tag); else _tlTags.add(tag);
+  renderTLTagPills();
+  renderTierList('main');
+  if(_lowTierOpen) renderTierList('low');
+}
+function clearTLTags(){
+  _tlTags.clear();
+  renderTLTagPills();
+  renderTierList('main');
+  if(_lowTierOpen) renderTierList('low');
+}
 function toggleShowAbandoned(btn){
   _showAbandoned=!_showAbandoned;
   btn.classList.toggle('btn-primary', _showAbandoned);
@@ -6347,6 +6427,7 @@ function renderTierList(variant='main'){
     if(!ALLOWED_STATUSES.has(t.status)) return false; // En cours et Abandonné exclus
     if(filter!=='all'&&t.type!==filter) return false;
     if(linkedSrcs.has(String(t.mal_id)+'_'+t.type)) return false;
+    if(_tlTags.size>0 && ![..._tlTags].every(g=>(t._tags||[]).includes(g))) return false;
     // Remarque : une œuvre qui appartient à une catégorie notée s'affiche quand même
     // individuellement ici, EN PLUS de la tuile de la catégorie plus bas — c'est voulu :
     // l'utilisateur veut voir l'œuvre par elle-même même si elle fait aussi partie d'un groupe.
