@@ -5651,7 +5651,7 @@ async function loadRelations(w){
 
 // ─── MIGRATION : récupérer les scores communauté manquants ───
 async function fetchMissingScores(){
-  const missing=Object.values(S.tracking).filter(t=>(!t._communityScore||!t._pubStatus||(t.type==='manga'&&!t._totalVolumes)) && t.mal_id && t.type && t.mal_id!=='undefined' && t.type!=='undefined');
+  const missing=Object.values(S.tracking).filter(t=>(!t._communityScore||!t._pubStatus||(t.type==='manga'&&!t._totalVolumes)||(t.type==='manga'&&!t._authors)||(t.type==='anime'&&!t._studios)) && t.mal_id && t.type && t.mal_id!=='undefined' && t.type!=='undefined');
   if(!missing.length) return;
   let changed=false;
   for(const t of missing){
@@ -5665,6 +5665,11 @@ async function fetchMissingScores(){
       if(pubStatus && S.tracking[t.mal_id]._pubStatus!==pubStatus){ S.tracking[t.mal_id]._pubStatus=pubStatus; changed=true; }
       // Nombre total de tomes de la série (pour le filtre avancé "Tomes de la série")
       if(t.type==='manga' && w?.volumes && !S.tracking[t.mal_id]._totalVolumes){ S.tracking[t.mal_id]._totalVolumes=w.volumes; changed=true; }
+      // Auteurs (manga) / Studios (anime) — pour la recherche par créateur dans le Suivi
+      const authorNames=(w?.authors||[]).map(a=>a.name).filter(Boolean);
+      if(authorNames.length && !S.tracking[t.mal_id]._authors){ S.tracking[t.mal_id]._authors=authorNames; changed=true; }
+      const studioNames=(w?.studios||[]).map(s=>s.name).filter(Boolean);
+      if(studioNames.length && !S.tracking[t.mal_id]._studios){ S.tracking[t.mal_id]._studios=studioNames; changed=true; }
       // Aussi assigner une date si manquante
       if(!S.tracking[t.mal_id]._addedAt){ S.tracking[t.mal_id]._addedAt=Date.now(); changed=true; }
     }catch(e){}
@@ -8292,9 +8297,13 @@ function saveScatReview(){
 async function openScoreStats(malId, type){
   openM('m-score-stats');
   const body=document.getElementById('score-stats-body');
-  body.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div></div>';
+  body.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div> Chargement…</div>';
+  const malUrl=`https://myanimelist.net/${type}/${malId}/_/stats`;
   try{
-    const d=await jikan(`/${type}/${malId}/statistics`);
+    // Jikan doit parfois scraper la page MAL à la volée la 1ère fois (pas encore en cache
+    // chez lui) : ça peut être lent et échouer une fois avant de réussir, donc plus de
+    // tentatives que d'habitude ici plutôt que d'abandonner trop vite.
+    const d=await jikan(`/${type}/${malId}/statistics`, 6);
     const raw=d?.data?.scores;
     if(!raw) throw new Error('no stats in response');
     // Jikan v4 renvoie "scores" comme un TABLEAU [{score,votes,percentage}, ...] et non un
@@ -8322,7 +8331,11 @@ async function openScoreStats(malId, type){
     body.innerHTML=html;
   }catch(e){
     console.error('openScoreStats a échoué:', e);
-    body.innerHTML='<p style="color:var(--t3);font-size:13px;padding:16px 0;text-align:center">Répartition des notes indisponible pour cette œuvre.</p>';
+    body.innerHTML=`<div style="text-align:center;padding:16px 0">
+      <p style="color:var(--t3);font-size:13px;margin-bottom:12px">Impossible de charger la répartition pour le moment (Jikan est parfois lent/saturé).</p>
+      <button class="btn btn-ghost btn-sm" onclick="openScoreStats(${malId},'${type}')" style="margin-right:6px">🔄 Réessayer</button>
+      <a class="btn btn-ghost btn-sm" href="${malUrl}" target="_blank" rel="noopener">Voir sur MyAnimeList ↗</a>
+    </div>`;
   }
 }
 
