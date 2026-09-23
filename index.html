@@ -2583,19 +2583,11 @@ function malListItemToShape(item, type){
   return w;
 }
 // Recherche texte via MAL officiel (fallback Jikan si proxy indispo). Retourne un tableau format Jikan.
+// NB : la recherche par auteur/studio a été retirée d'ici (peu fiable via /people et /producers
+// de Jikan). Elle reste disponible uniquement dans le Suivi, sur les auteurs/studios déjà
+// connus des œuvres suivies (voir _authors/_studios dans S.tracking + fetchMissingScores()).
 async function malSearch(type, q, limit=8){
-  const titleResults = await malSearchByTitle(type, q, limit);
-  // En plus de la recherche par titre : si le texte tapé correspond à un auteur (manga)
-  // ou un studio (animé), on ajoute aussi leurs œuvres aux résultats.
-  let creatorResults = [];
-  try{ creatorResults = await malSearchByCreator(type, q, limit); }catch(e){ /* pas grave, on garde juste le titre */ }
-  const seen = new Set(titleResults.map(x=>x.mal_id));
-  const uniqueCreatorResults = creatorResults.filter(x=>x && x.mal_id && !seen.has(x.mal_id));
-  // On réserve toujours un peu de place aux résultats "par créateur" (auteur/studio) pour
-  // qu'ils ne soient pas noyés si la recherche par titre remplit déjà tous les emplacements.
-  const titleSlots = uniqueCreatorResults.length ? Math.max(limit - 3, Math.ceil(limit/2)) : limit;
-  const merged = titleResults.slice(0, titleSlots).concat(uniqueCreatorResults);
-  return merged.slice(0, limit);
+  return malSearchByTitle(type, q, limit);
 }
 
 async function malSearchByTitle(type, q, limit=8){
@@ -8303,9 +8295,12 @@ async function openScoreStats(malId, type){
     // Jikan doit parfois scraper la page MAL à la volée la 1ère fois (pas encore en cache
     // chez lui) : ça peut être lent et échouer une fois avant de réussir, donc plus de
     // tentatives que d'habitude ici plutôt que d'abandonner trop vite.
-    const d=await jikan(`/${type}/${malId}/statistics`, 6);
+    const d=await jikan(`/${type}/${malId}/statistics`, 8);
     const raw=d?.data?.scores;
     if(!raw) throw new Error('no stats in response');
+    // Si la répartition existe mais que personne n'a encore noté (courant sur les œuvres
+    // peu populaires), toutes les valeurs sont à 0 — ce n'est pas une erreur, on l'affiche
+    // normalement (barres vides) plutôt que de tomber dans le catch.
     // Jikan v4 renvoie "scores" comme un TABLEAU [{score,votes,percentage}, ...] et non un
     // objet indexé par note — on normalise ici pour couvrir aussi l'autre forme au cas où.
     const byScore={};
@@ -9278,6 +9273,10 @@ async function loadFromFirebase(){
     setTimeout(migrateAllImagesToCloudinary, 2000);
     // Initialiser le routing APRÈS que les données sont prêtes
     initRouting();
+    // Récupérer dès le lancement les auteurs/studios (et autres infos manquantes) de tout
+    // le Suivi, pour que la recherche par auteur/studio du Suivi soit utilisable tout de
+    // suite, même si on n'ouvre pas la page Suivi en premier.
+    fetchMissingScores();
   }catch(e){
     console.error('Firebase load error',e);
     // Même en cas d'erreur, afficher la page correcte
