@@ -1389,6 +1389,12 @@ textarea.fi{resize:vertical;min-height:72px}
       <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-createlist')">Annuler</button>
       <button class="btn btn-primary" style="flex:1" onclick="doCreateList()">Créer</button>
     </div>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+      <label class="fl" style="display:block;margin-bottom:6px">Ou importer un fichier JSON (crée la liste directement)</label>
+      <input type="file" id="cl-json-input" accept=".json,application/json" style="display:none" onchange="importListJSON(this.files[0])">
+      <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('cl-json-input').click()">📂 Importer un JSON</button>
+      <p style="font-size:11px;color:var(--t3);margin-top:6px">Format attendu : {"title":"...", "items":[{"id":123,"title":"...","cover":"...","type":"manga"}, ...]}</p>
+    </div>
   </div>
 </div>
 
@@ -2119,10 +2125,16 @@ textarea.fi{resize:vertical;min-height:72px}
       </div>
     </div>
 
-    <!-- Row 3: Top auteurs/studios -->
+    <!-- Row 3: Top auteurs -->
     <div style="margin-top:32px">
-      <div class="sh"><h2 class="sh-title">Top auteurs / studios</h2></div>
+      <div class="sh"><h2 class="sh-title">Top auteurs <span style="font-weight:400;color:var(--t3);font-size:12px">(classés par nombre de tomes)</span></h2></div>
       <div id="top-authors" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div>
+    </div>
+
+    <!-- Row 4: Top studios -->
+    <div style="margin-top:32px">
+      <div class="sh"><h2 class="sh-title">Top studios <span style="font-weight:400;color:var(--t3);font-size:12px">(classés par nombre d'épisodes)</span></h2></div>
+      <div id="top-studios" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div>
     </div>
 
     <!-- Sauvegarde manuelle complète (export/import) -->
@@ -2196,6 +2208,14 @@ textarea.fi{resize:vertical;min-height:72px}
   <div class="modal" style="max-width:420px;max-height:80vh;overflow-y:auto">
     <div class="modal-title"><span>Répartition des notes</span><span class="modal-close" onclick="closeM('m-score-stats')">✕</span></div>
     <div id="score-stats-body"></div>
+  </div>
+</div>
+<!-- ═══════════════════════════════════════════ -->
+<div class="modal-bg" id="m-creator-works">
+  <div class="modal" style="max-width:460px;max-height:82vh;overflow-y:auto">
+    <div class="modal-title"><span id="creator-works-title">Œuvres</span><span class="modal-close" onclick="closeM('m-creator-works')">✕</span></div>
+    <div id="creator-works-filters" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px"></div>
+    <div id="creator-works-list"></div>
   </div>
 </div>
 <!-- ═══════════════════════════════════════════ -->
@@ -2583,11 +2603,19 @@ function malListItemToShape(item, type){
   return w;
 }
 // Recherche texte via MAL officiel (fallback Jikan si proxy indispo). Retourne un tableau format Jikan.
-// NB : la recherche par auteur/studio a été retirée d'ici (peu fiable via /people et /producers
-// de Jikan). Elle reste disponible uniquement dans le Suivi, sur les auteurs/studios déjà
-// connus des œuvres suivies (voir _authors/_studios dans S.tracking + fetchMissingScores()).
 async function malSearch(type, q, limit=8){
-  return malSearchByTitle(type, q, limit);
+  const titleResults = await malSearchByTitle(type, q, limit);
+  // En plus de la recherche par titre : si le texte tapé correspond à un auteur (manga)
+  // ou un studio (animé), on ajoute aussi leurs œuvres aux résultats.
+  let creatorResults = [];
+  try{ creatorResults = await malSearchByCreator(type, q, limit); }catch(e){ /* pas grave, on garde juste le titre */ }
+  const seen = new Set(titleResults.map(x=>x.mal_id));
+  const uniqueCreatorResults = creatorResults.filter(x=>x && x.mal_id && !seen.has(x.mal_id));
+  // On réserve toujours un peu de place aux résultats "par créateur" (auteur/studio) pour
+  // qu'ils ne soient pas noyés si la recherche par titre remplit déjà tous les emplacements.
+  const titleSlots = uniqueCreatorResults.length ? Math.max(limit - 3, Math.ceil(limit/2)) : limit;
+  const merged = titleResults.slice(0, titleSlots).concat(uniqueCreatorResults);
+  return merged.slice(0, limit);
 }
 
 async function malSearchByTitle(type, q, limit=8){
@@ -3501,6 +3529,8 @@ async function openWork(malId, type='manga', navOrigin=null){
       if(authorNames.length) S.tracking[malId]._authors=authorNames;
       const studioNames=(w.studios||[]).map(s=>s.name).filter(Boolean);
       if(studioNames.length) S.tracking[malId]._studios=studioNames;
+      if(type==='manga' && w.volumes) S.tracking[malId]._totalVolumes=w.volumes;
+      if(type==='anime' && w.episodes) S.tracking[malId]._totalEpisodes=w.episodes;
       save();
     }
     renderWorkPage(w);
@@ -4434,6 +4464,54 @@ function removeFromListDetail(idx){
   renderListDetail();
 }
 
+// Complète en arrière-plan les couvertures manquantes d'une liste importée (le JSON peut
+// ne contenir que id/title/type : les images sont récupérées via l'API MAL/proxy).
+async function fillListCovers(listId){
+  const l=S.lists.find(x=>x.id===listId);
+  if(!l) return;
+  let changed=false;
+  for(const it of l.items){
+    if(it.cover) continue;
+    try{
+      const w=await fetchWorkMain(it.type, it.id);
+      const url=w?.images?.jpg?.large_image_url||w?.images?.jpg?.image_url||'';
+      if(url){ it.cover=url; changed=true; }
+    }catch(e){}
+  }
+  if(changed){ save(); renderLists(); }
+}
+
+function importListJSON(file){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    let data;
+    try{ data=JSON.parse(e.target.result); }
+    catch(err){ toast('Fichier JSON invalide','err'); return; }
+    const title=(data.title||'Liste importée').toString().trim();
+    const rawItems=Array.isArray(data.items)?data.items:Array.isArray(data)?data:null;
+    if(!rawItems){ toast('JSON invalide : il faut un champ "items" (tableau)','err'); return; }
+    const items=rawItems.map(it=>({
+      id: Number(it.id||it.mal_id),
+      title: (it.title||'').toString(),
+      cover: (it.cover||it.image||'').toString(),
+      type: (it.type==='anime'?'anime':'manga')
+    })).filter(it=>it.id && it.title);
+    if(!items.length){ toast('Aucune œuvre valide trouvée dans le JSON','err'); return; }
+    const type=['normal','rated','image'].includes(data.type)?data.type:'normal';
+    const listId='l'+Date.now();
+    S.lists.push({id:listId, title, desc:(data.desc||'').toString(), items, type, ratings:{}, tierLabels:{}});
+    save();
+    closeM('m-createlist');
+    document.getElementById('cl-json-input').value='';
+    renderLists();
+    toast(`Liste "${title}" importée avec ${items.length} œuvre${items.length>1?'s':''} ✓`,'ok');
+    fillListCovers(listId);
+  };
+  reader.onerror=()=>toast('Erreur de lecture du fichier','err');
+  reader.readAsText(file);
+}
+
 function doCreateList(){
   const title=document.getElementById('cl-title').value.trim();
   const desc=document.getElementById('cl-desc').value.trim();
@@ -5275,35 +5353,87 @@ function renderRatingCurve(rated){
   ctx.stroke();
 }
 
-function renderTopAuthors(all){
-  const el=document.getElementById('top-authors');
-  if(!el) return;
-  const authorCount={};
-  all.forEach(t=>{
-    (t._authors||[]).forEach(a=>{
-      const key=a.name||a;
+// Regroupe les œuvres suivies par créateur (auteur pour le manga, studio pour l'animé),
+// avec un "poids" = nombre total de tomes (manga) ou d'épisodes (animé) de la série —
+// et pas juste le nombre d'œuvres, pour refléter "combien j'ai lu de cet auteur".
+function buildCreatorGroups(all, type){
+  const field = type==='manga' ? '_authors' : '_studios';
+  const groups={};
+  all.filter(t=>t.type===type).forEach(t=>{
+    (t[field]||[]).forEach(a=>{
+      const key=(a&&a.name)||a;
       if(!key) return;
-      if(!authorCount[key]) authorCount[key]={count:0,works:[],role:a.role||''};
-      authorCount[key].count++;
-      if(t.cover&&authorCount[key].works.length<3) authorCount[key].works.push(t.cover);
+      if(!groups[key]) groups[key]={name:key,weight:0,works:[]};
+      const weight = type==='manga' ? (t._totalVolumes||t.volume||0) : (t._totalEpisodes||t.episode||0);
+      groups[key].weight += weight;
+      groups[key].works.push(t);
     });
   });
-  const top=Object.entries(authorCount).sort((a,b)=>b[1].count-a[1].count).slice(0,8);
+  return groups;
+}
+
+function renderTopAuthors(all){
+  renderCreatorTop(all, 'manga', 'top-authors', 'tome');
+  renderCreatorTop(all, 'anime', 'top-studios', 'épisode');
+}
+
+function renderCreatorTop(all, type, elId, unitLabel){
+  const el=document.getElementById(elId);
+  if(!el) return;
+  const groups=buildCreatorGroups(all, type);
+  const top=Object.values(groups).sort((a,b)=>b.weight-a.weight).slice(0,8);
   if(!top.length){
-    el.innerHTML='<p style="color:var(--t3);font-size:13px">Pas encore de données auteurs.</p>';
+    el.innerHTML=`<p style="color:var(--t3);font-size:13px">Pas encore de données ${type==='manga'?'auteurs':'studios'}.</p>`;
     return;
   }
-  el.innerHTML=top.map(([name,{count,works,role}])=>`
-    <div style="background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
+  el.innerHTML=top.map(({name,weight,works})=>`
+    <div style="background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'" onclick="openCreatorWorks('${esc(name).replace(/'/g,"\\'")}','${type}')">
       <div style="display:flex;gap:2px;flex-shrink:0">
-        ${works.slice(0,2).map(c=>`<img src="${c}" style="width:28px;height:40px;object-fit:cover;border-radius:4px">`).join('')}
+        ${works.slice(0,2).map(t=>`<img src="${t.cover||''}" style="width:28px;height:40px;object-fit:cover;border-radius:4px">`).join('')}
       </div>
       <div style="min-width:0">
         <div style="font-size:13px;font-weight:800;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div>
-        <div style="font-size:11px;color:var(--t3);margin-top:2px">${count} œuvre${count>1?'s':''}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">${works.length} œuvre${works.length>1?'s':''}${weight?' · '+weight+' '+unitLabel+(weight>1?'s':''):''}</div>
       </div>
-      <div style="margin-left:auto;font-size:18px;font-weight:900;font-family:'Syne',sans-serif;color:var(--acc2);flex-shrink:0">${count}</div>
+      <div style="margin-left:auto;font-size:18px;font-weight:900;font-family:'Syne',sans-serif;color:var(--acc2);flex-shrink:0">${weight||works.length}</div>
     </div>`).join('');
+}
+
+// ─── POPUP "ŒUVRES D'UN CRÉATEUR" (auteur ou studio), avec filtre par statut ───
+let _creatorWorksCache=null;
+let _creatorStatusFilter='';
+function openCreatorWorks(name, type){
+  const groups=buildCreatorGroups(Object.values(S.tracking), type);
+  const group=groups[name];
+  if(!group) return;
+  _creatorWorksCache={name, type, works:group.works};
+  _creatorStatusFilter='';
+  document.getElementById('creator-works-title').textContent=`${type==='manga'?'✎':'🎬'} ${name}`;
+  renderCreatorWorksList();
+  openM('m-creator-works');
+}
+function renderCreatorWorksList(){
+  if(!_creatorWorksCache) return;
+  const {works}=_creatorWorksCache;
+  const statuses=[...new Set(works.map(t=>t.status).filter(Boolean))];
+  const filtersEl=document.getElementById('creator-works-filters');
+  filtersEl.innerHTML='<button class="saf-pill'+(!_creatorStatusFilter?' on':'')+'" onclick="setCreatorStatusFilter(\'\')">Tous</button>'
+    + statuses.map(s=>`<button class="saf-pill${_creatorStatusFilter===s?' on':''}" onclick="setCreatorStatusFilter('${s.replace(/'/g,"\\'")}')">${esc(s)}</button>`).join('');
+  const shown = _creatorStatusFilter ? works.filter(t=>t.status===_creatorStatusFilter) : works;
+  const listEl=document.getElementById('creator-works-list');
+  if(!shown.length){ listEl.innerHTML='<p style="color:var(--t3);font-size:13px;padding:10px 0">Aucune œuvre pour ce filtre.</p>'; return; }
+  listEl.innerHTML=shown.map(t=>`
+    <div class="cal-item-row" onclick="closeM('m-creator-works');openWork(${t.mal_id},'${t.type}')">
+      <img class="cal-item-cover" src="${t.cover||''}" loading="lazy">
+      <div class="cal-item-info">
+        <div class="cal-item-title">${esc(t.title||'')}</div>
+        <div class="cal-item-meta">${esc(t.status||'—')}</div>
+      </div>
+    </div>`).join('');
+}
+function setCreatorStatusFilter(status){
+  _creatorStatusFilter=status;
+  renderCreatorWorksList();
 }
 
 // ─── COLLECTION ───
@@ -5643,7 +5773,7 @@ async function loadRelations(w){
 
 // ─── MIGRATION : récupérer les scores communauté manquants ───
 async function fetchMissingScores(){
-  const missing=Object.values(S.tracking).filter(t=>(!t._communityScore||!t._pubStatus||(t.type==='manga'&&!t._totalVolumes)||(t.type==='manga'&&!t._authors)||(t.type==='anime'&&!t._studios)) && t.mal_id && t.type && t.mal_id!=='undefined' && t.type!=='undefined');
+  const missing=Object.values(S.tracking).filter(t=>(!t._communityScore||!t._pubStatus||(t.type==='manga'&&!t._totalVolumes)||(t.type==='manga'&&!t._authors)||(t.type==='anime'&&!t._studios)||(t.type==='anime'&&!t._totalEpisodes)) && t.mal_id && t.type && t.mal_id!=='undefined' && t.type!=='undefined');
   if(!missing.length) return;
   let changed=false;
   for(const t of missing){
@@ -5657,6 +5787,7 @@ async function fetchMissingScores(){
       if(pubStatus && S.tracking[t.mal_id]._pubStatus!==pubStatus){ S.tracking[t.mal_id]._pubStatus=pubStatus; changed=true; }
       // Nombre total de tomes de la série (pour le filtre avancé "Tomes de la série")
       if(t.type==='manga' && w?.volumes && !S.tracking[t.mal_id]._totalVolumes){ S.tracking[t.mal_id]._totalVolumes=w.volumes; changed=true; }
+      if(t.type==='anime' && w?.episodes && !S.tracking[t.mal_id]._totalEpisodes){ S.tracking[t.mal_id]._totalEpisodes=w.episodes; changed=true; }
       // Auteurs (manga) / Studios (anime) — pour la recherche par créateur dans le Suivi
       const authorNames=(w?.authors||[]).map(a=>a.name).filter(Boolean);
       if(authorNames.length && !S.tracking[t.mal_id]._authors){ S.tracking[t.mal_id]._authors=authorNames; changed=true; }
@@ -8295,12 +8426,9 @@ async function openScoreStats(malId, type){
     // Jikan doit parfois scraper la page MAL à la volée la 1ère fois (pas encore en cache
     // chez lui) : ça peut être lent et échouer une fois avant de réussir, donc plus de
     // tentatives que d'habitude ici plutôt que d'abandonner trop vite.
-    const d=await jikan(`/${type}/${malId}/statistics`, 8);
+    const d=await jikan(`/${type}/${malId}/statistics`, 6);
     const raw=d?.data?.scores;
     if(!raw) throw new Error('no stats in response');
-    // Si la répartition existe mais que personne n'a encore noté (courant sur les œuvres
-    // peu populaires), toutes les valeurs sont à 0 — ce n'est pas une erreur, on l'affiche
-    // normalement (barres vides) plutôt que de tomber dans le catch.
     // Jikan v4 renvoie "scores" comme un TABLEAU [{score,votes,percentage}, ...] et non un
     // objet indexé par note — on normalise ici pour couvrir aussi l'autre forme au cas où.
     const byScore={};
@@ -9273,10 +9401,6 @@ async function loadFromFirebase(){
     setTimeout(migrateAllImagesToCloudinary, 2000);
     // Initialiser le routing APRÈS que les données sont prêtes
     initRouting();
-    // Récupérer dès le lancement les auteurs/studios (et autres infos manquantes) de tout
-    // le Suivi, pour que la recherche par auteur/studio du Suivi soit utilisable tout de
-    // suite, même si on n'ouvre pas la page Suivi en premier.
-    fetchMissingScores();
   }catch(e){
     console.error('Firebase load error',e);
     // Même en cas d'erreur, afficher la page correcte
