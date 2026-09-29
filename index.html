@@ -233,6 +233,10 @@ body::after{
   font-size:13px;color:#fff;transition:all .15s;cursor:pointer;
 }
 .cc-ov-btn:hover{background:var(--acc);border-color:var(--acc);transform:scale(1.1)}
+.list-note-badge{position:absolute;bottom:5px;right:5px;z-index:2;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;transition:transform .15s}
+.list-note-badge:hover{transform:scale(1.15)}
+.list-section-title{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:var(--text);margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
 .cc-rating{
   display:inline-flex;align-items:center;gap:3px;
   background:rgba(0,0,0,.75);backdrop-filter:blur(6px);
@@ -2208,6 +2212,13 @@ textarea.fi{resize:vertical;min-height:72px}
   <div class="modal" style="max-width:420px;max-height:80vh;overflow-y:auto">
     <div class="modal-title"><span>Répartition des notes</span><span class="modal-close" onclick="closeM('m-score-stats')">✕</span></div>
     <div id="score-stats-body"></div>
+  </div>
+</div>
+<!-- ═══════════════════════════════════════════ -->
+<div class="modal-bg" id="m-list-note">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-title"><span id="list-note-title">Note</span><span class="modal-close" onclick="closeM('m-list-note')">✕</span></div>
+    <p id="list-note-body" style="color:var(--t2);font-size:13.5px;line-height:1.7"></p>
   </div>
 </div>
 <!-- ═══════════════════════════════════════════ -->
@@ -4322,8 +4333,9 @@ function renderListDetail(){
     }
   }
 
-  // Grille des œuvres
-  const itemsHtml=list.items.length?`<div class="cg-lg" id="list-drag-grid">${list.items.map((item,i)=>{
+  // Grille des œuvres — regroupée par "section" (sous-partie) si le JSON importé en définit,
+  // sinon tout reste affiché à plat comme avant (compatibilité avec les listes existantes).
+  const renderOneItem=(item,i)=>{
     const myRating=isRated?(list.ratings[item.id]||0):0;
     const displayName=list.itemNames[item.id]||item.title;
     const ratingOptions=buildRatingOptions(myRating,'—');
@@ -4337,6 +4349,7 @@ function renderListDetail(){
       <div class="cc-wrap" onclick="openWork(${item.id},'${item.type}')">
         <img class="cc-img" src="${item.cover}" loading="lazy">
         ${myRating?`<div class="cc-rating" style="position:absolute;top:5px;left:5px;z-index:2">★ ${myRating}</div>`:''}
+        ${item.note?`<div class="list-note-badge" title="Voir la note" onclick="event.stopPropagation();openListItemNote('${esc(displayName).replace(/'/g,"\\'")}','${esc(item.note).replace(/'/g,"\\'")}')">💬</div>`:''}
         <div class="cc-overlay">
           <div class="cc-ov-btns">
             <div class="cc-ov-btn" onclick="event.stopPropagation();removeFromListDetail(${i})" title="Retirer" style="font-size:11px">✕</div>
@@ -4351,8 +4364,29 @@ function renderListDetail(){
         </select>
       </div>`:''}
     </div>`;
-  }).join('')}</div>`
-  :'<div class="empty"><div class="empty-icon">🎌</div><div class="empty-title">Liste vide</div></div>';
+  };
+
+  const hasSections = list.items.some(it=>it.section);
+  let itemsHtml;
+  if(!list.items.length){
+    itemsHtml='<div class="empty"><div class="empty-icon">🎌</div><div class="empty-title">Liste vide</div></div>';
+  } else if(hasSections){
+    // Regroupe en conservant l'ordre d'apparition des sections et des items dans le JSON
+    const sections=[];
+    const byName={};
+    list.items.forEach((item,i)=>{
+      const name=item.section||'';
+      if(!byName[name]){ byName[name]={name,items:[]}; sections.push(byName[name]); }
+      byName[name].items.push({item,i});
+    });
+    itemsHtml=sections.map(sec=>`
+      <div style="margin-bottom:22px">
+        ${sec.name?`<div class="list-section-title">${esc(sec.name)}</div>`:''}
+        <div class="cg-lg" id="list-drag-grid">${sec.items.map(({item,i})=>renderOneItem(item,i)).join('')}</div>
+      </div>`).join('');
+  } else {
+    itemsHtml=`<div class="cg-lg" id="list-drag-grid">${list.items.map((item,i)=>renderOneItem(item,i)).join('')}</div>`;
+  }
 
   document.getElementById('listdetail-body').innerHTML=`
     <h1 style="font-size:22px;font-family:'Syne',sans-serif;font-weight:800;margin-bottom:6px">${esc(list.title)}</h1>
@@ -4495,7 +4529,9 @@ function importListJSON(file){
       id: Number(it.id||it.mal_id),
       title: (it.title||'').toString(),
       cover: (it.cover||it.image||'').toString(),
-      type: (it.type==='anime'?'anime':'manga')
+      type: (it.type==='anime'?'anime':'manga'),
+      section: it.section ? it.section.toString() : undefined,
+      note: it.note ? it.note.toString() : undefined
     })).filter(it=>it.id && it.title);
     if(!items.length){ toast('Aucune œuvre valide trouvée dans le JSON','err'); return; }
     const type=['normal','rated','image'].includes(data.type)?data.type:'normal';
@@ -5356,10 +5392,12 @@ function renderRatingCurve(rated){
 // Regroupe les œuvres suivies par créateur (auteur pour le manga, studio pour l'animé),
 // avec un "poids" = nombre total de tomes (manga) ou d'épisodes (animé) de la série —
 // et pas juste le nombre d'œuvres, pour refléter "combien j'ai lu de cet auteur".
-function buildCreatorGroups(all, type){
+function buildCreatorGroups(all, type, onlyRead=false){
   const field = type==='manga' ? '_authors' : '_studios';
   const groups={};
-  all.filter(t=>t.type===type).forEach(t=>{
+  // onlyRead : pour le classement, on ne compte que ce qui a réellement été lu/vu
+  // (Terminé ou À jour) — un "Planifié" ne compte pas dans le top.
+  all.filter(t=>t.type===type && (!onlyRead || t.status==='Terminé' || t.status==='À jour')).forEach(t=>{
     (t[field]||[]).forEach(a=>{
       const key=(a&&a.name)||a;
       if(!key) return;
@@ -5380,7 +5418,7 @@ function renderTopAuthors(all){
 function renderCreatorTop(all, type, elId, unitLabel){
   const el=document.getElementById(elId);
   if(!el) return;
-  const groups=buildCreatorGroups(all, type);
+  const groups=buildCreatorGroups(all, type, true);
   const top=Object.values(groups).sort((a,b)=>b.weight-a.weight).slice(0,8);
   if(!top.length){
     el.innerHTML=`<p style="color:var(--t3);font-size:13px">Pas encore de données ${type==='manga'?'auteurs':'studios'}.</p>`;
@@ -8462,6 +8500,11 @@ async function openScoreStats(malId, type){
   }
 }
 
+function openListItemNote(title, note){
+  document.getElementById('list-note-title').textContent=title;
+  document.getElementById('list-note-body').textContent=note;
+  openM('m-list-note');
+}
 function openM(id){document.getElementById(id).classList.add('on')}
 function closeM(id){document.getElementById(id).classList.remove('on')}
 document.addEventListener('click',e=>{
