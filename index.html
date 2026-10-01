@@ -236,6 +236,7 @@ body::after{
 .list-note-badge{position:absolute;bottom:5px;right:5px;z-index:2;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;transition:transform .15s}
 .list-note-badge:hover{transform:scale(1.15)}
 .list-section-title{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:var(--text);margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.list-group-sep{grid-column:1/-1;height:1px;background:var(--border);margin:6px 0 10px;opacity:.6}
 
 .cc-rating{
   display:inline-flex;align-items:center;gap:3px;
@@ -4382,7 +4383,9 @@ function renderListDetail(){
     itemsHtml=sections.map(sec=>`
       <div style="margin-bottom:22px">
         ${sec.name?`<div class="list-section-title">${esc(sec.name)}</div>`:''}
-        <div class="cg-lg" id="list-drag-grid">${sec.items.map(({item,i})=>renderOneItem(item,i)).join('')}</div>
+        <div class="cg-lg" id="list-drag-grid">${sec.items.map(({item,i},pos)=>
+          (item.newGroup && pos>0 ? '<div class="list-group-sep"></div>' : '') + renderOneItem(item,i)
+        ).join('')}</div>
       </div>`).join('');
   } else {
     itemsHtml=`<div class="cg-lg" id="list-drag-grid">${list.items.map((item,i)=>renderOneItem(item,i)).join('')}</div>`;
@@ -4531,7 +4534,8 @@ function importListJSON(file){
       cover: (it.cover||it.image||'').toString(),
       type: (it.type==='anime'?'anime':'manga'),
       section: it.section ? it.section.toString() : undefined,
-      note: it.note ? it.note.toString() : undefined
+      note: it.note ? it.note.toString() : undefined,
+      newGroup: it.newGroup === true
     })).filter(it=>it.id && it.title);
     if(!items.length){ toast('Aucune œuvre valide trouvée dans le JSON','err'); return; }
     const type=['normal','rated','image'].includes(data.type)?data.type:'normal';
