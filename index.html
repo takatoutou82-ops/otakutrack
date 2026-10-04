@@ -4508,16 +4508,23 @@ function removeFromListDetail(idx){
 async function fillListCovers(listId){
   const l=S.lists.find(x=>x.id===listId);
   if(!l) return;
-  let changed=false;
+  let sinceLastRefresh=0;
+  const refresh=()=>{
+    save();
+    if(S.currentListId===listId) renderListDetail(); else renderLists();
+  };
   for(const it of l.items){
     if(it.cover) continue;
     try{
       const w=await fetchWorkMain(it.type, it.id);
       const url=w?.images?.jpg?.large_image_url||w?.images?.jpg?.image_url||'';
-      if(url){ it.cover=url; changed=true; }
+      if(url){ it.cover=url; sinceLastRefresh++; }
     }catch(e){}
+    // Rafraîchit par petits paquets plutôt que d'attendre la fin des ~80 requêtes :
+    // les couvertures apparaissent progressivement au lieu de tout ou rien à la fin.
+    if(sinceLastRefresh>=4){ refresh(); sinceLastRefresh=0; }
   }
-  if(changed){ save(); renderLists(); }
+  if(sinceLastRefresh>0) refresh();
 }
 
 function importListJSON(file){
