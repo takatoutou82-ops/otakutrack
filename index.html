@@ -1399,7 +1399,7 @@ textarea.fi{resize:vertical;min-height:72px}
       <label class="fl" style="display:block;margin-bottom:6px">Ou importer un fichier JSON (crée la liste directement)</label>
       <input type="file" id="cl-json-input" accept=".json,application/json" style="display:none" onchange="importListJSON(this.files[0])">
       <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('cl-json-input').click()">📂 Importer un JSON</button>
-      <p style="font-size:11px;color:var(--t3);margin-top:6px">Format attendu : {"title":"...", "items":[{"id":123,"title":"...","cover":"...","type":"manga"}, ...]}</p>
+      <p style="font-size:11px;color:var(--t3);margin-top:6px">1 liste : {"title":"...", "items":[{"id":123,"title":"...","cover":"...","type":"manga"}, ...]}<br>Plusieurs listes d'un coup : {"lists":[{"title":"...","items":[...]}, {"title":"...","items":[...]}, ...]}</p>
     </div>
   </div>
 </div>
@@ -2616,16 +2616,24 @@ function malListItemToShape(item, type){
   return w;
 }
 // Recherche texte via MAL officiel (fallback Jikan si proxy indispo). Retourne un tableau format Jikan.
+// Recherche rapide par titre uniquement — c'est CE que tous les champs de recherche du site
+// utilisent (catalogue pagination, dropdown de recherche globale, Suivi, catégories, collection...).
+// Ne dépend QUE du proxy MAL officiel (rapide, pas de file d'attente partagée), donc pas de
+// risque de ralentir ou de faire planter les autres recherches du site.
 async function malSearch(type, q, limit=8){
+  return malSearchByTitle(type, q, limit);
+}
+
+// Recherche élargie (titre + auteur/studio) — utilisée UNIQUEMENT par le catalogue Manga/Animé
+// (voir renderCatalog), là où ça a été explicitement demandé. Passe par Jikan (lent, file
+// d'attente partagée limitée en débit), donc on ne l'appelle jamais depuis les autres champs de
+// recherche du site pour ne pas reproduire le problème de lenteur/erreurs généralisées.
+async function malSearchWithCreator(type, q, limit=8){
   const titleResults = await malSearchByTitle(type, q, limit);
-  // En plus de la recherche par titre : si le texte tapé correspond à un auteur (manga)
-  // ou un studio (animé), on ajoute aussi leurs œuvres aux résultats.
   let creatorResults = [];
   try{ creatorResults = await malSearchByCreator(type, q, limit); }catch(e){ /* pas grave, on garde juste le titre */ }
   const seen = new Set(titleResults.map(x=>x.mal_id));
   const uniqueCreatorResults = creatorResults.filter(x=>x && x.mal_id && !seen.has(x.mal_id));
-  // On réserve toujours un peu de place aux résultats "par créateur" (auteur/studio) pour
-  // qu'ils ne soient pas noyés si la recherche par titre remplit déjà tous les emplacements.
   const titleSlots = uniqueCreatorResults.length ? Math.max(limit - 3, Math.ceil(limit/2)) : limit;
   const merged = titleResults.slice(0, titleSlots).concat(uniqueCreatorResults);
   return merged.slice(0, limit);
@@ -3303,8 +3311,8 @@ async function renderCatalog(type){
     const allIds=[...genres,...themes];
     let items, pagination=null;
     if(query && page===1){
-      // Recherche texte, 1ère page : MAL officiel (fallback Jikan)
-      items = await malSearch(type, query, 20);
+      // Recherche texte, 1ère page : MAL officiel + recherche par auteur/studio
+      items = await malSearchWithCreator(type, query, 20);
     } else if(allIds.length===0 && page===1){
       // Tri par popularité, 1ère page, sans filtre : MAL officiel (fallback Jikan)
       items = await malRanking(type, 'bypopularity', 20);
@@ -3415,7 +3423,7 @@ function onCatalogSearch(type, val){
     el.style.display='block';
     el.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div></div>';
     try{
-      const items=await malSearch(type, val, 8);
+      const items=await malSearchWithCreator(type, val, 8);
       if(!items.length){el.innerHTML='<div style="padding:14px;color:var(--t3);font-size:13px">Aucun résultat</div>';return}
       el.innerHTML=items.map(item=>{
         const frT=(item.titles||[]).find(t=>t.type==='French')?.title;
@@ -3425,7 +3433,7 @@ function onCatalogSearch(type, val){
           <img class="sfr-thumb" src="${item.images?.jpg?.image_url||''}" loading="lazy">
           <div class="sfr-info">
             <div class="sfr-title">${esc(dispT)}</div>
-            <div class="sfr-meta">${origT?esc(origT)+' · ':''} ${type==='manga'?(item.authors?.[0]?.name||''):(item.studios?.[0]?.name||'')} · ${item.score?'★ '+item.score:''}</div>
+            <div class="sfr-meta">${item._matchedCreator?'✎ trouvé via '+esc(item._matchedCreator)+' · ':(origT?esc(origT)+' · ':'')} ${type==='manga'?(item.authors?.[0]?.name||''):(item.studios?.[0]?.name||'')} · ${item.score?'★ '+item.score:''}</div>
           </div>
           <div class="sfr-type" style="${type==='manga'?'background:rgba(244,114,182,.15);color:var(--manga)':'background:rgba(56,189,248,.15);color:var(--anime)'}">${type==='manga'?'MANGA':'ANIMÉ'}</div>
         </div>`;}).join('');
@@ -4527,6 +4535,28 @@ async function fillListCovers(listId){
   if(sinceLastRefresh>0) refresh();
 }
 
+// Construit et enregistre une seule liste à partir d'un objet {title, desc, type, items}.
+// Retourne l'id de la liste créée, ou null si le JSON de cette liste est invalide.
+function buildListFromJSON(data){
+  const title=(data.title||'Liste importée').toString().trim();
+  const rawItems=Array.isArray(data.items)?data.items:Array.isArray(data)?data:null;
+  if(!rawItems) return null;
+  const items=rawItems.map(it=>({
+    id: Number(it.id||it.mal_id),
+    title: (it.title||'').toString(),
+    cover: (it.cover||it.image||'').toString(),
+    type: (it.type==='anime'?'anime':'manga'),
+    section: it.section ? it.section.toString() : undefined,
+    note: it.note ? it.note.toString() : undefined,
+    newGroup: it.newGroup === true
+  })).filter(it=>it.id && it.title);
+  if(!items.length) return null;
+  const type=['normal','rated','image'].includes(data.type)?data.type:'normal';
+  const listId='l'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  S.lists.push({id:listId, title, desc:(data.desc||'').toString(), items, type, ratings:{}, tierLabels:{}});
+  return listId;
+}
+
 function importListJSON(file){
   if(!file) return;
   const reader=new FileReader();
@@ -4534,22 +4564,31 @@ function importListJSON(file){
     let data;
     try{ data=JSON.parse(e.target.result); }
     catch(err){ toast('Fichier JSON invalide','err'); return; }
-    const title=(data.title||'Liste importée').toString().trim();
-    const rawItems=Array.isArray(data.items)?data.items:Array.isArray(data)?data:null;
-    if(!rawItems){ toast('JSON invalide : il faut un champ "items" (tableau)','err'); return; }
-    const items=rawItems.map(it=>({
-      id: Number(it.id||it.mal_id),
-      title: (it.title||'').toString(),
-      cover: (it.cover||it.image||'').toString(),
-      type: (it.type==='anime'?'anime':'manga'),
-      section: it.section ? it.section.toString() : undefined,
-      note: it.note ? it.note.toString() : undefined,
-      newGroup: it.newGroup === true
-    })).filter(it=>it.id && it.title);
-    if(!items.length){ toast('Aucune œuvre valide trouvée dans le JSON','err'); return; }
-    const type=['normal','rated','image'].includes(data.type)?data.type:'normal';
-    const listId='l'+Date.now();
-    S.lists.push({id:listId, title, desc:(data.desc||'').toString(), items, type, ratings:{}, tierLabels:{}});
+
+    // Format multi-listes : {"lists":[{title,items,...}, {title,items,...}, ...]}
+    // Un seul fichier importé crée alors plusieurs listes d'un coup.
+    if(Array.isArray(data.lists)){
+      const createdIds=[];
+      let failCount=0;
+      data.lists.forEach(listData=>{
+        const id=buildListFromJSON(listData);
+        if(id) createdIds.push(id); else failCount++;
+      });
+      if(!createdIds.length){ toast('Aucune liste valide trouvée dans le JSON','err'); return; }
+      save();
+      closeM('m-createlist');
+      document.getElementById('cl-json-input').value='';
+      renderLists();
+      toast(`${createdIds.length} liste${createdIds.length>1?'s':''} importée${createdIds.length>1?'s':''} ✓${failCount?` (${failCount} ignorée${failCount>1?'s':''}, invalide${failCount>1?'s':''})`:''}`,'ok');
+      createdIds.forEach(id=>fillListCovers(id));
+      return;
+    }
+
+    // Format liste unique (comportement existant, inchangé)
+    const listId=buildListFromJSON(data);
+    if(!listId){ toast('JSON invalide : il faut un champ "items" (tableau), ou "lists" pour un import multiple','err'); return; }
+    const title=S.lists.find(l=>l.id===listId).title;
+    const items=S.lists.find(l=>l.id===listId).items;
     save();
     closeM('m-createlist');
     document.getElementById('cl-json-input').value='';
