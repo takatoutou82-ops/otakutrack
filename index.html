@@ -2616,30 +2616,35 @@ function malListItemToShape(item, type){
   return w;
 }
 // Recherche texte via MAL officiel (fallback Jikan si proxy indispo). Retourne un tableau format Jikan.
-// Recherche rapide par titre uniquement — c'est CE que tous les champs de recherche du site
-// utilisent (catalogue pagination, dropdown de recherche globale, Suivi, catégories, collection...).
-// Ne dépend QUE du proxy MAL officiel (rapide, pas de file d'attente partagée), donc pas de
-// risque de ralentir ou de faire planter les autres recherches du site.
-async function malSearch(type, q, limit=8){
-  return malSearchByTitle(type, q, limit);
+// ─── RECHERCHE ───
+// "Dernière recherche gagne" : chaque champ de recherche (canal) a un compteur. newSearchToken(canal)
+// invalide toutes les recherches précédentes du même canal et renvoie une fonction isStale() qui
+// permet à une recherche en cours de savoir qu'elle a été remplacée. Sans ça, une ancienne recherche
+// lente qui finissait APRÈS la nouvelle écrasait ses résultats (ex : "One Piece" réaffiché après "Naruto").
+const _searchSeq = {};
+function newSearchToken(channel){
+  const n = (_searchSeq[channel] = (_searchSeq[channel]||0) + 1);
+  return () => _searchSeq[channel] !== n;
+}
+function _isStaleErr(e){ return !!(e && e.message === 'stale'); }
+
+// Mémoire des recherches par titre (10 min). La clé contient le type, le texte cherché ET la limite :
+// deux recherches différentes ne peuvent donc jamais se partager un résultat.
+const _titleSearchCache = new Map();
+const TITLE_SEARCH_TTL = 10*60*1000;
+
+// Recherche rapide par titre (proxy MAL officiel, repli Jikan). C'est ce que tous les champs de
+// recherche du site utilisent. Retourne un tableau au format Jikan.
+async function malSearch(type, q, limit=8, isStale=null){
+  return malSearchByTitle(type, q, limit, isStale);
 }
 
-// Recherche élargie (titre + auteur/studio) — utilisée UNIQUEMENT par le catalogue Manga/Animé
-// (voir renderCatalog), là où ça a été explicitement demandé. Passe par Jikan (lent, file
-// d'attente partagée limitée en débit), donc on ne l'appelle jamais depuis les autres champs de
-// recherche du site pour ne pas reproduire le problème de lenteur/erreurs généralisées.
-async function malSearchWithCreator(type, q, limit=8){
-  const titleResults = await malSearchByTitle(type, q, limit);
-  let creatorResults = [];
-  try{ creatorResults = await malSearchByCreator(type, q, limit); }catch(e){ /* pas grave, on garde juste le titre */ }
-  const seen = new Set(titleResults.map(x=>x.mal_id));
-  const uniqueCreatorResults = creatorResults.filter(x=>x && x.mal_id && !seen.has(x.mal_id));
-  const titleSlots = uniqueCreatorResults.length ? Math.max(limit - 3, Math.ceil(limit/2)) : limit;
-  const merged = titleResults.slice(0, titleSlots).concat(uniqueCreatorResults);
-  return merged.slice(0, limit);
-}
+async function malSearchByTitle(type, q, limit=8, isStale=null){
+  const key = `${type}|${q.trim().toLowerCase()}|${limit}`;
+  const hit = _titleSearchCache.get(key);
+  if(hit && Date.now()-hit.ts < TITLE_SEARCH_TTL) return hit.items;
 
-async function malSearchByTitle(type, q, limit=8){
+  let items = null;
   if(MAL_PROXY && !MAL_PROXY.includes('TON-PROJET')){
     try{
       const controller=new AbortController();
@@ -2648,24 +2653,34 @@ async function malSearchByTitle(type, q, limit=8){
       clearTimeout(tid);
       if(r.ok){
         const d=await r.json();
-        if(d && Array.isArray(d.data)) return d.data.map(x=>malListItemToShape(x.node||x, type));
+        if(d && Array.isArray(d.data)) items = d.data.map(x=>malListItemToShape(x.node||x, type));
       }
     }catch(e){ /* repli Jikan ci-dessous */ }
   }
-  const d=await jikan(`/${type}?q=${encodeURIComponent(q)}&limit=${limit}&sfw`);
-  return (d.data||[]).map(x=>{x._type=type;return x});
+  if(isStale && isStale()) throw new Error('stale');
+  if(!items){
+    const d=await jikan(`/${type}?q=${encodeURIComponent(q)}&limit=${limit}&sfw`, 4, isStale);
+    items = (d.data||[]).map(x=>{x._type=type;return x});
+  }
+  if(items.length) _titleSearchCache.set(key, {ts:Date.now(), items});
+  return items;
 }
 
 // Recherche par créateur : auteur du manga (mangaka) ou studio d'animation.
 // Passe par Jikan (les auteurs/studios ne sont pas gérés par le proxy MAL) :
 // 1) on cherche la personne/le studio par son nom, 2) on récupère ses œuvres.
-async function malSearchByCreator(type, q, limit=8){
-  if(!q || q.trim().length<2) return [];
+// isStale() est vérifiée avant chaque appel : si l'utilisateur a retapé entre-temps, on abandonne
+// tout de suite au lieu de bloquer la file Jikan pour une recherche devenue inutile.
+async function malSearchByCreator(type, q, limit=8, isStale=null){
+  if(!q || q.trim().length<3) return [];
+  const stale = () => { if(isStale && isStale()) throw new Error('stale'); };
   if(type==='manga'){
-    const pd=await jikan(`/people?q=${encodeURIComponent(q)}&limit=3`);
+    stale();
+    const pd=await jikan(`/people?q=${encodeURIComponent(q)}&limit=3`, 2, isStale);
     const person=(pd.data||[])[0];
     if(!person) return [];
-    const md=await jikan(`/people/${person.mal_id}/manga`);
+    stale();
+    const md=await jikan(`/people/${person.mal_id}/manga`, 2, isStale);
     return (md.data||[]).slice(0,limit).map(x=>{
       const m=x.manga||x;
       m._type='manga';
@@ -2673,13 +2688,35 @@ async function malSearchByCreator(type, q, limit=8){
       return m;
     });
   } else {
-    const pd=await jikan(`/producers?q=${encodeURIComponent(q)}&limit=3`);
+    stale();
+    const pd=await jikan(`/producers?q=${encodeURIComponent(q)}&limit=3`, 2, isStale);
     const studio=(pd.data||[])[0];
     if(!studio) return [];
     const studioName=(studio.titles||[]).find(t=>t.type==='Default')?.title || (studio.titles||[])[0]?.title || q;
-    const ad=await jikan(`/anime?producers=${studio.mal_id}&limit=${limit}&order_by=popularity&sort=asc`);
+    stale();
+    const ad=await jikan(`/anime?producers=${studio.mal_id}&limit=${limit}&order_by=popularity&sort=asc`, 2, isStale);
     return (ad.data||[]).map(x=>{ x._type='anime'; x._matchedCreator=studioName; return x; });
   }
+}
+
+// Recherche progressive pour le catalogue : les résultats par TITRE (rapides) sont envoyés tout de
+// suite via onUpdate(items, done=false) ; les résultats par AUTEUR/STUDIO (lents, via Jikan) s'ajoutent
+// ensuite via onUpdate(items, true) — seulement si la recherche est toujours d'actualité.
+async function malSearchProgressive(type, q, limit, isStale, onUpdate){
+  const titleResults = await malSearchByTitle(type, q, limit, isStale);
+  if(isStale()) return;
+  const wantCreator = q.trim().length >= 3;
+  onUpdate(titleResults, !wantCreator);
+  if(!wantCreator) return;
+  let creatorResults = [];
+  try{ creatorResults = await malSearchByCreator(type, q, limit, isStale); }
+  catch(e){ if(_isStaleErr(e)) return; }
+  if(isStale()) return;
+  const seen = new Set(titleResults.map(x=>x.mal_id));
+  const unique = creatorResults.filter(x=>x && x.mal_id && !seen.has(x.mal_id));
+  if(!unique.length){ onUpdate(titleResults, true); return; }
+  const titleSlots = Math.max(limit-3, Math.ceil(limit/2));
+  onUpdate(titleResults.slice(0,titleSlots).concat(unique).slice(0,limit), true);
 }
 // Classement (top/popularité) via MAL officiel (fallback Jikan). rankingType: 'all'|'bypopularity'|...
 async function malRanking(type, rankingType, limit=8){
@@ -2739,8 +2776,12 @@ let _jikanTimestamps = []; // timestamps des requêtes envoyées dans la derniè
 let _jikanLastSent = 0;
 
 let _jikanQueue = Promise.resolve();
-function jikanQueued(path, retry=4){
-  const result = _jikanQueue.then(() => _jikanFetch(path, retry));
+function jikanQueued(path, retry=4, isStale=null){
+  const result = _jikanQueue.then(() => {
+    // Recherche devenue inutile pendant l'attente dans la file : on saute, sans appel réseau.
+    if(isStale && isStale()) throw new Error('stale');
+    return _jikanFetch(path, retry, isStale);
+  });
   _jikanQueue = result.catch(() => {});
   return result;
 }
@@ -2766,12 +2807,14 @@ async function _waitForSlot(){
   _jikanLastSent = now;
 }
 
-async function _jikanFetch(path, retry=4){
+async function _jikanFetch(path, retry=4, isStale=null){
   const now=Date.now();
   if(cache[path]&&(now-cache[path].ts)<CACHE_TTL)return cache[path].data;
   for(let i=0;i<retry;i++){
     try{
+      if(isStale && isStale()) throw new Error('stale');
       await _waitForSlot();
+      if(isStale && isStale()) throw new Error('stale');
       const controller = new AbortController();
       const tid = setTimeout(()=>controller.abort(), 12000);
       const r = await fetch(JIKAN+path, {signal:controller.signal});
@@ -2783,6 +2826,7 @@ async function _jikanFetch(path, retry=4){
       persistJikanCache();
       return d;
     }catch(e){
+      if(e && e.message==='stale') throw e; // recherche remplacée : on abandonne tout de suite, sans relance
       if(i===retry-1){
         // Dernier recours : on ressert une vieille valeur en cache plutôt que de planter l'affichage
         if(cache[path]) return cache[path].data;
@@ -2792,8 +2836,8 @@ async function _jikanFetch(path, retry=4){
     }
   }
 }
-async function jikan(path, retry=4){
-  return jikanQueued(path, retry);
+async function jikan(path, retry=4, isStale=null){
+  return jikanQueued(path, retry, isStale);
 }
 
 function delay(ms){return new Promise(r=>setTimeout(r,ms))}
@@ -3300,6 +3344,8 @@ function renderGenrePills(type, genres){
 
 
 async function renderCatalog(type){
+  // Chaque appel invalide les précédents : une ancienne réponse tardive ne peut plus écraser la nouvelle.
+  const isStale=newSearchToken('catalog-'+type);
   const page = type==='manga'?S.mangaPage:S.animePage;
   const genres = (type==='manga'?S.mangaGenres:S.animeGenres)||[];
   const themes = (type==='manga'?S.mangaThemes:S.animeThemes)||[];
@@ -3307,34 +3353,40 @@ async function renderCatalog(type){
   const el=document.getElementById(`${type}-catalog-wrap`);
   el.innerHTML='<div class="loading"><div class="spin"></div> Chargement…</div>';
 
+  function paint(items, pagination, done=true){
+    if(isStale()) return;
+    if(!items.length){
+      if(!done) return; // d'autres résultats (auteur/studio) peuvent encore arriver : on garde le chargement
+      el.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">Aucun résultat</div></div>';
+      document.getElementById(`${type}-pager`).innerHTML='';
+      return;
+    }
+    items.forEach(i=>i._type=type);
+    el.innerHTML=`<div class="cg-lg">${items.map(i=>coverCard(i)).join('')}</div>`
+      + (done?'':'<p style="color:var(--t3);font-size:11px;padding:10px 0">🔎 Recherche par auteur / studio en cours…</p>');
+    renderPager(type, page, pagination);
+  }
+
   try{
     const allIds=[...genres,...themes];
-    let items, pagination=null;
     if(query && page===1){
-      // Recherche texte, 1ère page : MAL officiel + recherche par auteur/studio
-      items = await malSearchWithCreator(type, query, 20);
+      // Recherche texte, 1ère page : titres tout de suite, puis auteur/studio quand ils arrivent
+      await malSearchProgressive(type, query, 20, isStale, (items,done)=>paint(items,null,done));
     } else if(allIds.length===0 && page===1){
       // Tri par popularité, 1ère page, sans filtre : MAL officiel (fallback Jikan)
-      items = await malRanking(type, 'bypopularity', 20);
+      const items = await malRanking(type, 'bypopularity', 20);
+      paint(items, null, true);
     } else {
       // Pages suivantes ou filtre par genre : MAL ne le permet pas (pas de pagination fiable
       // ni de filtre genre côté API officielle), on reste sur Jikan dans ces cas précis
       let params = query
         ? `q=${encodeURIComponent(query)}&page=${page}&limit=20&sfw`
         : `page=${page}&limit=20&order_by=members&sort=desc${allIds.length?`&genres=${allIds.join(',')}`:''}`;
-      const data=await jikan(`/${type}?${params}`);
-      items = data.data||[];
-      pagination = data.pagination;
+      const data=await jikan(`/${type}?${params}`, 4, isStale);
+      paint(data.data||[], data.pagination, true);
     }
-    if(!items.length){
-      el.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">Aucun résultat</div></div>';
-      document.getElementById(`${type}-pager`).innerHTML='';
-      return;
-    }
-    items.forEach(i=>i._type=type);
-    el.innerHTML=`<div class="cg-lg">${items.map(i=>coverCard(i)).join('')}</div>`;
-    renderPager(type, page, pagination);
   }catch(e){
+    if(isStale() || _isStaleErr(e)) return;
     el.innerHTML=`<p style="color:var(--t3);padding:20px 0;font-size:13px">⚠ Erreur de chargement. Réessaie dans quelques secondes.<br><br><button class="btn btn-ghost btn-sm" onclick="renderCatalog('${type}')">Réessayer</button></p>`;
   }
 }
@@ -3410,6 +3462,8 @@ function setGenreFilter(type, genre, btn){
 let searchTimer={};
 function onCatalogSearch(type, val){
   clearTimeout(searchTimer[type]);
+  // À chaque frappe on invalide la recherche précédente (même si elle est déjà partie sur le réseau).
+  newSearchToken('catdrop-'+type);
   if(!val.trim()){
     document.getElementById(`${type}-search-results`).style.display='none';
     if(type==='manga')S.mangaQuery='';
@@ -3418,13 +3472,21 @@ function onCatalogSearch(type, val){
     return;
   }
   searchTimer[type]=setTimeout(async()=>{
+    const isStale=newSearchToken('catdrop-'+type);
     // Show dropdown results
     const el=document.getElementById(`${type}-search-results`);
     el.style.display='block';
     el.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div></div>';
-    try{
-      const items=await malSearchWithCreator(type, val, 8);
-      if(!items.length){el.innerHTML='<div style="padding:14px;color:var(--t3);font-size:13px">Aucun résultat</div>';return}
+
+    function render(items, done){
+      if(isStale()) return;
+      if(!items.length){
+        // Rien par titre : si l'auteur/studio peut encore répondre, on garde l'indicateur de chargement
+        el.innerHTML = done
+          ? '<div style="padding:14px;color:var(--t3);font-size:13px">Aucun résultat</div>'
+          : '<div class="loading" style="padding:20px"><div class="spin"></div></div>';
+        return;
+      }
       el.innerHTML=items.map(item=>{
         const frT=(item.titles||[]).find(t=>t.type==='French')?.title;
         const dispT=frT||item.title_english||item.title;
@@ -3436,9 +3498,17 @@ function onCatalogSearch(type, val){
             <div class="sfr-meta">${item._matchedCreator?'✎ trouvé via '+esc(item._matchedCreator)+' · ':(origT?esc(origT)+' · ':'')} ${type==='manga'?(item.authors?.[0]?.name||''):(item.studios?.[0]?.name||'')} · ${item.score?'★ '+item.score:''}</div>
           </div>
           <div class="sfr-type" style="${type==='manga'?'background:rgba(244,114,182,.15);color:var(--manga)':'background:rgba(56,189,248,.15);color:var(--anime)'}">${type==='manga'?'MANGA':'ANIMÉ'}</div>
-        </div>`;}).join('');
-    }catch(e){el.innerHTML='<div style="padding:14px;color:var(--t3);font-size:13px">Erreur API</div>'}
-  },500);
+        </div>`;}).join('')
+        + (done?'':'<div style="padding:8px 14px;font-size:11px;color:var(--t3)">🔎 Recherche par auteur / studio…</div>');
+    }
+
+    try{
+      await malSearchProgressive(type, val, 8, isStale, render);
+    }catch(e){
+      if(isStale() || _isStaleErr(e)) return;
+      el.innerHTML='<div style="padding:14px;color:var(--t3);font-size:13px">Erreur API</div>';
+    }
+  },350);
 }
 
 // Close search results on outside click
@@ -3471,6 +3541,7 @@ function closeNavDropdown(){
 function navSearch(val){
   const dd=document.getElementById('nav-search-dropdown');
   if(!dd) return;
+  newSearchToken('nav'); // invalide la recherche précédente dès la frappe
   if(!val.trim()){ dd.style.display='none'; return; }
   clearTimeout(navSearchTimer);
   const q=val.toLowerCase();
@@ -3491,11 +3562,13 @@ function navSearch(val){
   dd.innerHTML=html;
   dd.style.display='block';
   navSearchTimer=setTimeout(async()=>{
+    const isStale=newSearchToken('nav');
     try{
       const [mangas,animes]=await Promise.allSettled([
-        malSearch('manga', val, 4),
-        malSearch('anime', val, 4)
+        malSearch('manga', val, 4, isStale),
+        malSearch('anime', val, 4, isStale)
       ]).then(rs=>rs.map(r=>r.status==='fulfilled'?r.value:[]));
+      if(isStale()) return; // une recherche plus récente a pris le relais
       const malEl=document.getElementById('nav-sr-mal');
       const loadEl=document.getElementById('nav-sr-loading');
       if(loadEl) loadEl.textContent='';
@@ -3511,7 +3584,7 @@ function navSearch(val){
           </div>
         </div>`).join('');
     }catch(e){}
-  },500);
+  },350);
 }
 
 // ─── WORK PAGE ───
@@ -6355,19 +6428,22 @@ function switchCtopImgSrc(tab){
 let _ctopSearchTimer=null;
 function ctopSearchDebounce(q){
   clearTimeout(_ctopSearchTimer);
+  newSearchToken('ctop');
   const el=document.getElementById('ctop-search-results');
   if(!q.trim()){ el.innerHTML=''; return; }
   el.innerHTML='<div class="loading"><div class="spin"></div></div>';
-  _ctopSearchTimer=setTimeout(()=>ctopDoSearch(q),450);
+  _ctopSearchTimer=setTimeout(()=>ctopDoSearch(q),350);
 }
 let _ctopSearchResultsCache=[];
 async function ctopDoSearch(q){
   const el=document.getElementById('ctop-search-results');
+  const isStale=newSearchToken('ctop');
   try{
     const [mangas,animes]=await Promise.allSettled([
-      malSearch('manga', q, 5),
-      malSearch('anime', q, 5)
+      malSearch('manga', q, 5, isStale),
+      malSearch('anime', q, 5, isStale)
     ]).then(rs=>rs.map(r=>r.status==='fulfilled'?r.value:[]));
+    if(isStale()) return;
     const results=[...mangas,...animes];
     if(!results.length){ el.innerHTML='<p style="color:var(--t3);font-size:13px;padding:10px">Aucun résultat.</p>'; return; }
     _ctopSearchResultsCache=results;
@@ -7504,13 +7580,16 @@ let _collPickTarget={type:'phys',malId:null,title:'',cover:''};
 
 async function searchForCollection(val,mode){
   clearTimeout(_collSearchTimer);
+  newSearchToken('coll-'+mode);
   const resId=mode+'-search-results';
   const el=document.getElementById(resId);
   if(!val||val.length<2){el.innerHTML='';return;}
   _collSearchTimer=setTimeout(async()=>{
+    const isStale=newSearchToken('coll-'+mode);
     el.innerHTML='<div class="loading" style="padding:12px"><div class="spin"></div></div>';
     try{
-      const items=await malSearch('manga', val, 6);
+      const items=await malSearch('manga', val, 6, isStale);
+      if(isStale()) return;
       el.innerHTML=items.map(item=>`
         <div class="lib-search-item" onclick="selectCollItem(${item.mal_id},'${esc(item.title_english||item.title)}','${esc(item.images?.jpg?.image_url||'')}','${mode}',${item.volumes||0})">
           <img src="${item.images?.jpg?.image_url||''}" loading="lazy">
@@ -7519,8 +7598,8 @@ async function searchForCollection(val,mode){
             <div style="font-size:11px;color:var(--t3)">${item.volumes||'?'} tomes · ${item.status||''}</div>
           </div>
         </div>`).join('');
-    }catch(e){el.innerHTML='<p style="color:var(--t3);padding:10px;font-size:12px">Erreur de recherche</p>';}
-  },500);
+    }catch(e){ if(isStale()||_isStaleErr(e)) return; el.innerHTML='<p style="color:var(--t3);padding:10px;font-size:12px">Erreur de recherche</p>';}
+  },350);
 }
 
 async function selectCollItem(malId,title,cover,mode,maxVols){
@@ -8010,26 +8089,29 @@ function editSuiviCategory(id){
 let _scatSearchTimer=null;
 function scatSearchDebounce(q){
   clearTimeout(_scatSearchTimer);
+  newSearchToken('scat');
   const el=document.getElementById('scat-search-results');
   if(!q.trim()){ el.innerHTML=''; return; }
   el.innerHTML='<div class="loading"><div class="spin"></div></div>';
-  _scatSearchTimer=setTimeout(()=>scatDoSearch(q),450);
+  _scatSearchTimer=setTimeout(()=>scatDoSearch(q),350);
 }
 
 let _scatSearchResultsCache=[];
 
 async function scatDoSearch(q){
   const el=document.getElementById('scat-search-results');
+  const isStale=newSearchToken('scat');
   try{
     let results=[];
     if(_scatType==='mixed'){
       const [mangas,animes]=await Promise.allSettled([
-        malSearch('manga',q,8), malSearch('anime',q,8)
+        malSearch('manga',q,8,isStale), malSearch('anime',q,8,isStale)
       ]).then(rs=>rs.map(r=>r.status==='fulfilled'?r.value:[]));
       results=[...mangas,...animes];
     } else {
-      results=await malSearch(_scatType,q,15);
+      results=await malSearch(_scatType,q,15,isStale);
     }
+    if(isStale()) return;
     const already=new Set(_scatItems.map(i=>i.mal_id+'_'+i.type));
     results=results.filter(r=>!already.has(r.mal_id+'_'+r._type));
     if(!results.length){
@@ -8047,6 +8129,7 @@ async function scatDoSearch(q){
       </div>`;
     }).join('');
   }catch(e){
+    if(isStale()||_isStaleErr(e)) return;
     el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Erreur de recherche.</p>';
   }
 }
@@ -8270,8 +8353,11 @@ function renderScatViewItems(){
     <div onclick="scatItemClick(${item.mal_id},'${item.type}')" style="cursor:pointer">
       <div style="position:relative;border-radius:${imp?'12px':'8px'};overflow:hidden;aspect-ratio:2/3;margin-bottom:4px;background:var(--bg4);${imp?'box-shadow:0 0 0 3px #facc15,0 6px 16px rgba(250,204,21,.35)':''}">
         <img src="${item.cover||''}" style="width:100%;height:100%;object-fit:cover" loading="lazy">
-        <div title="${item.type==='manga'?'Manga':'Animé'}" style="position:absolute;top:4px;left:4px;z-index:2;background:${item.type==='manga'?'var(--manga-c)':'var(--anime-c)'};color:#fff;font-size:9px;font-weight:900;border-radius:5px;padding:2px 5px;box-shadow:0 1px 4px rgba(0,0,0,.4)">${item.type==='manga'?'📖':'🎬'}</div>
-        ${imp?`<div style="position:absolute;top:4px;right:4px;z-index:2;background:#facc15;color:#1a1a1a;font-size:9px;font-weight:900;border-radius:5px;padding:2px 5px;box-shadow:0 1px 4px rgba(0,0,0,.4)">⭐</div>`:(item.rating?`<div class="cc-rating" style="position:absolute;top:4px;right:4px;z-index:2">★ ${item.rating}</div>`:'')}
+        <div style="position:absolute;top:4px;left:4px;z-index:2;display:flex;gap:3px;align-items:center">
+          <div title="${item.type==='manga'?'Manga':'Animé'}" style="background:${item.type==='manga'?'var(--manga-c)':'var(--anime-c)'};color:#fff;font-size:9px;font-weight:900;border-radius:5px;padding:2px 5px;box-shadow:0 1px 4px rgba(0,0,0,.4)">${item.type==='manga'?'📖':'🎬'}</div>
+          ${imp?`<div title="Œuvre importante" style="background:#facc15;color:#1a1a1a;font-size:9px;font-weight:900;border-radius:5px;padding:2px 5px;box-shadow:0 1px 4px rgba(0,0,0,.4)">⭐</div>`:''}
+        </div>
+        ${item.rating?`<div class="cc-rating" style="position:absolute;top:4px;right:4px;z-index:2">★ ${item.rating}</div>`:''}
       </div>
       <div style="font-size:11px;font-weight:${imp?'800':'700'};color:${imp?'#facc15':'inherit'};font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();renameScatItem(event,${item.mal_id},'${item.type}')" title="Double-clic pour renommer">${esc(item.displayName||item.title)}</div>
     </div>`;
@@ -8959,10 +9045,11 @@ function removeFromPhysCat(malId){
 let _physCatSearchTimer=null;
 function physCatSearchDebounce(q){
   clearTimeout(_physCatSearchTimer);
+  newSearchToken('physcat');
   const el=document.getElementById('phys-cat-search-results');
   if(!q.trim()){ el.innerHTML=''; return; }
   el.innerHTML='<div class="loading"><div class="spin"></div></div>';
-  _physCatSearchTimer=setTimeout(()=>physCatDoSearch(q),450);
+  _physCatSearchTimer=setTimeout(()=>physCatDoSearch(q),350);
 }
 
 let _physCatSearchResultsCache=[];
@@ -8971,8 +9058,10 @@ async function physCatDoSearch(q){
   const el=document.getElementById('phys-cat-search-results');
   const cat=(S.physCategories||[]).find(c=>c.id===_physCatOpenId);
   if(!cat)return;
+  const isStale=newSearchToken('physcat');
   try{
-    const results=await malSearch('manga',q,15);
+    const results=await malSearch('manga',q,15,isStale);
+    if(isStale()) return;
     const already=new Set((cat.seriesIds||[]).map(String));
     const filteredResults=results.filter(r=>!already.has(String(r.mal_id)));
     if(!filteredResults.length){
@@ -8989,6 +9078,7 @@ async function physCatDoSearch(q){
       </div>`;
     }).join('');
   }catch(e){
+    if(isStale()||_isStaleErr(e)) return;
     el.innerHTML='<p style="color:var(--t3);font-size:12px;padding:8px 0">Erreur de recherche.</p>';
   }
 }
