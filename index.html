@@ -1050,6 +1050,32 @@ textarea.fi{resize:vertical;min-height:72px}
 .ctl-pool-add:hover{border-color:var(--acc);color:var(--acc)}
 .ctl-pool-empty{color:var(--t3);font-size:12.5px;font-style:italic}
 
+/* ── Vue fractionnée des tier lists ── */
+.ctl-card.sv-sel{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc)}
+.ctl-card{position:relative}
+.sv-check{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:var(--acc);color:#fff;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;z-index:2}
+.sv-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-size:13px}
+.sv-bar .sv-count{font-weight:700}
+.sv-grid{display:grid;gap:10px;align-items:start}
+.sv-pane{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;min-width:0}
+.sv-head{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);font-family:'Syne',sans-serif;font-weight:800;font-size:13px}
+.sv-head .sv-name-h{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sv-head button{background:none;border:none;color:var(--t3);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:6px}
+.sv-head button:hover{color:var(--text);background:rgba(255,255,255,.07)}
+.sv-body{overflow-y:auto;overflow-x:hidden;padding:8px}
+.sv-row{display:flex;margin-bottom:5px;border-radius:7px;overflow:hidden}
+.sv-label{width:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-family:'Syne',sans-serif;font-size:11px;text-align:center}
+.sv-zone{flex:1;display:flex;flex-wrap:wrap;gap:5px;padding:5px;background:var(--bg3);align-items:flex-start;min-width:0;min-height:14px}
+.sv-row.sv-empty .sv-zone{min-height:14px;padding:2px 5px}
+.sv-row.sv-empty .sv-label{font-size:9px;opacity:.55}
+.sv-sep{width:100%;border-top:1px dashed var(--border2);margin:1px 0}
+.sv-item{width:var(--sw,80px);height:calc(var(--sw,80px)*1.4);border-radius:6px;overflow:hidden;position:relative;flex-shrink:0;background:var(--bg4)}
+.sv-item img{width:100%;height:100%;object-fit:cover;display:block}
+.sv-item .sv-iname{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.8);color:#fff;font-size:10px;font-weight:700;text-align:center;padding:3px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .12s}
+.sv-item:hover .sv-iname{opacity:1}
+.sv-empty-msg{color:var(--t3);font-size:12px;font-style:italic;padding:14px;text-align:center}
+@media(max-width:700px){.sv-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+
 
 /* ── Roulette "Quoi lire/voir ensuite ?" ── */
 .roulette-window{position:relative;height:200px;border-radius:12px;overflow:hidden;background:var(--bg3);border:1px solid var(--border)}
@@ -2082,9 +2108,13 @@ textarea.fi{resize:vertical;min-height:72px}
 <div class="pg" id="pg-tierlists">
   <div class="wrap pt32 pb40">
     <div class="sh">
-      <h1 class="sh-title" style="font-size:22px">Mes Tier Lists</h1>
-      <button class="btn btn-primary" onclick="openNewCtlModal()">+ Nouvelle tier list</button>
+      <h1 class="sh-title" style="font-size:22px" id="ctl-page-title">Mes Tier Lists</h1>
+      <div id="ctl-head-btns" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost" id="ctl-split-btn" onclick="startCtlSplitSelect()" title="Comparer plusieurs tier lists côte à côte">⫼ Vue fractionnée</button>
+        <button class="btn btn-primary" onclick="openNewCtlModal()">+ Nouvelle tier list</button>
+      </div>
     </div>
+    <div id="ctl-split-bar"></div>
     <div id="ctl-grid"></div>
   </div>
 </div>
@@ -6916,6 +6946,25 @@ function renderTierListsGallery(){
   const el=document.getElementById('ctl-grid');
   if(!el) return;
   const tops=S.customTierLists||[];
+  // Nettoyer la sélection (tier lists supprimées entre-temps)
+  _ctlSplit.sel=_ctlSplit.sel.filter(id=>tops.some(l=>l.id===id));
+  if(_ctlSplit.view && _ctlSplit.sel.length>=2){ renderCtlSplitView(); return; }
+  _ctlSplit.view=false;
+  const wrapEl=document.querySelector('#pg-tierlists .wrap');
+  if(wrapEl) wrapEl.style.maxWidth='';
+  const head=document.getElementById('ctl-head-btns'); if(head) head.style.display='flex';
+  const ttl=document.getElementById('ctl-page-title'); if(ttl) ttl.textContent='Mes Tier Lists';
+  const bar=document.getElementById('ctl-split-bar');
+  if(bar){
+    if(_ctlSplit.mode){
+      const n=_ctlSplit.sel.length;
+      bar.innerHTML=`<div class="sv-bar"><span class="sv-count">${n}/${CTL_SPLIT_MAX} sélectionnée${n>1?'s':''}</span>
+        <span style="color:var(--t3)">Clique sur les tier lists à comparer (2 à ${CTL_SPLIT_MAX}).</span>
+        <span style="flex:1"></span>
+        <button class="btn btn-primary btn-sm" ${n<2?'disabled style="opacity:.5;cursor:not-allowed"':''} onclick="openCtlSplitView()">Comparer (${n})</button>
+        <button class="btn btn-ghost btn-sm" onclick="cancelCtlSplitSelect()">Annuler</button></div>`;
+    } else bar.innerHTML='';
+  }
   if(!tops.length){
     el.innerHTML='<div class="empty"><div class="empty-icon">🏆</div><div class="empty-title">Aucune tier list</div><div class="empty-sub">Clique sur "+ Nouvelle tier list" pour en créer une</div></div>';
     return;
@@ -6925,12 +6974,135 @@ function renderTierListsGallery(){
     const preview=previewItems.length
       ? previewItems.map(it=>`<img src="${it.img||''}" loading="lazy">`).join('')
       : '<div class="ctl-card-preview-empty">🏆</div>';
-    return `<div class="ctl-card" onclick="openCustomTierList('${ctl.id}')">
+    const picked=_ctlSplit.sel.includes(ctl.id);
+    const click=_ctlSplit.mode?`toggleCtlSplitSel('${ctl.id}')`:`openCustomTierList('${ctl.id}')`;
+    return `<div class="ctl-card${picked?' sv-sel':''}" onclick="${click}">
+      ${picked?'<div class="sv-check">✓</div>':''}
       <div class="ctl-card-preview">${preview}</div>
       <div class="ctl-card-body">
         <div class="ctl-card-name">${esc(ctl.name)}</div>
         <div class="ctl-card-count">${Object.keys(ctl.items||{}).length} élément${Object.keys(ctl.items||{}).length!==1?'s':''}</div>
       </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// ─── VUE FRACTIONNÉE : comparer 2 à 8 tier lists côte à côte ───
+const CTL_SPLIT_MAX=8;
+const _ctlSplit={mode:false, view:false, sel:[], sync:false};
+function startCtlSplitSelect(){
+  if((S.customTierLists||[]).length<2){ toast('Il faut au moins 2 tier lists pour la vue fractionnée','err'); return; }
+  _ctlSplit.mode=true; _ctlSplit.view=false; _ctlSplit.sel=[];
+  renderTierListsGallery();
+}
+function cancelCtlSplitSelect(){
+  _ctlSplit.mode=false; _ctlSplit.view=false; _ctlSplit.sel=[];
+  renderTierListsGallery();
+}
+function toggleCtlSplitSel(id){
+  const i=_ctlSplit.sel.indexOf(id);
+  if(i>=0) _ctlSplit.sel.splice(i,1);
+  else{
+    if(_ctlSplit.sel.length>=CTL_SPLIT_MAX){ toast('Maximum '+CTL_SPLIT_MAX+' tier lists en vue fractionnée','err'); return; }
+    _ctlSplit.sel.push(id);
+  }
+  renderTierListsGallery();
+}
+function openCtlSplitView(){
+  if(_ctlSplit.sel.length<2){ toast('Choisis au moins 2 tier lists','err'); return; }
+  _ctlSplit.view=true;
+  renderTierListsGallery();
+  window.scrollTo({top:0});
+}
+function closeCtlSplitView(){
+  _ctlSplit.view=false; _ctlSplit.mode=true; // retour à la sélection pour pouvoir changer le choix
+  renderTierListsGallery();
+}
+function removeFromCtlSplit(id){
+  _ctlSplit.sel=_ctlSplit.sel.filter(x=>x!==id);
+  if(_ctlSplit.sel.length<2){ _ctlSplit.view=false; _ctlSplit.mode=true; toast('Il reste moins de 2 tier lists : retour à la sélection','ok'); }
+  renderTierListsGallery();
+}
+function toggleCtlSplitSync(){
+  _ctlSplit.sync=!_ctlSplit.sync;
+  const b=document.getElementById('sv-sync-btn');
+  if(b){ b.classList.toggle('btn-primary',_ctlSplit.sync); b.classList.toggle('btn-ghost',!_ctlSplit.sync); }
+}
+let _svScrolling=false;
+function svOnScroll(e){
+  if(!_ctlSplit.sync||_svScrolling) return;
+  const src=e.target;
+  const max=src.scrollHeight-src.clientHeight;
+  const ratio=max>0?src.scrollTop/max:0;
+  _svScrolling=true;
+  document.querySelectorAll('.sv-body').forEach(b=>{
+    if(b===src) return;
+    b.scrollTop=ratio*(b.scrollHeight-b.clientHeight);
+  });
+  requestAnimationFrame(()=>{ _svScrolling=false; });
+}
+function ctlZoneIds(ctl, block, tierIdx, sub){
+  const items=ctl.items||{}, assign=ctl.assign||{}, orders=ctl.orders||{};
+  const ids=Object.keys(items).filter(id=>{
+    const a=assign[id];
+    return a && a.block===block && a.tierIdx===tierIdx && (a.sub||null)===(sub||null);
+  });
+  const order=orders[`${block}_${tierIdx}_${sub||'x'}`]||[];
+  ids.sort((a,b)=>{
+    const ia=order.indexOf(a), ib=order.indexOf(b);
+    return (ia===-1?9999:ia)-(ib===-1?9999:ib);
+  });
+  return ids;
+}
+function renderCtlSplitView(){
+  const el=document.getElementById('ctl-grid');
+  const tops=S.customTierLists||[];
+  const list=_ctlSplit.sel.map(id=>tops.find(l=>l.id===id)).filter(Boolean);
+  const n=list.length;
+  const cols=n<=4?n:(n<=6?3:4);
+  const rows=Math.ceil(n/cols);
+  const sw=Math.max(44,Math.min(130,Math.floor((window.innerWidth-120)/cols/5.2)));
+  const bodyH=rows===1?'calc(100vh - 230px)':'calc((100vh - 250px)/2)';
+  const wrapEl=document.querySelector('#pg-tierlists .wrap');
+  if(wrapEl) wrapEl.style.maxWidth='none';
+  const head=document.getElementById('ctl-head-btns'); if(head) head.style.display='none';
+  const ttl=document.getElementById('ctl-page-title'); if(ttl) ttl.textContent='Comparaison de tier lists';
+  const bar=document.getElementById('ctl-split-bar');
+  if(bar) bar.innerHTML=`<div class="sv-bar">
+    <button class="btn btn-ghost btn-sm" onclick="closeCtlSplitView()">← Changer la sélection</button>
+    <button class="btn btn-ghost btn-sm" onclick="cancelCtlSplitSelect()">✕ Quitter la vue</button>
+    <span style="flex:1"></span>
+    <button class="btn ${_ctlSplit.sync?'btn-primary':'btn-ghost'} btn-sm" id="sv-sync-btn" onclick="toggleCtlSplitSync()" title="Faire défiler toutes les tier lists en même temps">🔗 Défilement synchronisé</button>
+    <span style="color:var(--t3)">${n} tier lists</span></div>`;
+
+  const renderRow=(ctl,tier,tierIdx,block)=>{
+    let parts, total;
+    if(tier.high!=null){
+      const hi=ctlZoneIds(ctl,block,tierIdx,'high'), lo=ctlZoneIds(ctl,block,tierIdx,'low');
+      total=hi.length+lo.length; parts=[hi,lo];
+    } else {
+      const ids=ctlZoneIds(ctl,block,tierIdx,null); total=ids.length; parts=[ids];
+    }
+    if(block==='low' && total===0) return '';
+    const itemHtml=id=>{
+      const it=(ctl.items||{})[id]; if(!it) return '';
+      return `<div class="sv-item" title="${esc(it.name||'')}"><img src="${it.img||''}" loading="lazy" onerror="this.style.visibility='hidden'"><div class="sv-iname">${esc(it.name||'')}</div></div>`;
+    };
+    const zone=parts.map(p=>p.map(itemHtml).join('')).join(parts.length>1?'<div class="sv-sep"></div>':'');
+    const lbl=tier.high!=null?`${tier.base}<br><span style="font-size:8px;opacity:.7">/${tier.high}</span>`:`${tier.base}`;
+    return `<div class="sv-row${total===0?' sv-empty':''}"><div class="sv-label" style="background:${tier.bg};color:${tier.color}">${lbl}</div><div class="sv-zone">${zone}</div></div>`;
+  };
+
+  el.innerHTML=`<div class="sv-grid" style="grid-template-columns:repeat(${cols},minmax(0,1fr))">${list.map(ctl=>{
+    const placed=Object.keys(ctl.items||{}).filter(id=>(ctl.assign||{})[id]).length;
+    const body=placed
+      ? CTL_MAIN.map((t,i)=>renderRow(ctl,t,i,'main')).join('')+CTL_LOW.map((t,i)=>renderRow(ctl,t,i,'low')).join('')
+      : '<div class="sv-empty-msg">Aucun élément placé dans cette tier list</div>';
+    return `<div class="sv-pane" style="--sw:${sw}px">
+      <div class="sv-head"><span class="sv-name-h" title="${esc(ctl.name)}">${esc(ctl.name)}</span>
+        <button onclick="openCustomTierList('${ctl.id}')" title="Ouvrir pour modifier">✎</button>
+        <button onclick="removeFromCtlSplit('${ctl.id}')" title="Retirer de la comparaison">✕</button></div>
+      <div class="sv-body" style="max-height:${bodyH};min-height:200px" onscroll="svOnScroll(event)">${body}</div>
     </div>`;
   }).join('')}</div>`;
 }
