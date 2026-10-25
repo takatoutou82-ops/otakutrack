@@ -2307,13 +2307,12 @@ textarea.fi{resize:vertical;min-height:72px}
     <!-- PHYSICAL LIBRARY -->
     <div id="ct-phys">
       <div class="library-header">
-        <button class="library-add-btn" onclick="openM('m-add-phys')">＋ Ajouter une série</button>
         <button class="library-add-btn" onclick="openAddPhysCat()" style="border-color:var(--acc3);color:var(--acc2)">📂 Nouvelle catégorie</button>
       </div>
       <div id="mc-coll-extra"></div>
       <div id="phys-library"></div>
       <div id="phys-empty" style="display:none">
-        <div class="empty"><div class="empty-icon">📚</div><div class="empty-title">Bibliothèque vide</div><div class="empty-sub">Cliquez sur "Ajouter une série" pour commencer votre bibliothèque.</div></div>
+        <div class="empty"><div class="empty-icon">📚</div><div class="empty-title">Bibliothèque vide</div><div class="empty-sub">Ouvre la fiche d'un manga → 📚 Éditions physiques, puis touche les tomes que tu possèdes : la série apparaîtra ici automatiquement.</div></div>
       </div>
     </div>
 
@@ -5336,6 +5335,12 @@ function mcToggleOwned(sid,eid,num){
       if(i>=0) a.splice(i,1); else a.push(num);
       if(!a.length) delete o[eid];
       if(!Object.keys(o).length) delete S.mcOwned[sid];
+      if(w){   // la série doit figurer dans Ma collection même si seule une autre édition est cochée
+        if(!S.collectionMeta) S.collectionMeta={};
+        if(!S.collectionMeta[w.mal_id]) S.collectionMeta[w.mal_id]={mal_id:w.mal_id,type:'manga',title:w.title_english||w.title,cover:w._coverFull||''};
+        if(!S.collection[w.mal_id]) S.collection[w.mal_id]={volumes:{},cbz:[],online:[]};
+        else if(S.collection[w.mal_id].volumes===undefined) S.collection[w.mal_id].volumes={};
+      }
       save();
     }
     mcDrawSeries(ser);
@@ -5401,6 +5406,48 @@ function mcMissingBadge(malId,owned,maxVol){
   const today=new Date().toISOString().slice(0,10); const miss=[];
   for(let i=1;i<=maxVol;i++){ if(owned[i]) continue; const v=mv[i]; if(v&&v.date&&v.date>today) continue; if(v) miss.push(i); }
   return miss.length?'<span style="font-size:10px;color:#fbbf24;margin-left:6px" title="Tomes parus que tu n\'as pas">manque : '+miss.slice(0,15).join(', ')+(miss.length>15?'…':'')+'</span>':'<span style="font-size:10px;color:#4ade80;margin-left:6px">complète ✓</span>';
+}
+function mcCollToggle(sid,eid,num){
+  if(!S.mcOwned) S.mcOwned={};
+  const o=S.mcOwned[sid]||(S.mcOwned[sid]={}); const a=o[eid]||(o[eid]=[]); const i=a.indexOf(num);
+  if(i>=0) a.splice(i,1); else a.push(num);
+  if(!a.length) delete o[eid]; if(!Object.keys(o).length) delete S.mcOwned[sid];
+  save(); renderCollection();
+}
+function mcShelfMulti(malId,ser,t){
+  const sid=ser.id, today=new Date().toISOString().slice(0,10);
+  const defId=mcDefEd(ser);
+  const ownedOf=eid=>eid===defId?new Set(Object.keys((S.collection[malId]||{}).volumes||{}).map(Number)):new Set(((S.mcOwned||{})[sid]||{})[eid]||[]);
+  const eds=[...ser.eds].sort((a,b)=>(a.id===defId?0:1)-(b.id===defId?0:1)||(a.parent?1:0)-(b.parent?1:0)||b.n-a.n);
+  const withOwned=eds.filter(e=>ownedOf(e.id).size>0);
+  const show=withOwned.length?withOwned:eds.filter(e=>e.id===defId);
+  if(!show.length) return '';
+  const hue=((malId*53)%360);
+  let totOwn=0, rows='';
+  show.forEach(e=>{
+    const ow=ownedOf(e.id); const seen=new Set();
+    const vols=ser.vols.filter(v=>v[0]===e.id).sort((a,b)=>a[1]-b[1]).filter(v=>!seen.has(v[1])&&seen.add(v[1]));
+    const released=vols.filter(v=>!(v[2]&&v[2]>today));
+    const own=vols.filter(v=>ow.has(v[1])).length; totOwn+=own;
+    const miss=released.filter(v=>!ow.has(v[1])).map(v=>v[1]);
+    const spines=vols.map(v=>{
+      const o=ow.has(v[1]), up=v[2]&&v[2]>today;
+      const click=e.id===defId?`toggleVol(${malId},${v[1]},true)`:`mcCollToggle('${sid}','${e.id}',${v[1]})`;
+      const bg=v[3]?`background-image:url('${v[3].replace(/'/g,"\\'")}');background-size:cover;background-position:center;${o?'':'filter:grayscale(1) brightness(.45);'}`:`background:hsl(${hue},${o?'55%,28%':'30%,18%'})`;
+      return `<div class="book-spine${o?'':' not-owned'}" onclick="${click}" title="Tome ${v[1]}${o?' ✓':up?' (à venir '+mcFmtDate(v[2])+')':' (manquant)'}"><div style="width:34px;height:118px;border-radius:3px 7px 7px 3px;overflow:hidden;position:relative;${bg}${up?';outline:1px dashed #fbbf24':''}"><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.55) 100%)"><span style="font-size:14px;font-weight:900;color:rgba(255,255,255,${o?'0.95':'0.4'});font-family:'Syne',sans-serif;line-height:1;text-shadow:0 1px 4px rgba(0,0,0,.8);margin-top:auto;margin-bottom:6px">${v[1]}</span>${o?'<span style="font-size:7px;color:rgba(255,255,255,0.6);margin-bottom:2px">✓</span>':''}</div></div></div>`;
+    }).join('');
+    rows+=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 6px;font-size:12px;color:var(--t2)"><b>${esc((e.t||'Édition standard')+(e.pub?' · '+e.pub:''))}</b><span class="shelf-owned-count">${own} / ${vols.length} tomes</span>${miss.length?`<span style="font-size:10px;color:#fbbf24">manque : ${miss.slice(0,15).join(', ')}${miss.length>15?'…':''}</span>`:(own?'<span style="font-size:10px;color:#4ade80">complète ✓</span>':'')}</div><div class="bookshelf-row">${spines}</div>`;
+  });
+  const cats=(S.physCategories||[]).filter(c=>c.seriesIds.includes(malId));
+  const catBadge=cats.length?`<span style="font-size:10px;background:rgba(139,124,248,.15);color:var(--acc2);border-radius:5px;padding:2px 7px;margin-left:6px">${cats.map(c=>esc(c.name)).join(', ')}</span>`:'';
+  return '<div class="bookshelf"><div class="bookshelf-manga-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +'<img src="'+esc(t.cover||'')+'" style="width:28px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0">'
+    +esc(t.title||ser.title||'Série #'+malId)+catBadge
+    +'<span class="shelf-owned-count">'+totOwn+' tome'+(totOwn>1?'s':'')+' · '+show.length+' édition'+(show.length>1?'s':'')+'</span>'
+    +`<button onclick="mcGoWork(${malId})" style="background:none;border:1px solid rgba(248,113,113,.35);border-radius:6px;padding:2px 8px;color:#f87171;font-size:10px;cursor:pointer;margin-left:auto">📚 Éditions</button>`
+    +`<button onclick="assignToCategory(${malId},'${esc(t.title||'').replace(/'/g,"\\'")}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;color:var(--t3);font-size:10px;cursor:pointer">📂 Catégorie</button>`
+    +`<button onclick="removePhysSeries(${malId},'${esc(t.title||'').replace(/'/g,"\\'")}')" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);border-radius:6px;padding:2px 8px;color:var(--red);font-size:10px;cursor:pointer">🗑 Supprimer</button>`
+    +'</div>'+rows+'</div>';
 }
 function mcGoWork(malId){ openWork(malId,'manga'); setTimeout(mcOpenTab,900); }
 function mcRenderCollExtra(){
@@ -6176,6 +6223,7 @@ function renderCollection(){
       return ids.map(id=>{
       const malId=parseInt(id);
       const t=getMeta(malId);
+      { const _ser=_mcMem[(S.mcMap||{})[malId]]; if(_ser){ const _h=mcShelfMulti(malId,_ser,t); if(_h) return _h; } }
       const coll=S.collection[malId]||{};
       const owned=coll.volumes||{};
       const allNums=Object.keys(owned).map(Number).sort((a,b)=>a-b);
@@ -6216,7 +6264,6 @@ function renderCollection(){
         );
       }
       if(isOngoing) spines.push('<div class="book-add-slot" style="opacity:.5;height:118px" title="En cours de publication…">…</div>');
-      spines.push('<div class="book-add-slot" onclick="openEditPhysCollection('+malId+')" title="Modifier" style="height:118px">✏</div>');
       const catBadge = (()=>{
         const cats=(S.physCategories||[]).filter(c=>c.seriesIds.includes(malId));
         return cats.length?`<span style="font-size:10px;background:rgba(139,124,248,.15);color:var(--acc2);border-radius:5px;padding:2px 7px;margin-left:6px">${cats.map(c=>c.name).join(', ')}</span>`:'';
@@ -9661,6 +9708,7 @@ function removePhysSeries(malId,title){
   if(c){
     delete c.volumes;
     delete c.added;
+    const _sid=(S.mcMap||{})[malId]; if(_sid&&S.mcOwned) delete S.mcOwned[_sid];
     if((!c.cbz||!c.cbz.length)&&(!c.online||!c.online.length)){
       delete S.collection[malId];
     }
