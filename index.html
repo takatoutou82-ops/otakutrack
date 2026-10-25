@@ -450,6 +450,23 @@ body::after{
 .tab:hover{color:var(--t2)}
 .tab.on{color:var(--text);border-bottom-color:var(--acc);text-shadow:0 0 20px rgba(139,124,248,.4)}
 .tp{display:none}.tp.on{display:block}
+.mc-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}
+.mc-sm{font-size:11px;color:var(--t3);margin-top:2px}.mc-btns{display:flex;gap:6px;flex-wrap:wrap}
+.mc-msg{background:var(--bg3);border-radius:8px;padding:12px;font-size:13px;color:var(--t2)}
+.mc-sub{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px}
+.mc-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.mc-chip{background:var(--bg3);border:1px solid var(--border);color:var(--t2);border-radius:999px;padding:5px 11px;font-size:12px;cursor:pointer}
+.mc-chip span{opacity:.6;margin-left:3px}.mc-chip.on{border-color:var(--acc);color:var(--text);background:rgba(139,124,248,.15)}
+.mc-prog{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--t2);margin-bottom:12px}
+.mc-bar{flex:1;height:7px;background:var(--bg3);border-radius:99px;overflow:hidden;max-width:260px}.mc-bar i{display:block;height:100%;background:var(--acc)}
+.mc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px}
+.mc-vol{cursor:pointer;text-align:center}.mc-cv{position:relative;aspect-ratio:2/3;background:var(--bg3);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--t3)}
+.mc-cv img{width:100%;height:100%;object-fit:cover}.mc-vol:not(.own) .mc-cv img{opacity:.55}.mc-vol.own .mc-cv{outline:2px solid var(--acc)}
+.mc-ck{position:absolute;top:4px;right:4px;background:var(--acc);color:#fff;border-radius:50%;width:20px;height:20px;font-size:12px;display:flex;align-items:center;justify-content:center}
+.mc-up{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);color:#fbbf24;font-size:10px;padding:2px 0}
+.mc-n{font-size:12px;font-weight:700;margin-top:4px}.mc-d{font-size:10px;color:var(--t3)}
+.mc-cands{display:flex;flex-direction:column;gap:6px}.mc-cand{display:flex;justify-content:space-between;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);cursor:pointer;text-align:left;font-size:13px}.mc-cand span{color:var(--t3);font-size:11px}
+
 
 /* ── PROGRESS ── */
 .prog-box{
@@ -1868,6 +1885,7 @@ textarea.fi{resize:vertical;min-height:72px}
       <div class="tabs" id="work-tabs">
         <button class="tab on" onclick="switchTab(this,'tp-progress')">Progression</button>
         <button class="tab" onclick="switchTab(this,'tp-reviews')">Critiques</button>
+        <button class="tab" id="tab-editions" style="display:none" onclick="switchTab(this,'tp-editions');mcRenderEditions()">📚 Éditions physiques</button>
         <button class="tab" onclick="switchTab(this,'tp-similar')">Similaires</button>
         <button class="tab" onclick="switchTab(this,'tp-relations')">Relations</button>
       </div>
@@ -1876,6 +1894,7 @@ textarea.fi{resize:vertical;min-height:72px}
         <div id="reviews-section"></div>
         <button class="btn btn-ghost" onclick="openM('m-review')" style="margin-top:10px">+ Écrire une critique</button>
       </div>
+      <div class="tp" id="tp-editions"><div id="mc-ed-section"></div></div>
       <div class="tp" id="tp-similar"><div class="cg" id="similar-section"></div></div>
       <div class="tp" id="tp-relations"><div id="relations-section"></div></div>
     </div>
@@ -2211,6 +2230,10 @@ textarea.fi{resize:vertical;min-height:72px}
         <button id="cal-toggle-anime" onclick="calSetType('anime')">🎬 Animé</button>
         <button id="cal-toggle-manga" onclick="calSetType('manga')">📖 Manga</button>
       </div>
+      <div class="cal-toggle" id="cal-source-toggle" style="display:none" title="Source des sorties manga">
+        <button id="cal-src-mn" onclick="calSetMangaSource('mn')">Manga-news</button>
+        <button id="cal-src-mc" onclick="calSetMangaSource('mc')">MangaCollec</button>
+      </div>
       <div class="cal-month-nav" id="cal-month-nav">
         <button onclick="calPrevMonth()">‹</button>
         <span class="cal-month-label" id="cal-month-label"></span>
@@ -2489,7 +2512,7 @@ function save(){
       suiviCategories:S.suiviCategories||[],
       tierImg:S.tierImg||null,arcsImgs:S.arcsImgs||{},
       customTierLists:S.customTierLists||[],
-      allTags:S.allTags||[]
+      allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{}
     }));
     localStorage.setItem('ot_last_update',String(Date.now()));
   }catch(e){}
@@ -2517,6 +2540,8 @@ function load(){
     if(d.arcsImgs) S.arcsImgs=d.arcsImgs;
     if(d.customTierLists) S.customTierLists=d.customTierLists;
     if(d.allTags) S.allTags=d.allTags;
+    if(d.mcMap) S.mcMap=d.mcMap;
+    if(d.mcOwned) S.mcOwned=d.mcOwned;
     if(d.bannerUrl){
       S.bannerUrl=d.bannerUrl;
       var bg=document.getElementById('profile-banner-bg');
@@ -3807,6 +3832,7 @@ function renderWorkPage(w){
           </div>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="openNautiljon('${esc(searchTitle).replace(/'/g,"\\'")}','${type}')" style="color:#60a5fa;border-color:rgba(96,165,250,.3)">🔍 Nautiljon</button>
+        ${type==='manga'?`<button class="btn btn-ghost btn-sm" onclick="mcOpenTab()" style="color:#f87171;border-color:rgba(248,113,113,.3)">📚 MangaCollec</button>`:''}
       </div>
     </div>
   `;
@@ -3814,6 +3840,7 @@ function renderWorkPage(w){
   renderProgressSection(w, t);
   renderReviews(w, t);
   loadSimilar(w);
+  mcOnWorkOpen(w,type);
   loadRelations(w);
   renderWorkSidebar(w, t);
   window._currentMalId = w.mal_id;
@@ -3953,7 +3980,7 @@ function exportFullBackup(){
     bannerSize:S.bannerSize||null, bannerPos:S.bannerPos||null,
     physCategories:S.physCategories||[], suiviCategories:S.suiviCategories||[],
     tierImg:S.tierImg||null, arcsImgs:S.arcsImgs||{}, customTierLists:S.customTierLists||[],
-    allTags:S.allTags||[]
+    allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{}
   };
   const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
@@ -4015,7 +4042,7 @@ function handleImportBackup(input){
         S.tierImg=data.tierImg||null;
         S.arcsImgs=data.arcsImgs||{};
         S.customTierLists=data.customTierLists||[];
-        S.allTags=data.allTags||[];
+        S.allTags=data.allTags||[]; S.mcMap=data.mcMap||S.mcMap||{}; S.mcOwned=data.mcOwned||S.mcOwned||{};
         save();
         toast('Sauvegarde importée avec succès ✓ Rechargement…','ok');
         setTimeout(()=>location.reload(), 1000);
@@ -4843,6 +4870,14 @@ let _calFilter='all';       // 'all' | 'suivi'
 let _calDate=new Date();    // mois affiché (jour ignoré, on utilise juste année/mois)
 let _calAnimeCache={};      // 'YYYY-MM' -> [{malId,title,cover,date,episode}]
 let _calMangaCache={};      // 'YYYY-MM' -> [{title,cover,date,editor,author,link}] | 'error'
+let _calMangaCacheMC={};    // idem pour la source MangaCollec
+let _calMangaSource=(()=>{ try{ return localStorage.getItem('ot_cal_manga_src')==='mc'?'mc':'mn'; }catch(e){ return 'mn'; } })();
+function calMangaCacheObj(){ return _calMangaSource==='mc'?_calMangaCacheMC:_calMangaCache; }
+function calSetMangaSource(src){
+  _calMangaSource=src==='mc'?'mc':'mn';
+  try{ localStorage.setItem('ot_cal_manga_src',_calMangaSource); }catch(e){}
+  renderCalendar();
+}
 let _calLoadToken=0;        // pour ignorer les réponses obsolètes si on change vite de mois
 
 function calSetType(type){
@@ -4871,6 +4906,12 @@ const CAL_MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Aoû
 async function renderCalendar(){
   document.getElementById('cal-toggle-anime').classList.toggle('on',_calType==='anime');
   document.getElementById('cal-toggle-manga').classList.toggle('on',_calType==='manga');
+  const srcT=document.getElementById('cal-source-toggle');
+  if(srcT){
+    srcT.style.display=_calType==='manga'?'inline-flex':'none';
+    document.getElementById('cal-src-mn').classList.toggle('on',_calMangaSource==='mn');
+    document.getElementById('cal-src-mc').classList.toggle('on',_calMangaSource==='mc');
+  }
   document.getElementById('cal-view-month').classList.toggle('on',_calView==='month');
   document.getElementById('cal-view-upcoming').classList.toggle('on',_calView==='upcoming');
   document.getElementById('cal-filter-all').classList.toggle('on',_calFilter==='all');
@@ -4910,7 +4951,9 @@ async function renderCalendar(){
     statusEl.textContent='';
     contentEl.innerHTML=`<p style="color:var(--t3);font-size:13px;padding:20px;text-align:center">
       ${_calType==='manga'
-        ? "Impossible de charger les sorties manga pour le moment (la source externe est indisponible ou a changé). Réessaie plus tard."
+        ? (_calMangaSource==='mc'
+            ? "Impossible de charger MangaCollec pour le moment (le relais Vercel « mangacollec » n'est pas déployé, ou le site est indisponible). Ouvre la console du navigateur (F12) pour le détail, ou repasse sur Manga-news."
+            : "Impossible de charger les sorties manga pour le moment (la source externe est indisponible ou a changé). Réessaie plus tard.")
         : "Impossible de charger le calendrier animé pour le moment. Réessaie plus tard."}
     </p>`;
     return;
@@ -4927,6 +4970,9 @@ async function renderCalendar(){
   }
 
   statusEl.textContent=items.length?'':'Aucune sortie trouvée pour cette période.';
+  if(_calType==='manga' && _calMangaSource==='mc' && items.length){
+    statusEl.textContent='Source : MangaCollec · '+items.length+' sortie'+(items.length>1?'s':'')+(_mcStale?' · données en cache (MangaCollec injoignable)':'');
+  }
 
   if(_calView==='upcoming'){
     contentEl.innerHTML=calRenderUpcomingList(items);
@@ -4995,7 +5041,7 @@ function calItemRowHtml(it){
 function calOpenDay(key){
   const [y,m,d]=key.split('-').map(Number);
   const cacheKey=y+'-'+String(m).padStart(2,'0');
-  const cache=_calType==='anime'?_calAnimeCache:_calMangaCache;
+  const cache=_calType==='anime'?_calAnimeCache:calMangaCacheObj();
   const monthItems=cache[cacheKey];
   if(!monthItems||monthItems==='error')return;
   const dayItems=monthItems.filter(it=>calDateKey(it.date)===key).sort((a,b)=>a.date-b.date);
@@ -5065,17 +5111,304 @@ async function calFetchAiringSchedules(startTs,endTs){
 // ou si le proxy CORS tombe en panne, cette fonction échouera proprement (voir catch plus bas).
 async function calGetMangaMonth(year,month){
   const key=year+'-'+String(month).padStart(2,'0');
-  if(_calMangaCache[key]) return _calMangaCache[key];
+  const cache=calMangaCacheObj();
+  if(cache[key] && cache[key]!=='error') return cache[key];
   try{
-    const items=await calFetchMangaNewsPlanning(year,month);
-    _calMangaCache[key]=items;
+    _mcStale=false;
+    const items=_calMangaSource==='mc'
+      ? await calFetchMangaCollecMonth(year,month)
+      : await calFetchMangaNewsPlanning(year,month);
+    cache[key]=items;
     return items;
   }catch(e){
-    console.error('Calendrier manga: échec du chargement',e);
-    _calMangaCache[key]='error';
+    console.error('Calendrier manga: échec du chargement ('+_calMangaSource+')',e);
+    if(_calMangaSource!=='mc') cache[key]='error';   // MangaCollec : on réessaie au prochain affichage
     return 'error';
   }
 }
+
+// ─── MangaCollec : onglet « Éditions physiques » (fiche manga) ───
+// Catalogue (éditions, couvertures, dates) = cache LOCAL (IndexedDB). Firestore ne reçoit que
+// S.mcMap (œuvre MAL → id série MangaCollec) et S.mcOwned (tomes cochés), tous deux minuscules.
+const MC_SER_TTL=7*24*3600*1000, MC_IDX_TTL=14*24*3600*1000;
+let _mcSel={};   // édition affichée par série (état d'affichage seulement)
+function mcIdb(){ return new Promise((res,rej)=>{ try{ const r=indexedDB.open('ot_mc',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }catch(e){ rej(e); } }); }
+async function mcKvGet(k){ try{ const db=await mcIdb(); return await new Promise(res=>{ const q=db.transaction('kv').objectStore('kv').get(k); q.onsuccess=()=>res(q.result||null); q.onerror=()=>res(null); }); }catch(e){ return null; } }
+async function mcKvSet(k,v){ try{ const db=await mcIdb(); await new Promise(res=>{ const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(v,k); tx.oncomplete=()=>res(); tx.onerror=()=>res(); }); }catch(e){} }
+function mcNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim(); }
+function mcCompactSeries(d,id){
+  const s=(d.series||[]).find(x=>x.id===id)||(d.series||[])[0]||{};
+  const pubs={}; (d.publishers||[]).forEach(p=>pubs[p.id]=p.title);
+  const eds=(d.editions||[]).filter(e=>!e.series_id||e.series_id===id).map(e=>({id:e.id,t:e.title||'',pub:pubs[e.publisher_id]||'',parent:e.parent_edition_id||null,n:e.volumes_count||0,stop:!!e.commercial_stop,nf:!!e.not_finished}));
+  const vols=(d.volumes||[]).map(v=>[v.edition_id,v.number,v.release_date||'',v.image_url||'',v.isbn||'',v.not_sold?1:0]);
+  const boxes=(d.boxes||[]).map(b=>[b.title||'',b.release_date||'',b.image_url||'',b.isbn||'']);
+  const authors=(d.authors||[]).map(a=>((a.first_name||'')+' '+(a.name||'')).trim());
+  return {id,title:s.title||'',ts:Date.now(),eds,vols,boxes,authors};
+}
+async function mcGetSeries(id,force){
+  const key='series:'+id;
+  const c=await mcKvGet(key);
+  if(c && !force && Date.now()-c.ts<MC_SER_TTL) return c;
+  try{
+    const d=await mcFetch('series',{id});
+    const cs=mcCompactSeries(d,id);
+    if(cs.eds.length||cs.vols.length){ await mcKvSet(key,cs); return cs; }
+    throw new Error('réponse vide');
+  }catch(e){ if(c) return c; throw e; }
+}
+async function mcGetIndex(){
+  const c=await mcKvGet('index');
+  if(c && Date.now()-c.ts<MC_IDX_TTL) return c.list;
+  try{
+    const d=await mcFetch('series');
+    const arr=Array.isArray(d)?d:(d.series||[]);
+    const types={}; (d.types||[]).forEach(t=>types[t.id]=t.title);
+    const list=arr.map(s=>[s.id,s.title||'',types[s.type_id]||'',s.adult_content?1:0]);
+    if(list.length>50){ await mcKvSet('index',{ts:Date.now(),list}); return list; }
+    throw new Error('liste vide');
+  }catch(e){ if(c) return c.list; throw e; }
+}
+function mcCandidates(list,titles){
+  const ts=titles.map(mcNorm).filter(Boolean); const out=new Map();
+  list.forEach(r=>{
+    const n=mcNorm(r[1]); if(!n) return;
+    let sc=0;
+    ts.forEach(t=>{ if(n===t) sc=Math.max(sc,100); else if(n.startsWith(t+' ')||t.startsWith(n+' ')) sc=Math.max(sc,60-Math.min(30,Math.abs(n.length-t.length))); else if(t.length>3&&n.includes(t)) sc=Math.max(sc,30); });
+    if(r[2] && /manga/i.test(r[2])) sc+=sc?5:0;
+    if(sc) out.set(r[0],{id:r[0],title:r[1],type:r[2],sc});
+  });
+  return [...out.values()].sort((a,b)=>b.sc-a.sc).slice(0,8);
+}
+function mcWorkTitles(w){
+  const a=[w.title,w.title_english,w.title_japanese]; (w.titles||[]).forEach(t=>a.push(t.title));
+  return [...new Set(a.filter(Boolean))];
+}
+function mcAgo(ts){ const m=Math.round((Date.now()-ts)/60000); if(m<2) return "à l'instant"; if(m<90) return m+' min'; const h=Math.round(m/60); if(h<48) return h+' h'; return Math.round(h/24)+' j'; }
+function mcFmtDate(d){ if(!d) return ''; const p=d.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d; }
+function mcOnWorkOpen(w,type){
+  const btn=document.getElementById('tab-editions'), panel=document.getElementById('mc-ed-section');
+  if(!btn||!panel) return;
+  const isManga=type==='manga';
+  btn.style.display=isManga?'':'none';
+  panel.innerHTML='';
+  if(!isManga){ if(btn.classList.contains('on')){ const first=document.querySelector('#work-tabs .tab'); if(first) first.click(); } return; }
+  const sid=(S.mcMap||{})[w.mal_id];
+  if(sid){   // mise à jour discrète en arrière-plan (cache périmé seulement)
+    mcGetSeries(sid,false).then(()=>{ if(S.currentWork&&S.currentWork.mal_id===w.mal_id&&document.getElementById('tp-editions').classList.contains('on')) mcRenderEditions(); }).catch(()=>{});
+  }
+  if(document.getElementById('tp-editions').classList.contains('on')) mcRenderEditions();
+}
+function mcOpenTab(){ const b=document.getElementById('tab-editions'); if(b){ b.style.display=''; b.click(); document.getElementById('work-tabs').scrollIntoView({behavior:'smooth',block:'center'}); } }
+async function mcRenderEditions(force){
+  const w=S.currentWork, box=document.getElementById('mc-ed-section'); if(!w||!box) return;
+  if(!MC_PROXY){ box.innerHTML='<div class="mc-msg">Relais MangaCollec non configuré.</div>'; return; }
+  const sid=(S.mcMap||{})[w.mal_id];
+  if(!sid){ return mcRenderMatch(w); }
+  box.innerHTML='<div class="loading"><div class="spin"></div> Chargement des éditions…</div>';
+  let ser;
+  try{ ser=await mcGetSeries(sid,!!force); }
+  catch(e){ if(!S.currentWork||S.currentWork.mal_id!==w.mal_id) return; box.innerHTML='<div class="mc-msg">Impossible de charger MangaCollec ('+esc(e.message)+').<br><button class="btn btn-ghost btn-sm" onclick="mcRenderEditions(true)" style="margin-top:8px">↻ Réessayer</button> <button class="btn btn-ghost btn-sm" onclick="mcUnlink()" style="margin-top:8px">Dissocier</button></div>'; return; }
+  if(!S.currentWork||S.currentWork.mal_id!==w.mal_id) return;
+  mcDrawSeries(ser);
+}
+function mcDrawSeries(ser){
+  const box=document.getElementById('mc-ed-section'); if(!box) return;
+  const eds=[...ser.eds].sort((a,b)=>(a.parent?1:0)-(b.parent?1:0)||b.n-a.n);
+  let cur=_mcSel[ser.id]; if(!eds.find(e=>e.id===cur)) cur=_mcSel[ser.id]=(eds[0]||{}).id;
+  const ed=eds.find(e=>e.id===cur)||{};
+  const vols=ser.vols.filter(v=>v[0]===cur).sort((a,b)=>a[1]-b[1]);
+  const owned=new Set(((S.mcOwned||{})[ser.id]||{})[cur]||[]);
+  const today=new Date().toISOString().slice(0,10);
+  const nOwn=vols.filter(v=>owned.has(v[1])).length;
+  const pct=vols.length?Math.round(nOwn/vols.length*100):0;
+  const edName=e=>(e.t||'Édition standard')+(e.pub?' · '+e.pub:'');
+  const chips=eds.map(e=>`<button class="mc-chip${e.id===cur?' on':''}" onclick="mcSelEd('${ser.id}','${e.id}')">${esc(edName(e))} <span>${e.n}</span>${e.stop?' <em title="Arrêt commercial">⛔</em>':''}</button>`).join('');
+  const cards=vols.map(v=>{
+    const up=v[2]&&v[2]>today, ow=owned.has(v[1]);
+    return `<div class="mc-vol${ow?' own':''}${up?' up':''}" onclick="mcToggleOwned('${ser.id}','${cur}',${v[1]})" title="${esc(ed.t||ser.title)} T${v[1]}${v[4]?' · ISBN '+esc(v[4]):''}">
+      <div class="mc-cv">${v[3]?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(v[3])}" alt="" onerror="this.style.display='none'">`:'<span>?</span>'}${ow?'<b class="mc-ck">✓</b>':''}${up?'<b class="mc-up">À venir</b>':''}</div>
+      <div class="mc-n">T${v[1]}</div><div class="mc-d">${esc(mcFmtDate(v[2]))}</div></div>`;
+  }).join('');
+  const boxes=(ser.boxes||[]).filter(b=>b[0]).sort((a,b)=>(a[1]||'').localeCompare(b[1]||''));
+  const boxHtml=boxes.length?`<div class="mc-sub">Coffrets (${boxes.length})</div><div class="mc-grid">${boxes.map(b=>`<div class="mc-vol"><div class="mc-cv">${b[2]?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(b[2])}" alt="" onerror="this.style.display='none'">`:'<span>?</span>'}</div><div class="mc-n" style="font-size:10px">${esc(b[0])}</div><div class="mc-d">${esc(mcFmtDate(b[1]))}</div></div>`).join('')}</div>`:'';
+  box.innerHTML=`<div class="mc-head"><div><b>${esc(ser.title)}</b><div class="mc-sm">${esc((ser.authors||[]).join(', '))}${ser.authors&&ser.authors.length?' · ':''}MangaCollec · actualisé il y a ${mcAgo(ser.ts)}</div></div>
+    <div class="mc-btns"><a class="btn btn-ghost btn-sm" href="https://www.mangacollec.com/series/${ser.id}" target="_blank" rel="noopener">↗ MangaCollec</a><button class="btn btn-ghost btn-sm" onclick="mcRenderEditions(true)">↻</button><button class="btn btn-ghost btn-sm" onclick="mcUnlink()">Dissocier</button></div></div>
+    <div class="mc-chips">${chips}</div>
+    <div class="mc-prog"><div class="mc-bar"><i style="width:${pct}%"></i></div><span>${nOwn}/${vols.length} tomes possédés (${pct}%)</span></div>
+    <div class="mc-grid">${cards||'<div class="mc-msg">Aucun tome pour cette édition.</div>'}</div>${boxHtml}
+    <div class="mc-sm" style="margin-top:12px">Touche un tome pour le marquer comme possédé. Données MangaCollec (non officiel), mises en cache sur cet appareil.</div>`;
+}
+function mcSelEd(sid,eid){ _mcSel[sid]=eid; mcGetSeries(sid,false).then(mcDrawSeries).catch(()=>{}); }
+function mcToggleOwned(sid,eid,num){
+  if(!S.mcOwned) S.mcOwned={};
+  const o=S.mcOwned[sid]||(S.mcOwned[sid]={});
+  const a=o[eid]||(o[eid]=[]); const i=a.indexOf(num);
+  if(i>=0) a.splice(i,1); else a.push(num);
+  if(!a.length) delete o[eid];
+  if(!Object.keys(o).length) delete S.mcOwned[sid];
+  save();
+  mcGetSeries(sid,false).then(mcDrawSeries).catch(()=>{});
+}
+function mcLink(sid){
+  const w=S.currentWork; if(!w) return;
+  if(!S.mcMap) S.mcMap={}; S.mcMap[w.mal_id]=sid; save(); mcRenderEditions(true);
+}
+function mcUnlink(){
+  const w=S.currentWork; if(!w||!confirm('Dissocier cette œuvre de MangaCollec ? (tes tomes cochés restent enregistrés)')) return;
+  delete (S.mcMap||{})[w.mal_id]; save(); mcRenderMatch(w);
+}
+function mcManualLink(){
+  const v=(document.getElementById('mc-manual')||{}).value||'';
+  const m=v.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if(!m){ toast('Colle un lien du type mangacollec.com/series/…','err'); return; }
+  mcLink(m[0].toLowerCase());
+}
+async function mcRenderMatch(w){
+  const box=document.getElementById('mc-ed-section'); if(!box) return;
+  box.innerHTML='<div class="loading"><div class="spin"></div> Recherche sur MangaCollec…</div>';
+  const manual=`<div class="mc-sub">Ou colle le lien de la série sur MangaCollec</div><div style="display:flex;gap:6px"><input id="mc-manual" class="inp" placeholder="https://www.mangacollec.com/series/…" style="flex:1"><button class="btn btn-sm" onclick="mcManualLink()">Lier</button></div>`;
+  let list;
+  try{ list=await mcGetIndex(); }
+  catch(e){ if(!S.currentWork||S.currentWork.mal_id!==w.mal_id) return; box.innerHTML='<div class="mc-msg">Recherche automatique indisponible ('+esc(e.message)+').</div>'+manual; return; }
+  if(!S.currentWork||S.currentWork.mal_id!==w.mal_id) return;
+  const c=mcCandidates(list,mcWorkTitles(w));
+  const exact=c.filter(x=>x.sc>=100);
+  if(exact.length===1){ mcLink(exact[0].id); return; }
+  box.innerHTML=(c.length?`<div class="mc-sub">Quelle série MangaCollec correspond à « ${esc(w.title)} » ?</div><div class="mc-cands">${c.map(x=>`<button class="mc-cand" onclick="mcLink('${x.id}')"><b>${esc(x.title)}</b><span>${esc(x.type)}</span></button>`).join('')}</div>`:'<div class="mc-msg">Aucune série trouvée automatiquement.</div>')+manual;
+}
+// Mise à jour discrète au lancement : quelques séries liées au plus, périmées seulement
+async function mcBackgroundRefresh(){
+  try{
+    if(!MC_PROXY||document.hidden) return;
+    const ids=[...new Set(Object.values(S.mcMap||{}))]; let done=0;
+    for(const id of ids){
+      if(done>=5||document.hidden) break;
+      const c=await mcKvGet('series:'+id);
+      if(c&&Date.now()-c.ts<MC_SER_TTL) continue;
+      try{ await mcGetSeries(id,true); }catch(e){ break; }
+      done++; await new Promise(r=>setTimeout(r,1500));
+    }
+  }catch(e){}
+}
+setTimeout(mcBackgroundRefresh,10000);
+
+// ─── Manga : MangaCollec (planning FR) via le relais Vercel /api/mangacollec ───
+// Non officiel : le relais demande une session anonyme à api.mangacollec.com (comme le site),
+// puis renvoie le planning. Tout est mis en cache LOCALEMENT (localStorage) — rien n'est écrit
+// dans Firestore. Si MangaCollec change son API, cette partie échoue proprement.
+const MC_PROXY=(typeof MAL_PROXY==='string' && !MAL_PROXY.includes('TON-PROJET')) ? MAL_PROXY.replace(/\/api\/mal\/?$/,'/api/mangacollec') : '';
+const MC_HIDE_ADULT=true;                 // masque les séries marquées « contenu adulte » par MangaCollec
+const MC_TTL_MONTH=12*3600*1000;          // 12 h pour le mois courant et à venir
+const MC_TTL_PAST=7*24*3600*1000;         // 7 jours pour les mois passés
+const MC_TTL_PUB=7*24*3600*1000;          // éditeurs : 7 jours
+const MC_CACHE_KEY='ot_mc_cal_v1', MC_PUB_KEY='ot_mc_pub_v1', MC_MAX_MONTHS=5;
+let _mcStale=false;
+
+async function mcFetch(path,params){
+  if(!MC_PROXY) throw new Error('relais MangaCollec non configuré (MAL_PROXY)');
+  const qs=Object.entries(params||{}).map(([k,v])=>'&'+k+'='+encodeURIComponent(v)).join('');
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),20000);
+  try{
+    const r=await fetch(MC_PROXY+'?path='+encodeURIComponent(path)+qs,{signal:ctrl.signal});
+    if(!r.ok) throw new Error('relais MangaCollec HTTP '+r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+function mcLoad(key,fallback){ try{ return JSON.parse(localStorage.getItem(key))||fallback; }catch(e){ return fallback; } }
+function mcSave(key,val){
+  try{ localStorage.setItem(key,JSON.stringify(val)); return true; }
+  catch(e){ try{ localStorage.removeItem(MC_CACHE_KEY); }catch(_){} return false; }
+}
+async function mcGetPublishers(){
+  const c=mcLoad(MC_PUB_KEY,null);
+  if(c && c.map && Date.now()-c.ts<MC_TTL_PUB) return c.map;
+  try{
+    const d=await mcFetch('publishers');
+    const map={}; (d.publishers||[]).forEach(p=>{ map[p.id]=p.title; });
+    mcSave(MC_PUB_KEY,{ts:Date.now(),map});
+    return map;
+  }catch(e){ if(c&&c.map) return c.map; return {}; }
+}
+// Convertit la réponse brute du planning en liste compacte [titre,cover,'YYYY-MM-DD',éditeur,lien,isbn]
+function mcBuildItems(data,pubs){
+  const ser=new Map((data.series||[]).map(x=>[x.id,x]));
+  const eds=new Map((data.editions||[]).map(x=>[x.id,x]));
+  const bed=new Map((data.box_editions||[]).map(x=>[x.id,x]));
+  const out=[];
+  (data.volumes||[]).forEach(v=>{
+    if(!v.release_date) return;
+    const ed=eds.get(v.edition_id); const se=ed&&ser.get(ed.series_id);
+    if(!se) return;
+    if(MC_HIDE_ADULT && se.adult_content) return;
+    const oneShot=ed.volumes_count===1 && !ed.last_volume_number;
+    const label=v.title ? v.title : (oneShot ? 'One-shot' : 'Tome '+v.number);
+    const title=se.title+' — '+label+(ed.title?' • '+ed.title:'');
+    out.push([title,v.image_url||'',v.release_date,pubs[ed.publisher_id]||'','https://www.mangacollec.com/series/'+se.id,v.isbn||'']);
+  });
+  (data.boxes||[]).forEach(b=>{
+    if(!b.release_date) return;
+    const be=bed.get(b.box_edition_id);
+    if(MC_HIDE_ADULT && be && be.adult_content) return;
+    const title=(be?be.title+' — ':'')+(b.title||'Coffret');
+    out.push([title,b.image_url||'',b.release_date,(be&&pubs[be.publisher_id])||'','',b.isbn||'']);
+  });
+  out.sort((a,b)=>a[2]<b[2]?-1:a[2]>b[2]?1:a[0].localeCompare(b[0],'fr'));
+  return out;
+}
+function mcHydrate(rows){
+  return rows.map(r=>{
+    const [y,m,d]=r[2].split('-').map(Number);
+    return {title:r[0],cover:r[1],date:new Date(y,m-1,d),editor:r[3],author:'',link:r[4],isbn:r[5]};
+  });
+}
+function mcIsFresh(monthKey,ts){
+  const now=new Date(), cur=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const ttl=monthKey<cur?MC_TTL_PAST:MC_TTL_MONTH;
+  return Date.now()-ts<ttl;
+}
+async function mcRefreshMonth(monthKey,force){
+  const store=mcLoad(MC_CACHE_KEY,{});
+  const hit=store[monthKey];
+  if(hit && !force && mcIsFresh(monthKey,hit.ts)) return {rows:hit.rows,fromCache:true};
+  const [data,pubs]=await Promise.all([mcFetch('planning',{month:monthKey}), mcGetPublishers()]);
+  if(!data || !Array.isArray(data.volumes)) throw new Error('réponse MangaCollec inattendue');
+  const rows=mcBuildItems(data,pubs);
+  const fresh=mcLoad(MC_CACHE_KEY,{});
+  fresh[monthKey]={ts:Date.now(),rows};
+  const keys=Object.keys(fresh).sort();
+  while(keys.length>MC_MAX_MONTHS) delete fresh[keys.shift()];   // on garde les 5 mois les plus récents
+  mcSave(MC_CACHE_KEY,fresh);
+  try{ localStorage.setItem('ot_mc_used','1'); }catch(e){}
+  return {rows,fromCache:false};
+}
+async function calFetchMangaCollecMonth(year,month){
+  const key=year+'-'+String(month).padStart(2,'0');
+  try{
+    const {rows}=await mcRefreshMonth(key,false);
+    return mcHydrate(rows);
+  }catch(e){
+    const old=mcLoad(MC_CACHE_KEY,{})[key];
+    if(old && old.rows){ _mcStale=true; return mcHydrate(old.rows); }   // relais injoignable → données en cache
+    throw e;
+  }
+}
+// Mise à jour discrète en arrière-plan : mois courant + 2 suivants, seulement si MangaCollec a déjà été utilisé,
+// espacée de 1,5 s entre chaque requête, et seulement quand l'onglet est visible.
+async function mcBackgroundRefresh(){
+  try{
+    if(localStorage.getItem('ot_mc_used')!=='1' || document.hidden || !MC_PROXY) return;
+    const d=new Date();
+    for(let i=0;i<3;i++){
+      const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      try{ await mcRefreshMonth(key,false); }catch(e){ break; }
+      d.setMonth(d.getMonth()+1);
+      await new Promise(r=>setTimeout(r,1500));
+    }
+    _calMangaCacheMC={};   // pour que le calendrier reprenne les données fraîches à l'affichage suivant
+  }catch(e){}
+}
+setTimeout(mcBackgroundRefresh,10000);
 
 // Plusieurs proxies CORS gratuits, essayés dans l'ordre : allorigins.win est souvent en
 // panne / rate-limité (timeouts, 403/429 fréquents), ce qui faisait échouer le calendrier
@@ -5331,7 +5664,7 @@ function computeFirebaseDocSize(){
     physCategories:S.physCategories||[],
     suiviCategories:S.suiviCategories||[],
     customTierLists:customTierListsClean,
-    allTags:S.allTags||[],
+    allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},
     _updatedAt:Date.now()
   };
 
@@ -9741,6 +10074,8 @@ async function loadFromFirebase(){
     if(remote.arcsImgs) S.arcsImgs=remote.arcsImgs;
     if(remote.customTierLists) S.customTierLists=remote.customTierLists;
     if(remote.allTags) S.allTags=remote.allTags;
+    if(remote.mcMap) S.mcMap=remote.mcMap;
+    if(remote.mcOwned) S.mcOwned=remote.mcOwned;
     try{ localStorage.setItem('ot_v3',JSON.stringify({
       tracking:S.tracking,lists:S.lists,collection:S.collection,
       collectionMeta:S.collectionMeta,profile:S.profile,
@@ -9750,7 +10085,7 @@ async function loadFromFirebase(){
       suiviCategories:S.suiviCategories||[],
       tierImg:S.tierImg||null,arcsImgs:S.arcsImgs||{},
       customTierLists:S.customTierLists||[],
-      allTags:S.allTags||[]
+      allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{}
     })); }catch(e){}
     renderCustomTops();
     renderTierList();
@@ -9844,7 +10179,7 @@ function fbSave(immediate=true){
         physCategories:S.physCategories||[],
         suiviCategories:S.suiviCategories||[],
         customTierLists:customTierListsClean,
-        allTags:S.allTags||[],
+        allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},
         _updatedAt:Date.now()
       });
     }catch(e){ console.error('Firebase save error',e); }
