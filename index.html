@@ -465,6 +465,8 @@ body::after{
 .mc-ck{position:absolute;top:4px;right:4px;background:var(--acc);color:#fff;border-radius:50%;width:20px;height:20px;font-size:12px;display:flex;align-items:center;justify-content:center}
 .mc-up{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);color:#fbbf24;font-size:10px;padding:2px 0}
 .mc-n{font-size:12px;font-weight:700;margin-top:4px}.mc-d{font-size:10px;color:var(--t3)}
+.mc-in{flex:1;width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 12px;font-size:13px;outline:none}.mc-in:focus{border-color:var(--acc)}
+.mc-uprow{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}.mc-upc{flex:0 0 92px;cursor:pointer;text-align:center}
 .mc-cands{display:flex;flex-direction:column;gap:6px}.mc-cand{display:flex;justify-content:space-between;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);cursor:pointer;text-align:left;font-size:13px}.mc-cand span{color:var(--t3);font-size:11px}
 
 
@@ -2302,6 +2304,7 @@ textarea.fi{resize:vertical;min-height:72px}
         <button class="library-add-btn" onclick="openM('m-add-phys')">＋ Ajouter une série</button>
         <button class="library-add-btn" onclick="openAddPhysCat()" style="border-color:var(--acc3);color:var(--acc2)">📂 Nouvelle catégorie</button>
       </div>
+      <div id="mc-coll-extra"></div>
       <div id="phys-library"></div>
       <div id="phys-empty" style="display:none">
         <div class="empty"><div class="empty-icon">📚</div><div class="empty-title">Bibliothèque vide</div><div class="empty-sub">Cliquez sur "Ajouter une série" pour commencer votre bibliothèque.</div></div>
@@ -5152,7 +5155,7 @@ async function mcGetSeries(id,force){
   try{
     const d=await mcFetch('series',{id});
     const cs=mcCompactSeries(d,id);
-    if(cs.eds.length||cs.vols.length){ await mcKvSet(key,cs); return cs; }
+    if(cs.eds.length||cs.vols.length){ await mcKvSet(key,cs); _mcMem[id]=cs; return cs; }
     throw new Error('réponse vide');
   }catch(e){ if(c) return c; throw e; }
 }
@@ -5173,14 +5176,15 @@ function mcCandidates(list,titles){
   list.forEach(r=>{
     const n=mcNorm(r[1]); if(!n) return;
     let sc=0;
-    ts.forEach(t=>{ if(n===t) sc=Math.max(sc,100); else if(n.startsWith(t+' ')||t.startsWith(n+' ')) sc=Math.max(sc,60-Math.min(30,Math.abs(n.length-t.length))); else if(t.length>3&&n.includes(t)) sc=Math.max(sc,30); });
+    ts.forEach(t=>{ if(n===t) sc=Math.max(sc,100); else if(n.startsWith(t+' ')||t.startsWith(n+' ')) sc=Math.max(sc,60-Math.min(30,Math.abs(n.length-t.length))); else if(t.length>3&&n.includes(t)) sc=Math.max(sc,30); else { const tk=t.split(' ').filter(x=>x.length>1), nt=n.split(' '); if(tk.length&&tk.every(x=>nt.includes(x))) sc=Math.max(sc,25); } });
     if(r[2] && /manga/i.test(r[2])) sc+=sc?5:0;
     if(sc) out.set(r[0],{id:r[0],title:r[1],type:r[2],sc});
   });
   return [...out.values()].sort((a,b)=>b.sc-a.sc).slice(0,8);
 }
 function mcWorkTitles(w){
-  const a=[w.title,w.title_english,w.title_japanese]; (w.titles||[]).forEach(t=>a.push(t.title));
+  const a=[]; (w.titles||[]).forEach(t=>{ if(t.type==='French') a.push(t.title); });
+  a.push(w.title,w.title_english,w.title_japanese); (w.titles||[]).forEach(t=>a.push(t.title));
   return [...new Set(a.filter(Boolean))];
 }
 function mcAgo(ts){ const m=Math.round((Date.now()-ts)/60000); if(m<2) return "à l'instant"; if(m<90) return m+' min'; const h=Math.round(m/60); if(h<48) return h+' h'; return Math.round(h/24)+' j'; }
@@ -5217,7 +5221,7 @@ function mcDrawSeries(ser){
   let cur=_mcSel[ser.id]; if(!eds.find(e=>e.id===cur)) cur=_mcSel[ser.id]=(eds[0]||{}).id;
   const ed=eds.find(e=>e.id===cur)||{};
   const vols=ser.vols.filter(v=>v[0]===cur).sort((a,b)=>a[1]-b[1]);
-  const owned=new Set(((S.mcOwned||{})[ser.id]||{})[cur]||[]);
+  const owned=mcOwnedSet(ser,cur);
   const today=new Date().toISOString().slice(0,10);
   const nOwn=vols.filter(v=>owned.has(v[1])).length;
   const pct=vols.length?Math.round(nOwn/vols.length*100):0;
@@ -5238,16 +5242,35 @@ function mcDrawSeries(ser){
     <div class="mc-grid">${cards||'<div class="mc-msg">Aucun tome pour cette édition.</div>'}</div>${boxHtml}
     <div class="mc-sm" style="margin-top:12px">Touche un tome pour le marquer comme possédé. Données MangaCollec (non officiel), mises en cache sur cet appareil.</div>`;
 }
+let _mcMem={}, _mcWarmed=false;
+function mcDefEd(ser){ const e=[...ser.eds].sort((a,b)=>(a.parent?1:0)-(b.parent?1:0)||b.n-a.n)[0]; return e?e.id:null; }
+function mcOwnedSet(ser,eid){
+  const w=S.currentWork;
+  if(w&&eid===mcDefEd(ser)) return new Set(Object.keys((S.collection[w.mal_id]||{}).volumes||{}).map(Number));
+  return new Set(((S.mcOwned||{})[ser.id]||{})[eid]||[]);
+}
 function mcSelEd(sid,eid){ _mcSel[sid]=eid; mcGetSeries(sid,false).then(mcDrawSeries).catch(()=>{}); }
 function mcToggleOwned(sid,eid,num){
-  if(!S.mcOwned) S.mcOwned={};
-  const o=S.mcOwned[sid]||(S.mcOwned[sid]={});
-  const a=o[eid]||(o[eid]=[]); const i=a.indexOf(num);
-  if(i>=0) a.splice(i,1); else a.push(num);
-  if(!a.length) delete o[eid];
-  if(!Object.keys(o).length) delete S.mcOwned[sid];
-  save();
-  mcGetSeries(sid,false).then(mcDrawSeries).catch(()=>{});
+  mcGetSeries(sid,false).then(ser=>{
+    const w=S.currentWork;
+    if(w&&eid===mcDefEd(ser)){   // édition principale : même donnée que l'onglet Ma collection
+      if(!S.collectionMeta) S.collectionMeta={};
+      const m=S.collectionMeta[w.mal_id]||(S.collectionMeta[w.mal_id]={mal_id:w.mal_id,type:'manga',title:w.title_english||w.title,cover:w._coverFull||''});
+      const nums=ser.vols.filter(v=>v[0]===eid).map(v=>v[1]);
+      m._knownVolumes=nums.length?Math.max(...nums):0;
+      const e=ser.eds.find(x=>x.id===eid); m._isOngoing=!!(e&&e.nf);
+      toggleVol(w.mal_id,num,false);
+    } else {
+      if(!S.mcOwned) S.mcOwned={};
+      const o=S.mcOwned[sid]||(S.mcOwned[sid]={});
+      const a=o[eid]||(o[eid]=[]); const i=a.indexOf(num);
+      if(i>=0) a.splice(i,1); else a.push(num);
+      if(!a.length) delete o[eid];
+      if(!Object.keys(o).length) delete S.mcOwned[sid];
+      save();
+    }
+    mcDrawSeries(ser);
+  }).catch(()=>{});
 }
 function mcLink(sid){
   const w=S.currentWork; if(!w) return;
@@ -5257,27 +5280,96 @@ function mcUnlink(){
   const w=S.currentWork; if(!w||!confirm('Dissocier cette œuvre de MangaCollec ? (tes tomes cochés restent enregistrés)')) return;
   delete (S.mcMap||{})[w.mal_id]; save(); mcRenderMatch(w);
 }
-function mcManualLink(){
-  const v=(document.getElementById('mc-manual')||{}).value||'';
+async function mcManualLink(){
+  const inp=document.getElementById('mc-manual'); const v=(inp&&inp.value)||'';
   const m=v.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   if(!m){ toast('Colle un lien du type mangacollec.com/series/…','err'); return; }
-  mcLink(m[0].toLowerCase());
+  const id=m[0].toLowerCase();
+  if(/\/editions?\//i.test(v)){   // lien d'une édition : on retrouve la série
+    try{
+      toast('Lecture du lien…');
+      const d=await mcFetch('editions',{id});
+      const e=(d.editions||[]).find(x=>x.id===id)||(d.editions||[])[0];
+      if(!e||!e.series_id) throw new Error('série introuvable');
+      mcLink(e.series_id);
+    }catch(err){ toast('Lien non reconnu : '+err.message,'err'); }
+    return;
+  }
+  mcLink(id);
+}
+let _mcList=null;
+function mcSearchUI(){
+  const q=(document.getElementById('mc-q')||{}).value||''; const el=document.getElementById('mc-cands'); if(!el||!_mcList) return;
+  const c=q.trim().length>=2?mcCandidates(_mcList,[q]):[];
+  el.innerHTML=c.length?c.map(x=>`<button class="mc-cand" onclick="mcLink('${x.id}')"><b>${esc(x.title)}</b><span>${esc(x.type)}</span></button>`).join(''):(q.trim().length>=2?'<div class="mc-msg">Aucun résultat pour ce titre.</div>':'');
 }
 async function mcRenderMatch(w){
   const box=document.getElementById('mc-ed-section'); if(!box) return;
   box.innerHTML='<div class="loading"><div class="spin"></div> Recherche sur MangaCollec…</div>';
-  const manual=`<div class="mc-sub">Ou colle le lien de la série sur MangaCollec</div><div style="display:flex;gap:6px"><input id="mc-manual" class="inp" placeholder="https://www.mangacollec.com/series/…" style="flex:1"><button class="btn btn-sm" onclick="mcManualLink()">Lier</button></div>`;
-  let list;
-  try{ list=await mcGetIndex(); }
-  catch(e){ if(!S.currentWork||S.currentWork.mal_id!==w.mal_id) return; box.innerHTML='<div class="mc-msg">Recherche automatique indisponible ('+esc(e.message)+').</div>'+manual; return; }
+  let err=null;
+  try{ _mcList=await mcGetIndex(); }catch(e){ err=e; _mcList=null; }
   if(!S.currentWork||S.currentWork.mal_id!==w.mal_id) return;
-  const c=mcCandidates(list,mcWorkTitles(w));
-  const exact=c.filter(x=>x.sc>=100);
-  if(exact.length===1){ mcLink(exact[0].id); return; }
-  box.innerHTML=(c.length?`<div class="mc-sub">Quelle série MangaCollec correspond à « ${esc(w.title)} » ?</div><div class="mc-cands">${c.map(x=>`<button class="mc-cand" onclick="mcLink('${x.id}')"><b>${esc(x.title)}</b><span>${esc(x.type)}</span></button>`).join('')}</div>`:'<div class="mc-msg">Aucune série trouvée automatiquement.</div>')+manual;
+  const titles=mcWorkTitles(w);
+  if(_mcList){
+    const ex=mcCandidates(_mcList,titles).filter(x=>x.sc>=100);
+    if(ex.length===1){ mcLink(ex[0].id); return; }
+  }
+  const fr=((w.titles||[]).find(t=>t.type==='French')||{}).title||'';
+  box.innerHTML=`<div class="mc-msg">${err?'Recherche automatique indisponible ('+esc(err.message)+').':'MangaCollec n\'utilise que les <b>titres français</b> : cherche le titre français de la série.'}</div>
+    ${_mcList?`<div class="mc-sub">Rechercher sur MangaCollec</div><input id="mc-q" class="mc-in" value="${esc(fr)}" placeholder="Titre français (ex : L'Attaque des Titans)" oninput="mcSearchUI()"><div id="mc-cands" class="mc-cands" style="margin-top:8px"></div>`:''}
+    <div class="mc-sub">Ou colle le lien MangaCollec (série ou édition)</div>
+    <div style="display:flex;gap:6px"><input id="mc-manual" class="mc-in" placeholder="https://www.mangacollec.com/series/…" onkeydown="if(event.key==='Enter'){event.preventDefault();mcManualLink()}" onpaste="setTimeout(mcManualLink,80)"><button class="btn btn-sm" onclick="mcManualLink()">Lier</button></div>`;
+  if(_mcList){ const c=mcCandidates(_mcList,titles); const el=document.getElementById('mc-cands'); if(el&&!fr&&c.length) el.innerHTML=c.map(x=>`<button class="mc-cand" onclick="mcLink('${x.id}')"><b>${esc(x.title)}</b><span>${esc(x.type)}</span></button>`).join(''); else mcSearchUI(); }
 }
+// ── Ma collection : couvertures réelles, tomes manquants, prochaines sorties ──
+async function mcWarm(){ let ch=false; for(const id of new Set(Object.values(S.mcMap||{}))){ if(_mcMem[id]) continue; const c=await mcKvGet('series:'+id); if(c){ _mcMem[id]=c; ch=true; } } return ch; }
+function mcVolMap(malId){
+  const ser=_mcMem[(S.mcMap||{})[malId]]; if(!ser) return null;
+  const def=mcDefEd(ser); const m={}; ser.vols.forEach(v=>{ if(v[0]===def) m[v[1]]={img:v[3],date:v[2]}; }); return m;
+}
+function mcMissingBadge(malId,owned,maxVol){
+  const mv=mcVolMap(malId); if(!mv) return '';
+  const today=new Date().toISOString().slice(0,10); const miss=[];
+  for(let i=1;i<=maxVol;i++){ if(owned[i]) continue; const v=mv[i]; if(v&&v.date&&v.date>today) continue; if(v) miss.push(i); }
+  return miss.length?'<span style="font-size:10px;color:#fbbf24;margin-left:6px" title="Tomes parus que tu n\'as pas">manque : '+miss.slice(0,15).join(', ')+(miss.length>15?'…':'')+'</span>':'<span style="font-size:10px;color:#4ade80;margin-left:6px">complète ✓</span>';
+}
+function mcGoWork(malId){ openWork(malId,'manga'); setTimeout(mcOpenTab,900); }
+function mcRenderCollExtra(){
+  const el=document.getElementById('mc-coll-extra'); if(!el) return;
+  const ids=Object.keys(S.collection||{}).filter(id=>{ const c=S.collection[id]; return c&&(c.volumes!==undefined||c.added); });
+  const today=new Date().toISOString().slice(0,10); const up=[]; const unl=[]; let linked=0;
+  ids.forEach(id=>{
+    const sid=(S.mcMap||{})[id]; const meta=S.tracking[id]||(S.collectionMeta||{})[id]||{};
+    if(!sid){ unl.push({id,title:meta.title||('Série #'+id)}); return; }
+    linked++;
+    const ser=_mcMem[sid]; if(!ser) return; const def=mcDefEd(ser);
+    ser.vols.forEach(v=>{ if(v[0]===def&&v[2]>today) up.push({id,title:meta.title||ser.title,n:v[1],d:v[2],img:v[3]}); });
+  });
+  up.sort((a,b)=>a.d.localeCompare(b.d));
+  if(!MC_PROXY||!ids.length){ el.innerHTML=''; return; }
+  let h='<div style="margin-bottom:22px">';
+  if(up.length) h+='<div class="mc-sub" style="margin-top:0">📅 Prochaines sorties de ma collection</div><div class="mc-uprow">'+up.slice(0,14).map(x=>`<div class="mc-upc" onclick="openWork(${x.id},'manga')"><div class="mc-cv" style="aspect-ratio:2/3">${x.img?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(x.img)}" alt="" onerror="this.style.display='none'">`:''}</div><div class="mc-n">T${x.n}</div><div class="mc-d">${esc(mcFmtDate(x.d))}</div><div class="mc-d" style="color:var(--t2)">${esc((x.title||'').slice(0,22))}</div></div>`).join('')+'</div>';
+  if(unl.length) h+=`<div class="mc-msg" style="margin-top:10px"><b>${linked}</b> série(s) liée(s) à MangaCollec · <b>${unl.length}</b> non liée(s). <button class="btn btn-ghost btn-sm" onclick="mcAutoLinkCollection(this)">🔗 Associer automatiquement</button><div class="mc-sm" style="margin-top:6px">Non liées : ${unl.slice(0,12).map(x=>`<a href="#" onclick="mcGoWork(${x.id});return false" style="color:var(--acc2)">${esc(x.title)}</a>`).join(' · ')}${unl.length>12?' …':''}</div></div>`;
+  el.innerHTML=h+'</div>';
+}
+async function mcAutoLinkCollection(btn){
+  if(btn){ btn.disabled=true; btn.textContent='Recherche…'; }
+  try{
+    const list=await mcGetIndex(); let n=0;
+    Object.keys(S.collection||{}).forEach(id=>{
+      if((S.mcMap||{})[id]) return;
+      const meta=S.tracking[id]||(S.collectionMeta||{})[id]||{};
+      const ex=mcCandidates(list,[meta.title,meta.title_english].filter(Boolean)).filter(x=>x.sc>=100);
+      if(ex.length===1){ if(!S.mcMap) S.mcMap={}; S.mcMap[id]=ex[0].id; n++; }
+    });
+    if(n){ save(); toast(n+' série(s) associée(s)','ok'); for(const id of new Set(Object.values(S.mcMap||{}))){ try{ await mcGetSeries(id,false); }catch(e){} } }
+    else toast('Aucune correspondance exacte : lie les séries depuis leur fiche (titre français)','');
+  }catch(e){ toast('Recherche indisponible : '+e.message,'err'); }
+  renderCollection();
+}
+function mcCollHook(){ mcRenderCollExtra(); if(!_mcWarmed){ _mcWarmed=true; mcWarm().then(ch=>{ if(ch) renderCollection(); }); } }
 // Mise à jour discrète au lancement : quelques séries liées au plus, périmées seulement
-async function mcBackgroundRefresh(){
+async function mcSeriesRefresh(){
   try{
     if(!MC_PROXY||document.hidden) return;
     const ids=[...new Set(Object.values(S.mcMap||{}))]; let done=0;
@@ -5290,7 +5382,7 @@ async function mcBackgroundRefresh(){
     }
   }catch(e){}
 }
-setTimeout(mcBackgroundRefresh,10000);
+setTimeout(mcSeriesRefresh,10000);
 
 // ─── Manga : MangaCollec (planning FR) via le relais Vercel /api/mangacollec ───
 // Non officiel : le relais demande une session anonyme à api.mangacollec.com (comme le site),
@@ -5964,6 +6056,7 @@ function setCreatorStatusFilter(status){
 
 // ─── COLLECTION ───
 function renderCollection(){
+  try{ mcCollHook(); }catch(e){}
   // Build list of manga entries from collection — may or may not be in tracking
   // Un malId compte comme "dans la collection" dès qu'une entrée existe (même sans
   // tome coché, ex: série ajoutée mais pas encore de tome pointé), pour éviter
@@ -6002,14 +6095,17 @@ function renderCollection(){
       const meta=S.collectionMeta?.[malId]||S.tracking?.[malId]||{};
       const knownMax=meta._customMax||meta._knownVolumes||0;
       const maxOwned=allNums.length?allNums[allNums.length-1]:0;
-      const maxVol=Math.max(knownMax, maxOwned, 1);
+      const mcMaxN=(()=>{ const m=mcVolMap(malId); return m?Math.max(0,...Object.keys(m).map(Number)):0; })();
+      const maxVol=Math.max(knownMax, maxOwned, mcMaxN, 1);
       const isOngoing=meta._isOngoing||false;
       const ownedCount=allNums.length;
       const hue=((malId*53)%360);
       const coverUrl=(t.cover||'').replace(/'/g,"\\'");
+      const mcv=mcVolMap(malId);
       const spines=[];
       for(let i=1;i<=maxVol;i++){
         const isOwned=!!owned[i];
+        const mi=mcv&&mcv[i];
         // Recadrage différent de la couverture de la série pour chaque tome, pour simuler
         // des dos de livre visuellement distincts plutôt qu'un simple aplat de couleur
         const bgPosX=(i*37)%100;
@@ -6019,7 +6115,7 @@ function renderCollection(){
           +'onclick="toggleVol('+malId+','+i+',true)" '
           +'title="Tome '+i+(isOwned?' ✓':' (manquant)')+'">'
           +'<div style="width:34px;height:118px;border-radius:3px 7px 7px 3px;overflow:hidden;position:relative;'
-          +(coverUrl
+          +(mi&&mi.img?('background-image:url(\''+mi.img.replace(/'/g,"\\'")+'\');background-size:cover;background-position:center;'+(isOwned?'':'filter:grayscale(1) brightness(.45);')):coverUrl
             ?('background-image:url(\''+coverUrl+'\');background-size:220% 340%;background-position:'+bgPosX+'% '+bgPosY+'%;'
               +'box-shadow:inset 0 0 0 1000px hsla('+hue+',60%,'+(isOwned?'22%,.42':'15%,.72')+')')
             :('background:hsl('+hue+','+(isOwned?'55%,28%':'30%,18%')+')'))
@@ -6044,6 +6140,7 @@ function renderCollection(){
         +esc(t.title||'Série #'+malId)
         +catBadge
         +'<span class="shelf-owned-count">'+ownedCount+' / '+maxVol+(isOngoing?' (en cours)':'')+' tomes</span>'
+        +mcMissingBadge(malId,owned,maxVol)
         +'<button onclick="assignToCategory('+malId+',\''+esc(t.title||'')+'\')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;color:var(--t3);font-size:10px;cursor:pointer;margin-left:auto">📂 Catégorie</button>'
         +'<button onclick="removePhysSeries('+malId+',\''+esc(t.title||'')+'\')" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);border-radius:6px;padding:2px 8px;color:var(--red);font-size:10px;cursor:pointer">🗑 Supprimer</button>'
         +'</div>'
