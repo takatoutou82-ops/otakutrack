@@ -1788,15 +1788,6 @@ textarea.fi{resize:vertical;min-height:72px}
   </div>
 
   <div class="wrap pb40">
-    <!-- Recommandations -->
-    <div id="home-reco-sec" style="display:none">
-      <div class="sh">
-        <h2 class="sh-title">✦ Pour toi <span class="badge b-new">RECO</span></h2>
-        <button class="btn btn-ghost" onclick="loadRecommendations(true)">Actualiser →</button>
-      </div>
-      <div id="home-reco-wrap"><div class="loading"><div class="spin"></div></div></div>
-      <div style="margin-top:28px"></div>
-    </div>
 
     <!-- In progress -->
     <div id="home-inprogress-sec" style="display:none">
@@ -2162,6 +2153,7 @@ textarea.fi{resize:vertical;min-height:72px}
   <div class="wrap pt32 pb40">
     <div class="sh"><h1 class="sh-title" style="font-size:22px">Mes Statistiques</h1></div>
     <div class="stats-grid" id="stats-grid"></div>
+    <div id="stats-coll" style="margin-top:28px"></div>
 
     <!-- Row 1: Genres + Donut statuts -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px">
@@ -2189,17 +2181,6 @@ textarea.fi{resize:vertical;min-height:72px}
       </div>
     </div>
 
-    <!-- Row 3: Top auteurs -->
-    <div style="margin-top:32px">
-      <div class="sh"><h2 class="sh-title">Top auteurs <span style="font-weight:400;color:var(--t3);font-size:12px">(classés par nombre de tomes)</span></h2></div>
-      <div id="top-authors" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div>
-    </div>
-
-    <!-- Row 4: Top studios -->
-    <div style="margin-top:32px">
-      <div class="sh"><h2 class="sh-title">Top studios <span style="font-weight:400;color:var(--t3);font-size:12px">(classés par nombre d'épisodes)</span></h2></div>
-      <div id="top-studios" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div>
-    </div>
 
     <!-- Sauvegarde manuelle complète (export/import) -->
     <div style="margin-top:32px">
@@ -2210,6 +2191,7 @@ textarea.fi{resize:vertical;min-height:72px}
           <button class="btn btn-ghost" onclick="document.getElementById('backup-import-input').click()">⬆ Importer une sauvegarde</button>
           <input type="file" id="backup-import-input" accept="application/json" style="display:none" onchange="handleImportBackup(this)">
         </div>
+        <div id="autobk-box" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)"></div>
         <p style="font-size:11.5px;color:var(--t3);margin-top:10px;line-height:1.5">
           La sauvegarde contient absolument tout (suivi, listes, profil, tier lists, collection, tags…) dans un fichier que tu gardes sur ton appareil.<br>
           ⚠️ Importer une sauvegarde <strong>remplace</strong> toutes tes données actuelles. Une sauvegarde de sécurité de ton état actuel est automatiquement téléchargée juste avant, au cas où tu te serais trompé de fichier.
@@ -2349,6 +2331,8 @@ textarea.fi{resize:vertical;min-height:72px}
     <div class="modal-title"><span id="scat-modal-title">Nouvelle catégorie</span><span class="modal-close" onclick="closeM('m-scat-create')">✕</span></div>
     <input id="scat-name-input" class="inp" placeholder="Nom de la catégorie (ex: Attaque des Titans)" style="margin-bottom:12px">
     <textarea id="scat-desc-input" class="inp" placeholder="Description (optionnelle)…" style="height:70px;resize:vertical;margin-bottom:12px"></textarea>
+    <input id="scat-tags-input" class="inp" list="scat-tags-dl" placeholder="Tags (séparés par des virgules, ex : shonen, favoris)" style="margin-bottom:12px">
+    <datalist id="scat-tags-dl"></datalist>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <label style="font-size:12px;color:var(--t3);white-space:nowrap">Note globale</label>
       <select id="scat-rating-input" class="status-sel" style="margin-top:0;width:auto;flex:1"></select>
@@ -3152,7 +3136,6 @@ async function renderHome(){
   // Lancer les chargements sans bloquer la navigation
   loadHomePopular();
   setTimeout(()=>loadHomeTop(), 500);
-  setTimeout(()=>loadRecommendations(), 1200);
 }
 
 // ─── ROULETTE "Quoi lire/voir ensuite ?" ───
@@ -3606,6 +3589,27 @@ function closeNavDropdown(){
   _navFocusIdx=-1;
 }
 
+function navLocalSearch(q){
+  const nq=mcNorm(q); if(nq.length<2) return '';
+  const has=t=>mcNorm(t).includes(nq);
+  const row=(ico,title,sub,click,img)=>`<div class="nav-sr-item" onclick="closeNavDropdown();document.getElementById('navSearchInput').value='';${click}">${img?`<img src="${esc(img)}" referrerpolicy="no-referrer" style="width:28px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0">`:`<div style="width:28px;height:40px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${ico}</div>`}<div style="min-width:0"><div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)}</div><div style="font-size:10px;color:var(--t3)">${esc(sub)}</div></div></div>`;
+  const head=h=>`<div style="padding:8px 12px 4px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase">${h}</div>`;
+  let out='';
+  const sec=(h,arr)=>{ if(arr.length) out+=head(h)+arr.join(''); };
+  // collection physique
+  const coll=[];
+  Object.keys(S.collection||{}).forEach(id=>{ const c=S.collection[id]; if(!c||!(c.volumes!==undefined||c.added)) return; const m=S.tracking[id]||(S.collectionMeta||{})[id]||{}; if(m.title&&has(m.title)) coll.push(row('📚',m.title,Object.keys(c.volumes||{}).length+' tome(s) en collection',`nav('collection');`,m.cover)); });
+  sec('Ma collection',coll.slice(0,4));
+  const wish=Object.values(S.mcWish||{}).filter(a=>has(a[0])).slice(0,3).map(a=>row('♥',a[0],'Wishlist',`nav('collection');setTimeout(()=>{const b=document.querySelectorAll('.coll-tab')[4];if(b)b.click()},50);`,a[2]));
+  sec('Wishlist',wish);
+  const bx=[]; Object.values(S.mcBoxes||{}).forEach(o=>Object.values(o).forEach(a=>{ if(has(a[0])) bx.push(row('📦',a[0],'Coffret possédé',`nav('collection');setTimeout(()=>{const b=document.querySelectorAll('.coll-tab')[3];if(b)b.click()},50);`,a[1])); }));
+  sec('Coffrets',bx.slice(0,3));
+  const lists=(S.lists||[]).filter(l=>has(l.title)||(l.items||[]).some(i=>has(i.title))).slice(0,4).map(l=>{ const hit=!has(l.title)?(l.items||[]).find(i=>has(i.title)):null; return row('📋',l.title,hit?'contient « '+hit.title+' »':(l.items||[]).length+' élément(s)',`openListDetail('${l.id}')`); });
+  sec('Mes listes',lists);
+  const cats=(S.suiviCategories||[]).filter(c=>has(c.name)).slice(0,3).map(c=>row('🗂',c.name,(c.items||[]).length+' œuvre(s)',`openSuiviCategory('${c.id}')`,c.cover));
+  sec('Catégories de suivi',cats);
+  return out;
+}
 function navSearch(val){
   const dd=document.getElementById('nav-search-dropdown');
   if(!dd) return;
@@ -3613,7 +3617,7 @@ function navSearch(val){
   if(!val.trim()){ dd.style.display='none'; return; }
   clearTimeout(navSearchTimer);
   const q=val.toLowerCase();
-  const tracked=Object.values(S.tracking).filter(t=>t.title.toLowerCase().includes(q)).slice(0,5);
+  const tracked=Object.values(S.tracking).filter(t=>t.title.toLowerCase().includes(q)||(t._authors||[]).some(a=>String(a).toLowerCase().includes(q))||(t._studios||[]).some(a=>String(a).toLowerCase().includes(q))).slice(0,5);
   let html='';
   if(tracked.length){
     html+=`<div style="padding:8px 12px 4px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase">Mon suivi</div>`;
@@ -3626,6 +3630,7 @@ function navSearch(val){
         </div>
       </div>`).join('');
   }
+  html+=navLocalSearch(q);
   html+=`<div style="padding:8px 12px 4px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase">MAL <span id="nav-sr-loading">…</span></div><div id="nav-sr-mal"></div>`;
   dd.innerHTML=html;
   dd.style.display='block';
@@ -3985,6 +3990,79 @@ async function loadSimilar(w){
 }
 
 // ─── SAUVEGARDE MANUELLE COMPLÈTE (export/import) ───
+// ─── SAUVEGARDE AUTOMATIQUE HEBDOMADAIRE ───
+// Chrome/Edge sur ordinateur : on choisit un dossier une fois ; chaque semaine (à l'ouverture du site),
+// le fichier « otakutrack-sauvegarde.json » est RÉÉCRIT dans ce dossier (l'ancien est remplacé, rien ne s'accumule).
+const AUTOBK_FILE='otakutrack-sauvegarde.json', AUTOBK_DAYS=7;
+function buildBackupObject(){
+  return {
+    _meta:{app:'OtakuTrack', exportedAt:new Date().toISOString(), version:1},
+    tracking:S.tracking||{}, lists:S.lists||[], collection:S.collection||{}, collectionMeta:S.collectionMeta||{},
+    profile:S.profile||{}, customCovers:S.customCovers||{}, bannerUrl:S.bannerUrl||null,
+    bannerSize:S.bannerSize||null, bannerPos:S.bannerPos||null,
+    physCategories:S.physCategories||[], suiviCategories:S.suiviCategories||[],
+    tierImg:S.tierImg||null, arcsImgs:S.arcsImgs||{}, customTierLists:S.customTierLists||[],
+    allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{}
+  };
+}
+function autobkSupported(){ return typeof window.showDirectoryPicker==='function'; }
+function autobkLast(){ try{ return parseInt(localStorage.getItem('ot_autobk_last')||'0')||0; }catch(e){ return 0; } }
+async function autobkRender(){
+  const box=document.getElementById('autobk-box'); if(!box) return;
+  if(!autobkSupported()){ box.innerHTML='<b style="font-size:13px">🔁 Sauvegarde automatique</b><p style="font-size:11.5px;color:var(--t3);margin-top:6px;line-height:1.5">Disponible uniquement sur Chrome ou Edge sur ordinateur (le navigateur du téléphone ne permet pas d\'écrire dans un dossier choisi).</p>'; return; }
+  const h=await mcKvGet('bkdir'); const last=autobkLast();
+  const when=last?new Date(last).toLocaleString('fr-FR',{dateStyle:'long',timeStyle:'short'}):'jamais';
+  box.innerHTML=`<b style="font-size:13px">🔁 Sauvegarde automatique (chaque semaine)</b>
+    <div style="font-size:12px;color:var(--t2);margin:8px 0">${h?`Dossier : <b>${esc(h.name)}</b> · dernière sauvegarde : <b>${when}</b>`:'Aucun dossier choisi.'}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="autobkChoose()">📁 ${h?'Changer de dossier':'Choisir le dossier'}</button>${h?`<button class="btn btn-ghost btn-sm" onclick="autobkRun(true)">Sauvegarder maintenant</button><button class="btn btn-ghost btn-sm" onclick="autobkOff()">Désactiver</button>`:''}</div>
+    <p style="font-size:11.5px;color:var(--t3);margin-top:8px;line-height:1.5">Le fichier <code>${AUTOBK_FILE}</code> est <b>remplacé</b> à chaque sauvegarde (il n'y a toujours qu'un seul fichier). Elle se fait quand tu ouvres le site, si la dernière date de plus de ${AUTOBK_DAYS} jours — le navigateur ne peut pas sauvegarder site fermé. Au besoin, il te demandera de confirmer l'accès au dossier (un clic).</p>`;
+}
+async function autobkChoose(){
+  try{
+    const h=await window.showDirectoryPicker({mode:'readwrite',id:'otakutrack-backup'});
+    await mcKvSet('bkdir',h);
+    await autobkRun(true);
+  }catch(e){ if(e&&e.name!=='AbortError') toast('Impossible de choisir le dossier : '+e.message,'err'); }
+  autobkRender();
+}
+async function autobkOff(){ await mcKvSet('bkdir',null); try{ localStorage.removeItem('ot_autobk_last'); }catch(e){} autobkBanner(false); autobkRender(); toast('Sauvegarde automatique désactivée'); }
+async function autobkRun(manual){
+  try{
+    const h=await mcKvGet('bkdir'); if(!h) return false;
+    let perm=await h.queryPermission({mode:'readwrite'});
+    if(perm!=='granted'){
+      if(!manual){ autobkBanner(true); return false; }   // il faut un clic de l'utilisateur
+      perm=await h.requestPermission({mode:'readwrite'});
+      if(perm!=='granted'){ toast('Accès au dossier refusé','err'); return false; }
+    }
+    const fh=await h.getFileHandle(AUTOBK_FILE,{create:true});
+    const w=await fh.createWritable();
+    await w.write(JSON.stringify(buildBackupObject()));
+    await w.close();   // remplace le contenu précédent du même fichier
+    try{ localStorage.setItem('ot_autobk_last',String(Date.now())); }catch(e){}
+    autobkBanner(false); autobkRender();
+    if(manual) toast('Sauvegarde enregistrée ✓','ok');
+    return true;
+  }catch(e){ if(manual) toast('Sauvegarde impossible : '+e.message,'err'); return false; }
+}
+function autobkBanner(show){
+  let b=document.getElementById('autobk-banner');
+  if(!show){ if(b) b.remove(); return; }
+  if(b) return;
+  b=document.createElement('div'); b.id='autobk-banner';
+  b.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9999;background:var(--bg2);border:1px solid var(--acc);border-radius:12px;padding:12px 14px;font-size:12.5px;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:300px';
+  b.innerHTML='🔁 Sauvegarde hebdomadaire à faire.<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary btn-sm" onclick="autobkRun(true)">Sauvegarder</button><button class="btn btn-ghost btn-sm" onclick="autobkBanner(false)">Plus tard</button></div>';
+  document.body.appendChild(b);
+}
+async function autobkCheck(){
+  try{
+    if(!autobkSupported()) return;
+    const h=await mcKvGet('bkdir'); if(!h) return;
+    if(Date.now()-autobkLast()<AUTOBK_DAYS*24*3600*1000) return;
+    await autobkRun(false);
+  }catch(e){}
+}
+setTimeout(autobkCheck,8000);
 function exportFullBackup(){
   const backup={
     _meta:{app:'OtakuTrack', exportedAt:new Date().toISOString(), version:1},
@@ -5463,7 +5541,8 @@ function mcRenderCollExtra(){
   });
   up.sort((a,b)=>a.d.localeCompare(b.d));
   if(!MC_PROXY||!ids.length){ el.innerHTML=''; return; }
-  let h='<div style="margin-bottom:22px"><div class="mc-msg" style="margin-bottom:12px">📚 <b>MangaCollec</b> : '+linked+' série(s) liée(s) sur '+ids.length+(linked?' — couvertures réelles, tomes manquants et prochaines sorties actifs sur celles-ci.':' — lie tes séries pour voir les vraies couvertures, les tomes manquants et les prochaines sorties.')+'</div>';
+  const _sm=mcCollSummaryHtml();
+  let h='<div style="margin-bottom:22px"><div class="mc-msg" style="margin-bottom:12px">📊 <b>'+_sm.fmt(_sm.st.tomes)+' tomes</b> · '+_sm.st.series+' séries · '+_sm.st.boxes+' coffrets · valeur estimée <b>~'+_sm.fmt(_sm.val)+' €</b> <a href="#" onclick="nav(\'stats\');return false" style="color:var(--acc2);margin-left:6px">détails & prix</a></div><div class="mc-msg" style="margin-bottom:12px">📚 <b>MangaCollec</b> : '+linked+' série(s) liée(s) sur '+ids.length+(linked?' — couvertures réelles, tomes manquants et prochaines sorties actifs sur celles-ci.':' — lie tes séries pour voir les vraies couvertures, les tomes manquants et les prochaines sorties.')+'</div>';
   if(up.length) h+='<div class="mc-sub" style="margin-top:0">📅 Prochaines sorties de ma collection</div><div class="mc-uprow">'+up.slice(0,14).map(x=>`<div class="mc-upc" onclick="openWork(${x.id},'manga')"><div class="mc-cv" style="aspect-ratio:2/3">${x.img?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(x.img)}" alt="" onerror="this.style.display='none'">`:''}</div><div class="mc-n">T${x.n}</div><div class="mc-d">${esc(mcFmtDate(x.d))}</div><div class="mc-d" style="color:var(--t2)">${esc((x.title||'').slice(0,22))}</div></div>`).join('')+'</div>';
   if(unl.length) h+=`<div class="mc-msg" style="margin-top:10px"><b>${linked}</b> série(s) liée(s) à MangaCollec · <b>${unl.length}</b> non liée(s). <button class="btn btn-ghost btn-sm" onclick="mcAutoLinkCollection(this)">🔗 Associer automatiquement</button><div class="mc-sm" style="margin-top:6px">Non liées : ${unl.slice(0,12).map(x=>`<a href="#" onclick="mcGoWork(${x.id});return false" style="color:var(--acc2)">${esc(x.title)}</a>`).join(' · ')}${unl.length>12?' …':''}</div></div>`;
   el.innerHTML=h+'</div>';
@@ -5501,6 +5580,49 @@ function mcRenderBoxesWish(){
 }
 function mcWishRemove(k){ if(S.mcWish) delete S.mcWish[k]; save(); mcRenderBoxesWish(); }
 function mcToggleBoxFromColl(sid,key){ if(!confirm('Retirer ce coffret de ta collection ?')) return; if(S.mcBoxes&&S.mcBoxes[sid]){ delete S.mcBoxes[sid][key]; if(!Object.keys(S.mcBoxes[sid]).length) delete S.mcBoxes[sid]; } save(); mcRenderBoxesWish(); }
+// ── Statistiques de collection + valeur estimée ──
+function mcCollPrices(){ const pr=(S.profile&&S.profile.collPrices)||{}; return {tome:pr.tome>0?pr.tome:7.5, box:pr.box>0?pr.box:45}; }
+function mcCollStats(){
+  const rows=[]; let tomes=0, editions=0, boxes=0;
+  const ids=new Set(Object.keys(S.collection||{}));
+  Object.entries(S.mcMap||{}).forEach(([mal,sid])=>{ if((S.mcOwned||{})[sid]) ids.add(mal); });
+  ids.forEach(id=>{
+    const c=S.collection[id]||{}; const sid=(S.mcMap||{})[id];
+    const nDef=Object.keys(c.volumes||{}).length; let nOther=0, eds=nDef?1:0;
+    if(sid&&S.mcOwned&&S.mcOwned[sid]) Object.values(S.mcOwned[sid]).forEach(a=>{ nOther+=a.length; if(a.length) eds++; });
+    const n=nDef+nOther; if(!n) return;
+    const meta=S.tracking[id]||(S.collectionMeta||{})[id]||{};
+    const ser=sid&&_mcMem[sid]; let total=0;
+    if(ser){ const def=mcDefEd(ser); total=ser.vols.filter(v=>v[0]===def).length; }
+    rows.push({id,title:meta.title||('Série #'+id),n,total,def:nDef});
+    tomes+=n; editions+=eds;
+  });
+  Object.values(S.mcBoxes||{}).forEach(o=>boxes+=Object.keys(o).length);
+  const complete=rows.filter(r=>r.total&&r.def>=r.total).length;
+  return {rows,tomes,editions,boxes,complete,series:rows.length};
+}
+function mcSetPrice(kind){
+  const pr=mcCollPrices(); const v=prompt(kind==='tome'?'Prix moyen d\'un tome (€) :':'Prix moyen d\'un coffret (€) :',String(pr[kind]).replace('.',','));
+  if(v===null) return; const x=parseFloat(String(v).replace(',','.')); if(!(x>0)){ toast('Prix invalide','err'); return; }
+  if(!S.profile) S.profile={}; S.profile.collPrices={...(S.profile.collPrices||{}),[kind]:x}; save();
+  mcRenderStatsColl(); renderCollection();
+}
+function mcCollSummaryHtml(){
+  const st=mcCollStats(), pr=mcCollPrices(); const val=st.tomes*pr.tome+st.boxes*pr.box;
+  const fmt=n=>n.toLocaleString('fr-FR',{maximumFractionDigits:0});
+  return {st,pr,val,fmt};
+}
+function mcRenderStatsColl(){
+  const el=document.getElementById('stats-coll'); if(!el) return;
+  mcWarm().then(ch=>{ if(ch) mcRenderStatsColl(); });
+  const {st,pr,val,fmt}=mcCollSummaryHtml();
+  const tile=(n,l)=>`<div class="stat-card"><div class="stat-val">${n}</div><div class="stat-lbl">${l}</div></div>`;
+  const top=[...st.rows].sort((a,b)=>b.n-a.n).slice(0,8), mx=top.length?top[0].n:1;
+  el.innerHTML=`<div class="sh"><h2 class="sh-title">Ma collection physique</h2></div>
+    <div class="stats-grid">${tile(fmt(st.tomes),'tomes possédés')}${tile(st.series,'séries')}${tile(st.editions,'éditions')}${tile(st.boxes,'coffrets')}${tile(st.complete,'séries complètes')}${tile('~'+fmt(val)+' €','valeur estimée')}</div>
+    <div style="font-size:11.5px;color:var(--t3);margin:8px 0 14px;line-height:1.6">Estimation = ${fmt(st.tomes)} tomes × <b>${String(pr.tome).replace('.',',')} €</b> + ${st.boxes} coffrets × <b>${String(pr.box).replace('.',',')} €</b> (MangaCollec ne fournit pas les prix). <a href="#" onclick="mcSetPrice('tome');return false" style="color:var(--acc2)">Changer le prix d'un tome</a> · <a href="#" onclick="mcSetPrice('box');return false" style="color:var(--acc2)">Changer le prix d'un coffret</a></div>
+    ${top.length?`<div class="mc-sub">Séries les plus fournies</div>`+top.map(r=>`<div style="display:flex;align-items:center;gap:10px;margin:5px 0;font-size:12.5px"><div style="width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.title)}</div><div style="flex:1;height:8px;background:var(--bg3);border-radius:99px;overflow:hidden"><i style="display:block;height:100%;width:${Math.round(r.n/mx*100)}%;background:var(--acc)"></i></div><div style="width:84px;text-align:right;color:var(--t2)">${r.n}${r.total?' / '+r.total:''}</div></div>`).join(''):''}`;
+}
 function mcCollHook(){ mcRenderBoxesWish(); mcRenderCollExtra(); if(!_mcWarmed){ _mcWarmed=true; mcWarm().then(ch=>{ if(ch) renderCollection(); }); } }
 // Mise à jour discrète au lancement : quelques séries liées au plus, périmées seulement
 async function mcSeriesRefresh(){
@@ -5814,8 +5936,8 @@ function renderStats(){
   // ── Distribution des notes ──
   setTimeout(()=>renderRatingCurve(rated), 80);
 
-  // ── Top auteurs / studios ──
-  renderTopAuthors(all);
+  mcRenderStatsColl();
+  autobkRender();
 
   // ── Stockage Firebase (lecture seule) ──
   renderFbStorageIndicator();
@@ -6775,6 +6897,9 @@ function renderSuivi(){
       let cats=[];
       if(!query&&!_safStatus&&(tab!=='dropped'||_dropSubFilter[type]!=='noncontinue')){
         cats=(S.suiviCategories||[]).filter(c=>(c.section||c.type)===type&&c.tab===tab);
+        if(_safNoTag||_safTags.size||_safTagsExcl.size){   // les catégories obéissent aussi au filtre par tags
+          cats=cats.filter(c=>{ const ct=c.tags||[]; return _safNoTag?!ct.length:([..._safTags].every(g=>ct.includes(g))&&[..._safTagsExcl].every(g=>!ct.includes(g))); });
+        }
       }
 
       const catEntries=cats.map(c=>({
@@ -6792,7 +6917,7 @@ function renderSuivi(){
                 </div>
               </div>
               <div class="cc-title">${esc(c.name)}</div>
-              <div class="cc-meta">${(c.items||[]).length} œuvre(s)${c.rating?' · ★'+c.rating:''}</div>
+              <div class="cc-meta">${(c.items||[]).length} œuvre(s)${c.rating?' · ★'+c.rating:''}${(c.tags||[]).length?' · #'+c.tags.slice(0,2).map(esc).join(' #'):''}</div>
             </div>`
       }));
 
@@ -8797,6 +8922,7 @@ function openCreateSuiviCategory(type,tab){
   _scatCoverKey='';
   document.getElementById('scat-modal-title').textContent='Nouvelle catégorie';
   document.getElementById('scat-name-input').value='';
+  scatTagsFill([]);
   document.getElementById('scat-desc-input').value='';
   document.getElementById('scat-rating-input').innerHTML=buildRatingOptions(0,'— Non notée');
   setScatType(type);
@@ -8815,6 +8941,7 @@ function editSuiviCategory(id){
   _scatCoverKey=cat.coverKey || (_scatItems.length?(_scatItems[0].mal_id+'_'+_scatItems[0].type):'');
   document.getElementById('scat-modal-title').textContent='Modifier la catégorie';
   document.getElementById('scat-name-input').value=cat.name||'';
+  scatTagsFill(cat.tags||[]);
   document.getElementById('scat-desc-input').value=cat.description||'';
   document.getElementById('scat-rating-input').innerHTML=buildRatingOptions(cat.rating||0,'— Non notée');
   setScatType(cat.type||'manga');
@@ -8976,6 +9103,16 @@ function scatDrop(toIdx){
   renderScatItems();
 }
 
+function scatTagsFill(tags){
+  const i=document.getElementById('scat-tags-input'); if(i) i.value=(tags||[]).join(', ');
+  const dl=document.getElementById('scat-tags-dl'); if(dl) dl.innerHTML=(S.allTags||[]).map(t=>`<option value="${esc(t)}">`).join('');
+}
+function scatTagsRead(){
+  const raw=(document.getElementById('scat-tags-input')||{}).value||'';
+  const tags=[...new Set(raw.split(',').map(x=>x.trim()).filter(Boolean))];
+  if(!S.allTags) S.allTags=[]; tags.forEach(t=>{ if(!S.allTags.includes(t)) S.allTags.push(t); });
+  return tags;
+}
 function saveSuiviCategory(){
   const name=document.getElementById('scat-name-input').value.trim();
   if(!name){toast('Donne un nom à la catégorie','err');return;}
@@ -9003,13 +9140,14 @@ function saveSuiviCategory(){
           }
         });
       }
-      S.suiviCategories[idx]={...S.suiviCategories[idx],name,rating,description,cover,coverKey,type:_scatType,section:_scatSection,items:_scatItems.map((i,o)=>({...i,order:o}))};
+      S.suiviCategories[idx]={...S.suiviCategories[idx],tags:scatTagsRead(),name,rating,description,cover,coverKey,type:_scatType,section:_scatSection,items:_scatItems.map((i,o)=>({...i,order:o}))};
     }
   } else {
     S.suiviCategories.push({
       id:'scat_'+Date.now(),
       type:_scatType,section:_scatSection,tab:_scatTab,
       name,rating,description,cover,coverKey,
+      tags:scatTagsRead(),
       reviews:[],
       _addedAt:Date.now(),
       items:_scatItems.map((i,o)=>({...i,order:o}))
