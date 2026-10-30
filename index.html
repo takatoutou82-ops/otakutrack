@@ -1358,6 +1358,38 @@ textarea.fi{resize:vertical;min-height:72px}
 @media(max-width:768px){
   .suivi-adv-filters{padding:10px 12px}
 }
+/* ══ THÈME VERRE (liquid glass) ══ */
+body.glass{
+  --bg:#07071a; --bg2:rgba(255,255,255,.04); --bg3:rgba(255,255,255,.06); --bg4:rgba(30,30,60,.55);
+  --surface:rgba(255,255,255,.075); --s2:rgba(255,255,255,.11);
+  --border:rgba(255,255,255,.14); --border2:rgba(255,255,255,.22);
+  --t2:#b4b4d4; --t3:#8b8bb0; --t4:rgba(255,255,255,.12);
+  background:#07071a;
+}
+body.glass::after{
+  background:
+    radial-gradient(ellipse 900px 700px at 10% 0%, rgba(139,92,246,.55) 0%, transparent 65%),
+    radial-gradient(ellipse 800px 600px at 90% 25%, rgba(56,189,248,.40) 0%, transparent 62%),
+    radial-gradient(ellipse 800px 700px at 30% 100%, rgba(244,114,182,.38) 0%, transparent 65%),
+    radial-gradient(ellipse 600px 500px at 100% 100%, rgba(52,211,153,.22) 0%, transparent 65%);
+}
+body.glass::after{z-index:-1}
+body.glass #nav{background:rgba(20,20,45,.45);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);border-bottom:1px solid rgba(255,255,255,.18);box-shadow:0 1px 0 rgba(255,255,255,.08) inset,0 8px 30px rgba(0,0,0,.25)}
+body.glass .modal{background:rgba(35,35,70,.55);backdrop-filter:blur(36px) saturate(1.8);-webkit-backdrop-filter:blur(36px) saturate(1.8);border:1px solid rgba(255,255,255,.22);border-radius:26px;box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 30px 80px rgba(0,0,0,.5)}
+body.glass .modal-bg{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+body.glass [style*="var(--surface)"],body.glass [style*="var(--bg3)"],body.glass [style*="var(--bg2)"],
+body.glass .mc-msg,body.glass .bookshelf,body.glass .nav-searchbox,body.glass .saf-pill,body.glass .mc-chip,body.glass .mc-in,body.glass .btn-ghost,body.glass select,body.glass textarea,body.glass input[type=text],body.glass input[type=search],body.glass input:not([type]){
+  backdrop-filter:blur(22px) saturate(1.7);-webkit-backdrop-filter:blur(22px) saturate(1.7);
+  box-shadow:0 1px 0 rgba(255,255,255,.16) inset,0 6px 20px rgba(0,0,0,.18);
+}
+body.glass [style*="var(--surface)"],body.glass .bookshelf{border-radius:20px !important}
+body.glass .saf-pill,body.glass .mc-chip,body.glass .btn{border-radius:999px}
+body.glass .btn-primary{background:linear-gradient(180deg,rgba(166,150,255,.95),rgba(110,90,235,.9));border:1px solid rgba(255,255,255,.35);box-shadow:0 1px 0 rgba(255,255,255,.45) inset,0 8px 22px rgba(95,77,224,.45)}
+body.glass .saf-pill.on,body.glass .mc-chip.on{background:rgba(139,124,248,.4);border-color:rgba(255,255,255,.4);color:#fff}
+body.glass .cc img,body.glass .mc-cv{border-radius:14px}
+body.glass .nav-sr-item:hover,body.glass .nav-sr-item.focused{background:rgba(255,255,255,.12)}
+body.glass ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25)}
+@supports not (backdrop-filter:blur(1px)){ body.glass [style*="var(--surface)"],body.glass .modal,body.glass #nav{background:rgba(30,30,55,.92)} }
 </style>
 </head>
 <body>
@@ -2191,6 +2223,7 @@ textarea.fi{resize:vertical;min-height:72px}
           <button class="btn btn-ghost" onclick="document.getElementById('backup-import-input').click()">⬆ Importer une sauvegarde</button>
           <input type="file" id="backup-import-input" accept="application/json" style="display:none" onchange="handleImportBackup(this)">
         </div>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b style="font-size:13px">🪟 Thème « verre »</b><div style="font-size:11.5px;color:var(--t3);margin-top:3px">Surfaces translucides et floutées, façon iPhone.</div></div><button class="btn btn-ghost btn-sm" id="glass-btn" onclick="toggleGlass()">Activer / désactiver</button></div>
         <div id="autobk-box" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)"></div>
         <p style="font-size:11.5px;color:var(--t3);margin-top:10px;line-height:1.5">
           La sauvegarde contient absolument tout (suivi, listes, profil, tier lists, collection, tags…) dans un fichier que tu gardes sur ton appareil.<br>
@@ -6737,6 +6770,19 @@ function toggleSAFGenreMulti(val, btn){
   renderSuivi();
 }
 
+
+function applyGlass(){ let on=true; try{ on=localStorage.getItem('ot_glass')!=='0'; }catch(e){} document.body.classList.toggle('glass',on); }
+function toggleGlass(){ let on=true; try{ on=localStorage.getItem('ot_glass')!=='0'; localStorage.setItem('ot_glass',on?'0':'1'); }catch(e){ document.body.classList.toggle('glass'); } applyGlass(); }
+document.addEventListener('DOMContentLoaded',applyGlass);
+if(document.readyState!=='loading') applyGlass();
+const LEN_TAGS=['one-shot','œuvre courte','œuvre moyenne','œuvre longue','œuvre très longue'];
+function lenTag(t){
+  if(!t||t.type!=='manga') return null;
+  const n=t._totalVolumes; if(!n) return null;
+  return n<=3?LEN_TAGS[0]:n<=10?LEN_TAGS[1]:n<=20?LEN_TAGS[2]:n<=45?LEN_TAGS[3]:LEN_TAGS[4];
+}
+function effTags(t){ const a=t._tags||[]; const l=lenTag(t); return l&&!a.includes(l)?[...a,l]:a; }
+function allTagChoices(){ return [...LEN_TAGS,...[...(S.allTags||[])].filter(x=>!LEN_TAGS.includes(x)).sort()]; }
 let _safTags=new Set();
 let _safTagsExcl=new Set();
 let _safNoTag=false;
@@ -6746,7 +6792,7 @@ function populateSuiviTagFilter(){
   if(!wrap) return;
   // On liste TOUS les tags jamais créés (S.allTags), pas seulement ceux actuellement utilisés,
   // pour que la liste reste stable même si aucune œuvre n'a ce tag pour le moment.
-  const sorted=[...(S.allTags||[])].sort();
+  const sorted=allTagChoices();
   // +2 : bouton "Tous" + bouton "Sans tag", toujours affichés même sans tag créé
   if(wrap.children.length === sorted.length+2) return; // déjà peuplé
   wrap.innerHTML='<button class="saf-pill'+(!_safNoTag&&_safTags.size===0&&_safTagsExcl.size===0?' on':'')+'" data-tg="" onclick="toggleSAFTagMulti(\'\',this)">Tous</button>'
@@ -6859,8 +6905,8 @@ function renderSuivi(){
       (_safGenres.size===0||[..._safGenres].every(g=>(t._genres||[]).concat(t._themes||[]).includes(g))) &&
       (_safGenresExcl.size===0||[..._safGenresExcl].every(g=>!(t._genres||[]).concat(t._themes||[]).includes(g))) &&
       (_safNoTag?(!(t._tags||[]).length):(
-        (_safTags.size===0||[..._safTags].every(g=>(t._tags||[]).includes(g))) &&
-        (_safTagsExcl.size===0||[..._safTagsExcl].every(g=>!(t._tags||[]).includes(g)))
+        (_safTags.size===0||[..._safTags].every(g=>effTags(t).includes(g))) &&
+        (_safTagsExcl.size===0||[..._safTagsExcl].every(g=>!effTags(t).includes(g)))
       )) &&
       (!_safDemo||(t._demographics||[]).some(d=>d===_safDemo)) &&
       (!_safStatus||(()=>{
@@ -7358,7 +7404,7 @@ function toggleTLTagPanel(){
 }
 function renderTLTagPills(){
   const wrap=document.getElementById('tl-tag-pills-wrap');
-  const sorted=[...(S.allTags||[])].sort();
+  const sorted=allTagChoices();
   if(!sorted.length){ wrap.innerHTML='<span style="font-size:11.5px;color:var(--t3);font-style:italic">Aucun tag créé pour le moment.</span>'; return; }
   wrap.innerHTML='<button class="saf-pill'+(_tlTags.size===0?' on':'')+'" onclick="clearTLTags()">Tous</button>'
     +sorted.map(g=>`<button class="saf-pill${_tlTags.has(g)?' on':''}" onclick="toggleTLTag('${esc(g).replace(/'/g,"\\'")}',this)">${esc(g)}</button>`).join('');
@@ -7441,7 +7487,7 @@ function renderTierList(variant='main'){
     if(!ALLOWED_STATUSES.has(t.status)) return false; // En cours et Abandonné exclus
     if(filter!=='all'&&t.type!==filter) return false;
     if(linkedSrcs.has(String(t.mal_id)+'_'+t.type)) return false;
-    if(_tlTags.size>0 && ![..._tlTags].every(g=>(t._tags||[]).includes(g))) return false;
+    if(_tlTags.size>0 && ![..._tlTags].every(g=>effTags(t).includes(g))) return false;
     // Remarque : une œuvre qui appartient à une catégorie notée s'affiche quand même
     // individuellement ici, EN PLUS de la tuile de la catégorie plus bas — c'est voulu :
     // l'utilisateur veut voir l'œuvre par elle-même même si elle fait aussi partie d'un groupe.
