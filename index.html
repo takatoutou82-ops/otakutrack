@@ -1358,38 +1358,46 @@ textarea.fi{resize:vertical;min-height:72px}
 @media(max-width:768px){
   .suivi-adv-filters{padding:10px 12px}
 }
-/* ══ THÈME VERRE (liquid glass) ══ */
+/* ══ THÈME VERRE v2 — léger : le flou n'est utilisé que sur la barre du haut et les fenêtres ══ */
 body.glass{
-  --bg:#07071a; --bg2:rgba(255,255,255,.04); --bg3:rgba(255,255,255,.06); --bg4:rgba(30,30,60,.55);
-  --surface:rgba(255,255,255,.075); --s2:rgba(255,255,255,.11);
-  --border:rgba(255,255,255,.14); --border2:rgba(255,255,255,.22);
-  --t2:#b4b4d4; --t3:#8b8bb0; --t4:rgba(255,255,255,.12);
-  background:#07071a;
+  --bg:#080818; --bg2:rgba(255,255,255,.045); --bg3:rgba(255,255,255,.065); --bg4:rgba(32,30,66,.82);
+  --surface:rgba(255,255,255,.07); --s2:rgba(255,255,255,.12);
+  --border:rgba(255,255,255,.13); --border2:rgba(255,255,255,.24);
+  --t2:#b9b9d9; --t3:#8e8eb4; --t4:rgba(255,255,255,.14);
+  background:#080818;
 }
+body.glass::before{display:none}   /* le grain plein écran coûtait cher */
 body.glass::after{
+  z-index:-1;transform:translateZ(0);
   background:
-    radial-gradient(ellipse 900px 700px at 10% 0%, rgba(139,92,246,.55) 0%, transparent 65%),
-    radial-gradient(ellipse 800px 600px at 90% 25%, rgba(56,189,248,.40) 0%, transparent 62%),
-    radial-gradient(ellipse 800px 700px at 30% 100%, rgba(244,114,182,.38) 0%, transparent 65%),
+    radial-gradient(ellipse 900px 700px at 8% -5%, rgba(139,92,246,.60) 0%, transparent 65%),
+    radial-gradient(ellipse 800px 600px at 95% 20%, rgba(34,211,238,.38) 0%, transparent 62%),
+    radial-gradient(ellipse 800px 700px at 25% 105%, rgba(244,114,182,.40) 0%, transparent 65%),
     radial-gradient(ellipse 600px 500px at 100% 100%, rgba(52,211,153,.22) 0%, transparent 65%);
 }
-body.glass::after{z-index:-1}
-body.glass #nav{background:rgba(20,20,45,.45);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);border-bottom:1px solid rgba(255,255,255,.18);box-shadow:0 1px 0 rgba(255,255,255,.08) inset,0 8px 30px rgba(0,0,0,.25)}
-body.glass .modal{background:rgba(35,35,70,.55);backdrop-filter:blur(36px) saturate(1.8);-webkit-backdrop-filter:blur(36px) saturate(1.8);border:1px solid rgba(255,255,255,.22);border-radius:26px;box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 30px 80px rgba(0,0,0,.5)}
-body.glass .modal-bg{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+/* barre du haut + fenêtres : seuls éléments floutés (2 éléments, pas des centaines) */
+body.glass #nav{background:rgba(22,20,52,.62);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);border-bottom:1px solid rgba(255,255,255,.16);box-shadow:0 1px 0 rgba(255,255,255,.10) inset}
+body.glass .modal{background:linear-gradient(160deg,rgba(60,52,120,.88),rgba(28,26,62,.92));backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.24);border-radius:26px;box-shadow:0 1px 0 rgba(255,255,255,.28) inset,0 30px 70px rgba(0,0,0,.5)}
+/* le reste : simple transparence + reflet (très léger pour le processeur) */
 body.glass [style*="var(--surface)"],body.glass [style*="var(--bg3)"],body.glass [style*="var(--bg2)"],
 body.glass .mc-msg,body.glass .bookshelf,body.glass .nav-searchbox,body.glass .saf-pill,body.glass .mc-chip,body.glass .mc-in,body.glass .btn-ghost,body.glass select,body.glass textarea,body.glass input[type=text],body.glass input[type=search],body.glass input:not([type]){
-  backdrop-filter:blur(22px) saturate(1.7);-webkit-backdrop-filter:blur(22px) saturate(1.7);
-  box-shadow:0 1px 0 rgba(255,255,255,.16) inset,0 6px 20px rgba(0,0,0,.18);
+  background-image:linear-gradient(155deg,rgba(255,255,255,.13),rgba(255,255,255,.02) 55%);
+  box-shadow:0 1px 0 rgba(255,255,255,.18) inset;
 }
 body.glass [style*="var(--surface)"],body.glass .bookshelf{border-radius:20px !important}
 body.glass .saf-pill,body.glass .mc-chip,body.glass .btn{border-radius:999px}
-body.glass .btn-primary{background:linear-gradient(180deg,rgba(166,150,255,.95),rgba(110,90,235,.9));border:1px solid rgba(255,255,255,.35);box-shadow:0 1px 0 rgba(255,255,255,.45) inset,0 8px 22px rgba(95,77,224,.45)}
-body.glass .saf-pill.on,body.glass .mc-chip.on{background:rgba(139,124,248,.4);border-color:rgba(255,255,255,.4);color:#fff}
+body.glass .btn-primary{background:linear-gradient(180deg,#a99cff,#6a55ea);border:1px solid rgba(255,255,255,.4);box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 6px 18px rgba(95,77,224,.45)}
+body.glass .saf-pill.on,body.glass .mc-chip.on,body.glass .fb.on{background:linear-gradient(180deg,rgba(167,150,255,.55),rgba(110,90,235,.45));border-color:rgba(255,255,255,.45);color:#fff}
 body.glass .cc img,body.glass .mc-cv{border-radius:14px}
+body.glass .cc:hover{transform:translateY(-4px);filter:drop-shadow(0 10px 22px rgba(139,124,248,.45))}
+body.glass .nav-links a.on,body.glass .nav-links .on{background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,.08));box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 4px 14px rgba(139,124,248,.4)}
+/* titres : dégradé irisé, signature du site */
+body.glass .sh-title,body.glass .modal-title{background:linear-gradient(90deg,#fff 0%,#d8d0ff 40%,#8fe3ff 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+body.glass .sh-title .badge,body.glass .sh-title span{-webkit-text-fill-color:currentColor}
 body.glass .nav-sr-item:hover,body.glass .nav-sr-item.focused{background:rgba(255,255,255,.12)}
 body.glass ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25)}
-@supports not (backdrop-filter:blur(1px)){ body.glass [style*="var(--surface)"],body.glass .modal,body.glass #nav{background:rgba(30,30,55,.92)} }
+@media (max-width:820px),(pointer:coarse){ body.glass #nav,body.glass .modal{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(26,24,60,.94)} body.glass::after{position:fixed} }
+@media (prefers-reduced-motion:reduce){ body.glass *{transition:none !important;animation:none !important} }
 </style>
 </head>
 <body>
@@ -1975,7 +1983,7 @@ body.glass ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25)}
       </div>
       <div class="saf-row" style="align-items:flex-start">
         <span class="saf-label" style="padding-top:4px">Tags</span>
-        <div id="suivi-tag-pills" style="display:flex;flex-wrap:wrap;gap:5px;flex:1"></div>
+        <div style="flex:1"><div id="suivi-tag-pills" style="display:flex;flex-wrap:wrap;gap:5px"></div><div style="font-size:10.5px;color:var(--t3);margin-top:6px">Clic droit (ou appui long sur téléphone) sur un tag perso pour le supprimer partout.</div></div>
       </div>
       <div class="saf-row">
         <span class="saf-label">Ma note</span>
@@ -2183,7 +2191,7 @@ body.glass ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25)}
 <!-- ═══════════════════════════════════════════ -->
 <div class="pg" id="pg-stats">
   <div class="wrap pt32 pb40">
-    <div class="sh"><h1 class="sh-title" style="font-size:22px">Mes Statistiques</h1></div>
+    <div class="sh" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h1 class="sh-title" style="font-size:22px">Mes Statistiques</h1><button class="btn btn-ghost btn-sm" onclick="tutoOpen()">🎬 Revoir le tutoriel</button></div>
     <div class="stats-grid" id="stats-grid"></div>
     <div id="stats-coll" style="margin-top:28px"></div>
 
@@ -3466,7 +3474,7 @@ async function renderCatalog(type){
       let params = query
         ? `q=${encodeURIComponent(query)}&page=${page}&limit=20&sfw`
         : `page=${page}&limit=20&order_by=members&sort=desc${allIds.length?`&genres=${allIds.join(',')}`:''}`;
-      const data=await jikan(`/${type}?${params}`, 4, isStale);
+      const data=await _jikanFetch(`/${type}?${params}`, 4, isStale);   // voie directe : ne fait plus la queue derrière les mises à jour de fond
       paint(data.data||[], data.pagination, true);
     }
   }catch(e){
@@ -4045,10 +4053,10 @@ async function autobkRender(){
   if(!autobkSupported()){ box.innerHTML='<b style="font-size:13px">🔁 Sauvegarde automatique</b><p style="font-size:11.5px;color:var(--t3);margin-top:6px;line-height:1.5">Disponible uniquement sur Chrome ou Edge sur ordinateur (le navigateur du téléphone ne permet pas d\'écrire dans un dossier choisi).</p>'; return; }
   const h=await mcKvGet('bkdir'); const last=autobkLast();
   const when=last?new Date(last).toLocaleString('fr-FR',{dateStyle:'long',timeStyle:'short'}):'jamais';
-  box.innerHTML=`<b style="font-size:13px">🔁 Sauvegarde automatique (chaque semaine)</b>
+  box.innerHTML=`<b style="font-size:13px">🔁 Sauvegarde automatique (à chaque ouverture du site)</b>
     <div style="font-size:12px;color:var(--t2);margin:8px 0">${h?`Dossier : <b>${esc(h.name)}</b> · dernière sauvegarde : <b>${when}</b>`:'Aucun dossier choisi.'}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="autobkChoose()">📁 ${h?'Changer de dossier':'Choisir le dossier'}</button>${h?`<button class="btn btn-ghost btn-sm" onclick="autobkRun(true)">Sauvegarder maintenant</button><button class="btn btn-ghost btn-sm" onclick="autobkOff()">Désactiver</button>`:''}</div>
-    <p style="font-size:11.5px;color:var(--t3);margin-top:8px;line-height:1.5">Le fichier <code>${AUTOBK_FILE}</code> est <b>remplacé</b> à chaque sauvegarde (il n'y a toujours qu'un seul fichier). Elle se fait quand tu ouvres le site, si la dernière date de plus de ${AUTOBK_DAYS} jours — le navigateur ne peut pas sauvegarder site fermé. Au besoin, il te demandera de confirmer l'accès au dossier (un clic).</p>`;
+    <p style="font-size:11.5px;color:var(--t3);margin-top:8px;line-height:1.5">Le fichier <code>${AUTOBK_FILE}</code> est <b>remplacé</b> à chaque sauvegarde (il n'y a toujours qu'un seul fichier). Elle se fait à chaque fois que tu ouvres le site — le navigateur ne peut pas sauvegarder site fermé. Au besoin, il te demandera de confirmer l'accès au dossier (un clic).</p>`;
 }
 async function autobkChoose(){
   try{
@@ -4084,18 +4092,17 @@ function autobkBanner(show){
   if(b) return;
   b=document.createElement('div'); b.id='autobk-banner';
   b.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9999;background:var(--bg2);border:1px solid var(--acc);border-radius:12px;padding:12px 14px;font-size:12.5px;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:300px';
-  b.innerHTML='🔁 Sauvegarde hebdomadaire à faire.<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary btn-sm" onclick="autobkRun(true)">Sauvegarder</button><button class="btn btn-ghost btn-sm" onclick="autobkBanner(false)">Plus tard</button></div>';
+  b.innerHTML='🔁 Sauvegarde automatique : un clic pour confirmer.<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary btn-sm" onclick="autobkRun(true)">Sauvegarder</button><button class="btn btn-ghost btn-sm" onclick="autobkBanner(false)">Plus tard</button></div>';
   document.body.appendChild(b);
 }
 async function autobkCheck(){
   try{
     if(!autobkSupported()) return;
     const h=await mcKvGet('bkdir'); if(!h) return;
-    if(Date.now()-autobkLast()<AUTOBK_DAYS*24*3600*1000) return;
     await autobkRun(false);
   }catch(e){}
 }
-setTimeout(autobkCheck,8000);
+setTimeout(autobkCheck,3000);
 function exportFullBackup(){
   const backup={
     _meta:{app:'OtakuTrack', exportedAt:new Date().toISOString(), version:1},
@@ -6799,6 +6806,23 @@ function populateSuiviTagFilter(){
     +'<button class="saf-pill'+(_safNoTag?' on':'')+'" data-tg="'+SAF_NOTAG_VAL+'" onclick="toggleSAFTagMulti(\''+SAF_NOTAG_VAL+'\',this)">Sans tag</button>'
     +sorted.map(g=>`<button class="saf-pill${_safTags.has(g)?' on':_safTagsExcl.has(g)?' excl':''}" data-tg="${esc(g)}" onclick="toggleSAFTagMulti('${esc(g).replace(/'/g,"\\'")}',this)">${esc(g)}</button>`).join('');
 }
+function deleteTagEverywhere(tag){
+  if(LEN_TAGS.includes(tag)){ toast('Les tags de longueur sont automatiques : impossible de les supprimer','err'); return; }
+  if(!confirm('Supprimer le tag « '+tag+' » ?\n\nIl sera retiré de toutes les œuvres et catégories où tu l\'as mis, et des filtres. Cette action est définitive.')) return;
+  Object.values(S.tracking||{}).forEach(t=>{ if(t._tags) t._tags=t._tags.filter(x=>x!==tag); });
+  (S.suiviCategories||[]).forEach(c=>{ if(c.tags) c.tags=c.tags.filter(x=>x!==tag); });
+  S.allTags=(S.allTags||[]).filter(x=>x!==tag);
+  _safTags.delete(tag); _safTagsExcl.delete(tag); _tlTags.delete(tag);
+  save(); populateSuiviTagFilter(); renderSuivi(); toast('Tag « '+tag+' » supprimé','ok');
+}
+(function(){
+  const host=()=>document.getElementById('suivi-tag-pills');
+  const pick=e=>{ const b=e.target.closest&&e.target.closest('.saf-pill'); return b&&b.dataset.tg?b:null; };
+  document.addEventListener('contextmenu',e=>{ const h=host(); if(!h||!h.contains(e.target)) return; const b=pick(e); if(!b||b.dataset.tg===SAF_NOTAG_VAL) return; e.preventDefault(); deleteTagEverywhere(b.dataset.tg); });
+  let tm=null;
+  document.addEventListener('touchstart',e=>{ const h=host(); if(!h||!h.contains(e.target)) return; const b=pick(e); if(!b||b.dataset.tg===SAF_NOTAG_VAL) return; tm=setTimeout(()=>{ tm=null; deleteTagEverywhere(b.dataset.tg); },700); },{passive:true});
+  ['touchend','touchmove','touchcancel'].forEach(ev=>document.addEventListener(ev,()=>{ if(tm){clearTimeout(tm);tm=null;} },{passive:true}));
+})();
 function toggleSAFTagMulti(val, btn){
   if(!val){
     _safTags.clear();
@@ -6944,7 +6968,9 @@ function renderSuivi(){
       if(!query&&!_safStatus&&(tab!=='dropped'||_dropSubFilter[type]!=='noncontinue')){
         cats=(S.suiviCategories||[]).filter(c=>(c.section||c.type)===type&&c.tab===tab);
         if(_safNoTag||_safTags.size||_safTagsExcl.size){   // les catégories obéissent aussi au filtre par tags
-          cats=cats.filter(c=>{ const ct=c.tags||[]; return _safNoTag?!ct.length:([..._safTags].every(g=>ct.includes(g))&&[..._safTagsExcl].every(g=>!ct.includes(g))); });
+          const _inc=[..._safTags], _exc=[..._safTagsExcl].filter(g=>!LEN_TAGS.includes(g));
+          if(_inc.some(g=>LEN_TAGS.includes(g))) cats=[];   // les tags automatiques de longueur ne concernent que les œuvres
+          else cats=cats.filter(c=>{ const ct=c.tags||[]; return _safNoTag?!ct.length:(_inc.every(g=>ct.includes(g))&&_exc.every(g=>!ct.includes(g))); });
         }
       }
 
@@ -9155,7 +9181,7 @@ function scatTagsFill(tags){
 }
 function scatTagsRead(){
   const raw=(document.getElementById('scat-tags-input')||{}).value||'';
-  const tags=[...new Set(raw.split(',').map(x=>x.trim()).filter(Boolean))];
+  const tags=[...new Set(raw.split(',').map(x=>x.trim()).filter(x=>x&&!LEN_TAGS.includes(x)))];
   if(!S.allTags) S.allTags=[]; tags.forEach(t=>{ if(!S.allTags.includes(t)) S.allTags.push(t); });
   return tags;
 }
@@ -10692,5 +10718,101 @@ renderCustomTops();
 initFirebase();
 
 </script>
+<style>
+#tuto{position:fixed;inset:0;z-index:100000;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(5,5,16,.82)}
+#tuto.on{display:flex}
+.tu-card{width:100%;max-width:760px;max-height:94vh;overflow:auto;border-radius:28px;padding:22px 22px 18px;background:linear-gradient(160deg,rgba(70,60,140,.92),rgba(24,22,56,.96));border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 0 rgba(255,255,255,.3) inset,0 40px 90px rgba(0,0,0,.6);color:#f0f0fa;font-family:'Instrument Sans',sans-serif}
+.tu-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;font-size:12px;color:#b9b9d9}
+.tu-bar{height:4px;background:rgba(255,255,255,.14);border-radius:9px;overflow:hidden;margin-bottom:14px}
+.tu-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#a99cff,#8fe3ff,#f472b6);border-radius:9px}
+.tu-stage{position:relative;height:210px;border-radius:20px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.tu-h{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;margin-bottom:6px;background:linear-gradient(90deg,#fff,#d8d0ff 45%,#8fe3ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tu-p{font-size:14px;line-height:1.6;color:#d6d6ee}
+.tu-p b{color:#fff}
+.tu-ul{margin:10px 0 0 0;padding:0;list-style:none;display:grid;gap:6px}
+.tu-ul li{font-size:13px;color:#c9c9e6;padding-left:22px;position:relative;line-height:1.5}
+.tu-ul li::before{content:'✦';position:absolute;left:0;color:#a99cff}
+.tu-btns{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:16px;flex-wrap:wrap}
+.tu-btn{border-radius:999px;padding:9px 18px;font-size:13px;font-weight:700;border:1px solid rgba(255,255,255,.28);color:#fff;background:rgba(255,255,255,.1);cursor:pointer}
+.tu-btn.p{background:linear-gradient(180deg,#a99cff,#6a55ea);border-color:rgba(255,255,255,.45)}
+.tu-dots{display:flex;gap:5px;flex-wrap:wrap;justify-content:center}
+.tu-dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.22);cursor:pointer}
+.tu-dots i.on{background:#fff;width:20px;border-radius:9px}
+/* éléments animés des maquettes */
+.tu-chip{display:inline-block;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);margin:3px}
+.tu-cov{width:62px;height:90px;border-radius:10px;display:inline-block;margin:0 5px;box-shadow:0 8px 20px rgba(0,0,0,.4)}
+.tu-in{animation:tuIn .7s both}
+@keyframes tuIn{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes tuPulse{0%,100%{box-shadow:0 0 0 0 rgba(169,156,255,.0)}50%{box-shadow:0 0 0 7px rgba(169,156,255,.35)}}
+@keyframes tuLit{0%,35%{background:rgba(255,255,255,.1)}45%,100%{background:linear-gradient(180deg,rgba(167,150,255,.8),rgba(110,90,235,.7));border-color:#fff}}
+@keyframes tuType{from{width:0}to{width:15ch}}
+@keyframes tuFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes tuTick{0%,40%{filter:grayscale(1) brightness(.45)}55%,100%{filter:none}}
+@keyframes tuSlide{from{transform:translateX(-30px);opacity:0}to{transform:none;opacity:1}}
+.tu-type{display:inline-block;overflow:hidden;white-space:nowrap;border-right:2px solid #fff;width:0;animation:tuType 1.8s steps(15) .4s forwards,tuBlink .7s step-end infinite}
+@keyframes tuBlink{50%{border-color:transparent}}
+@media (prefers-reduced-motion:reduce){#tuto *{animation:none !important}}
+@media (max-width:560px){.tu-h{font-size:20px}.tu-stage{height:180px}}
+</style>
+<div id="tuto" role="dialog" aria-modal="true" aria-label="Tutoriel OtakuTrack"><div class="tu-card">
+  <div class="tu-top"><span id="tu-count"></span><span><label style="cursor:pointer"><input type="checkbox" id="tu-auto" checked onchange="tutoAuto(this.checked)"> lecture auto</label></span></div>
+  <div class="tu-bar"><i id="tu-prog"></i></div>
+  <div class="tu-stage" id="tu-stage"></div>
+  <div class="tu-h" id="tu-title"></div>
+  <div class="tu-p" id="tu-text"></div>
+  <ul class="tu-ul" id="tu-list"></ul>
+  <div class="tu-btns"><button class="tu-btn" onclick="tutoClose()">Passer</button><div class="tu-dots" id="tu-dots"></div><span><button class="tu-btn" onclick="tutoGo(-1)">←</button> <button class="tu-btn p" id="tu-next" onclick="tutoGo(1)">Suivant →</button></span></div>
+</div></div>
+<script>
+(function(){
+const cov=(a,b,d)=>`<span class="tu-cov tu-in" style="background:linear-gradient(160deg,${a},${b});animation-delay:${d}s"></span>`;
+const STEPS=[
+ {t:'Bienvenue sur OtakuTrack 👋',p:'Ton carnet de bord <b>manga &amp; animé</b> : ce que tu lis, ce que tu regardes, ce que tu possèdes en rayon… tout au même endroit, sauvegardé pour toi.',l:['Cette visite dure 2 minutes et explique <b>tout</b> le site.','Tu pourras la revoir quand tu veux : page <b>Stats</b> → « Revoir le tutoriel ».','Aucun compte obligatoire : tout reste dans ton navigateur (et peut se synchroniser).'],
+  s:`<div style="text-align:center"><div style="font-size:64px;animation:tuFloat 3s ease-in-out infinite">📚</div><div class="tu-in" style="font-family:Syne;font-size:26px;font-weight:800;margin-top:6px">OtakuTrack</div></div>`},
+ {t:'Chercher et ajouter une œuvre',p:'Utilise la <b>barre de recherche en haut</b> (titre, auteur ou studio) ou parcours les catalogues <b>Manga</b> et <b>Animé</b>.',l:['Clique sur une œuvre pour ouvrir sa fiche (synopsis, note, tomes/épisodes).','Sur la fiche, choisis un statut : À lire / En cours / Terminé / Abandonné…','Ta progression (chapitre, tome, épisode) et ta note se règlent sur la fiche.'],
+  s:`<div style="width:78%"><div class="tu-chip" style="width:100%;margin:0;padding:11px 16px;border-radius:14px">🔍 <span class="tu-type">One Piece</span></div><div style="margin-top:14px;text-align:center">${cov('#f472b6','#7c3aed',1.6)}${cov('#38bdf8','#6366f1',1.8)}${cov('#fbbf24','#ef4444',2)}</div></div>`},
+ {t:'Mon Suivi',p:'La page <b>Suivi</b> range tout ce que tu as ajouté, séparé en <b>Manga</b> et <b>Animé</b>, avec un onglet par statut.',l:['Tri par note, avancement ou date d’ajout ; recherche dans ton suivi.','Crée des <b>catégories</b> (« Mes coups de cœur », « Shonen »…) pour regrouper des œuvres.','« Filtres avancés » : genres, tags, note, nombre de tomes…'],
+  s:`<div style="width:86%"><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><span class="tu-chip" style="animation:tuLit 5s infinite">📋 À lire</span><span class="tu-chip" style="animation:tuLit 5s 1.2s infinite">▶ En cours</span><span class="tu-chip" style="animation:tuLit 5s 2.4s infinite">✓ Terminé</span><span class="tu-chip">✕ Abandonné</span></div><div style="margin-top:14px;text-align:center">${cov('#a99cff','#312e81',.2)}${cov('#34d399','#065f46',.4)}${cov('#f472b6','#831843',.6)}${cov('#fbbf24','#92400e',.8)}</div></div>`},
+ {t:'Tags et filtres',p:'Les <b>tags</b> sont tes étiquettes perso : ajoute-en sur n’importe quelle œuvre ou catégorie, puis filtre avec.',l:['Dans Suivi → <b>Filtres avancés</b> : clique un tag pour l’inclure, clique encore pour l’exclure.','Les manga reçoivent <b>automatiquement</b> un tag de longueur : one-shot (1-3 tomes), courte (4-10), moyenne (11-20), longue (21-45), très longue (46+).','Pour supprimer un de <b>tes</b> tags partout : <b>clic droit</b> dessus (ou appui long sur téléphone), puis confirme.'],
+  s:`<div style="width:86%;text-align:center"><span class="tu-chip" style="animation:tuLit 4s infinite">one-shot</span><span class="tu-chip" style="animation:tuLit 4s .8s infinite">œuvre courte</span><span class="tu-chip" style="animation:tuLit 4s 1.6s infinite">œuvre longue</span><span class="tu-chip">favori</span><span class="tu-chip">à relire</span><div class="tu-in" style="margin-top:14px;font-size:12px;color:#b9b9d9;animation-delay:1s">🖱 clic droit sur un tag perso → supprimer</div></div>`},
+ {t:'Listes et Tier Lists',p:'Deux façons de classer et de partager tes goûts.',l:['<b>Listes</b> : crée tes listes (« Top 10 isekai », « À offrir »…), ajoute des œuvres, réordonne par glisser-déposer. Tu peux aussi <b>importer</b> une liste au format JSON.','<b>Tier Lists</b> : classe tes œuvres de S à D ; filtre par tag (ex : seulement les œuvres longues).','Le <b>Profil</b> résume ton top, tes classements et ta tier list automatique.'],
+  s:`<div style="width:80%">${['S','A','B'].map((r,i)=>`<div class="tu-in" style="display:flex;gap:8px;align-items:center;margin:5px 0;animation-delay:${i*.35}s"><b style="width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:${['#f87171','#fb923c','#fbbf24'][i]};color:#111">${r}</b><span style="flex:1;height:30px;border-radius:8px;background:rgba(255,255,255,.1);display:flex;align-items:center;padding:0 8px;gap:5px">${'<i style="width:18px;height:24px;border-radius:4px;background:linear-gradient(160deg,#a99cff,#312e81);display:inline-block"></i>'.repeat(3-i)}</span></div>`).join('')}</div>`},
+ {t:'Catalogues Manga et Animé',p:'Explore des milliers d’œuvres, triées par popularité.',l:['Clique sur un ou plusieurs <b>genres</b> pour affiner (Action, Isekai, Seinen…).','Tape dans la barre de recherche pour chercher par titre, auteur ou studio.','Clique sur une couverture pour ouvrir la fiche et l’ajouter à ton suivi.'],
+  s:`<div style="width:88%;text-align:center"><span class="tu-chip">Tous</span><span class="tu-chip" style="animation:tuLit 4s infinite">Action</span><span class="tu-chip">Isekai</span><span class="tu-chip" style="animation:tuLit 4s 1.4s infinite">Seinen</span><span class="tu-chip">Romance</span><div style="margin-top:12px">${cov('#38bdf8','#1e3a8a',1.2)}${cov('#f472b6','#9d174d',1.4)}${cov('#34d399','#064e3b',1.6)}${cov('#fbbf24','#78350f',1.8)}</div></div>`},
+ {t:'Ma Collection physique',p:'Le coin des collectionneurs : suis les <b>tomes papier</b> que tu possèdes, édition par édition (données MangaCollec).',l:['Ouvre la fiche d’un manga → onglet <b>📚 Éditions physiques</b> → lie la série (cherche son titre français ou colle le lien MangaCollec).','Coche les <b>tomes que tu possèdes</b> : la série apparaît dans <b>Ma collection</b>, une étagère par édition, avec les tomes manquants.','Sous-onglets <b>📦 Coffrets</b> et <b>♥ Wishlist</b> pour les coffrets et ce que tu veux acheter.','Les <b>statistiques</b> de collection (nombre de tomes, valeur estimée) sont dans Stats.'],
+  s:`<div style="display:flex;gap:6px;align-items:flex-end">${[1,2,3,4,5,6].map(n=>`<div style="width:34px;height:118px;border-radius:3px 8px 8px 3px;background:linear-gradient(160deg,#a99cff,#4c1d95);display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;font-weight:900;animation:tuTick 5s ${n*.45}s infinite both;box-shadow:0 8px 18px rgba(0,0,0,.4)">${n}</div>`).join('')}</div>`},
+ {t:'Calendrier des sorties',p:'Toutes les sorties de <b>tomes papier</b> du mois, avec de gros en-têtes de jour pendant que tu fais défiler.',l:['Choisis le mois avec le sélecteur, puis fais simplement défiler.','Touche le ♥ d’un tome pour l’ajouter à ta wishlist.','Les sorties des séries de ta collection sont aussi rappelées dans Ma collection.'],
+  s:`<div style="width:80%">${['Lun. 3','Mer. 5','Ven. 14'].map((d,i)=>`<div class="tu-in" style="animation-delay:${i*.5}s;margin:5px 0"><div style="font-size:11px;font-weight:800;color:#a99cff">${d} novembre</div><div style="display:flex;gap:6px;margin-top:3px"><i style="width:30px;height:42px;border-radius:5px;background:linear-gradient(160deg,#f472b6,#7c3aed);display:inline-block"></i><i style="width:30px;height:42px;border-radius:5px;background:linear-gradient(160deg,#38bdf8,#312e81);display:inline-block"></i></div></div>`).join('')}</div>`},
+ {t:'Stats, sauvegarde et synchro',p:'Tes données t’appartiennent : garde-les en sécurité.',l:['<b>Stats</b> : genres préférés, répartition par statut, radar de goûts, notes… + statistiques de ta collection.','<b>Sauvegarde complète</b> : un fichier à télécharger / réimporter quand tu veux.','<b>Sauvegarde automatique</b> (Chrome/Edge sur ordinateur) : choisis un dossier, le fichier est remplacé à chaque ouverture du site.','<b>Connexion</b> (en haut à droite) : synchronise tes données entre téléphone et ordinateur.'],
+  s:`<div style="text-align:center"><div style="font-size:54px;animation:tuFloat 3s ease-in-out infinite">🔁</div><div class="tu-in" style="margin-top:8px;font-size:13px;color:#d6d6ee">sauvegarde à chaque ouverture ✓</div></div>`},
+ {t:'C’est parti ! 🚀',p:'Tu sais tout. Commence par chercher ton premier manga ou animé favori.',l:['Thème « verre » activable/désactivable dans Stats → Sauvegarde.','Ce tutoriel est toujours disponible dans <b>Stats</b>.'],
+  s:`<div style="text-align:center"><div style="font-size:64px;animation:tuFloat 2.4s ease-in-out infinite">✨</div></div>`}
+];
+let i=0,timer=null,auto=true,dur=11000;
+function draw(){
+  const s=STEPS[i];
+  document.getElementById('tu-count').textContent='Étape '+(i+1)+' / '+STEPS.length;
+  document.getElementById('tu-stage').innerHTML=s.s;
+  document.getElementById('tu-title').textContent=s.t;
+  document.getElementById('tu-text').innerHTML=s.p;
+  document.getElementById('tu-list').innerHTML=(s.l||[]).map(x=>'<li>'+x+'</li>').join('');
+  document.getElementById('tu-dots').innerHTML=STEPS.map((_,k)=>`<i class="${k===i?'on':''}" onclick="tutoJump(${k})"></i>`).join('');
+  document.getElementById('tu-next').textContent=i===STEPS.length-1?'Terminer ✓':'Suivant →';
+  const pr=document.getElementById('tu-prog'); pr.style.transition='none'; pr.style.width='0';
+  if(timer) clearTimeout(timer);
+  if(auto&&i<STEPS.length-1){ void pr.offsetWidth; pr.style.transition='width '+dur+'ms linear'; pr.style.width='100%'; timer=setTimeout(()=>{i++;draw();},dur); }
+  else pr.style.width=((i+1)/STEPS.length*100)+'%';
+}
+window.tutoOpen=function(){ i=0; document.getElementById('tuto').classList.add('on'); draw(); };
+window.tutoClose=function(){ document.getElementById('tuto').classList.remove('on'); if(timer) clearTimeout(timer); try{localStorage.setItem('ot_tuto_done','1');}catch(e){} };
+window.tutoGo=function(d){ if(d>0&&i===STEPS.length-1){ tutoClose(); return; } i=Math.max(0,Math.min(STEPS.length-1,i+d)); draw(); };
+window.tutoJump=function(k){ i=k; draw(); };
+window.tutoAuto=function(v){ auto=v; draw(); };
+document.addEventListener('keydown',e=>{ if(!document.getElementById('tuto').classList.contains('on')) return; if(e.key==='ArrowRight') tutoGo(1); else if(e.key==='ArrowLeft') tutoGo(-1); else if(e.key==='Escape') tutoClose(); });
+// 1re visite : pas de données ni de drapeau « déjà vu »
+try{ if(!localStorage.getItem('ot_tuto_done') && !localStorage.getItem('ot_v3')) setTimeout(tutoOpen,1200); }catch(e){}
+})();
+</script>
+
 </body>
 </html>
