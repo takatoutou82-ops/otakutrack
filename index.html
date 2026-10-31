@@ -3500,6 +3500,24 @@ function renderGenrePills(type, genres){
 }
 
 
+const _rankPool={};
+async function malRankPool(type){
+  if(_rankPool[type]) return _rankPool[type];
+  if(!MAL_PROXY || MAL_PROXY.includes('TON-PROJET')) return null;
+  try{
+    const get=async off=>{
+      const c=new AbortController(); const t=setTimeout(()=>c.abort(),12000);
+      const r=await fetch(`${MAL_PROXY}?type=${type}&ranking=bypopularity&limit=500&offset=${off}&withgenres=1`,{signal:c.signal});
+      clearTimeout(t); if(!r.ok) throw new Error(r.status);
+      const d=await r.json(); return d.data||[];
+    };
+    const parts=await Promise.all([get(0),get(500)]);
+    const raw=[].concat(...parts);
+    if(!raw.length || !(raw[0].node||raw[0]).genres) return null;   // ancien relais : pas de genres => Jikan
+    const pool=raw.map(x=>{ const n=x.node||x; const w=malListItemToShape(n,type); w._gids=(n.genres||[]).map(g=>String(g.id)); return w; });
+    _rankPool[type]=pool; return pool;
+  }catch(e){ return null; }
+}
 async function renderCatalog(type){
   // Chaque appel invalide les précédents : une ancienne réponse tardive ne peut plus écraser la nouvelle.
   const isStale=newSearchToken('catalog-'+type);
@@ -3534,8 +3552,21 @@ async function renderCatalog(type){
       const items = await malRanking(type, 'bypopularity', 20);
       paint(items, null, true);
     } else {
-      // Pages suivantes ou filtre par genre : MAL ne le permet pas (pas de pagination fiable
-      // ni de filtre genre côté API officielle), on reste sur Jikan dans ces cas précis
+      // Genres / pages suivantes : on filtre le classement MAL officiel (1000 œuvres les plus populaires)
+      const pool=await malRankPool(type);
+      if(pool){
+        if(isStale()) return;
+        const sel=allIds.map(String);
+        const list=sel.length?pool.filter(w=>sel.every(g=>w._gids.includes(g))):pool;
+        if(!list.length){
+          el.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">Aucun résultat</div><p style="color:var(--t3);font-size:12px;margin-top:6px">Aucune œuvre populaire ne cumule tous ces genres. Retire-en un.</p></div>';
+          document.getElementById(`${type}-pager`).innerHTML=''; return;
+        }
+        const last=Math.ceil(list.length/20);
+        paint(list.slice((page-1)*20,page*20),{last_visible_page:last,current_page:page,has_next_page:page<last},true);
+        return;
+      }
+      // Secours : Jikan
       let params = query
         ? `q=${encodeURIComponent(query)}&page=${page}&limit=20&sfw`
         : `page=${page}&limit=20&order_by=members&sort=desc${allIds.length?`&genres=${allIds.join(',')}`:''}`;
@@ -7566,7 +7597,8 @@ function renderTierList(variant='main'){
   // Catégories de suivi qui ont une note → apparaissent comme éléments
   const cats=(S.suiviCategories||[]).filter(c=>
     c.rating>0 &&
-    (filter==='all'||c.type===filter)
+    (filter==='all'||c.type===filter) &&
+    (_tlTags.size===0 || (![..._tlTags].some(g=>LEN_TAGS.includes(g)) && [..._tlTags].every(g=>(c.tags||[]).includes(g))))
   );
 
   const all=Object.values(S.tracking).filter(t=>{
