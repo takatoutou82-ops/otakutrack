@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
 
-  const { type, id, q, ranking, limit } = req.query;
+  const { type, id, q, ranking, limit, offset, withgenres } = req.query;
 
   if (!type || !['anime', 'manga'].includes(type)) {
     res.status(400).json({ error: 'Paramètre "type" invalide. Attendu: anime|manga' });
@@ -32,13 +32,18 @@ export default async function handler(req, res) {
     ? 'id,title,main_picture,alternative_titles,mean,studios,media_type,status'
     : 'id,title,main_picture,alternative_titles,mean,authors{first_name,last_name},media_type,status';
 
+  // Option « withgenres » : ajoute les genres dans les listes (sert aux filtres par genre du catalogue)
+  const fieldsList = withgenres ? listFields + ',genres' : listFields;
+  const lim = Math.min(Math.max(parseInt(limit, 10) || 8, 1), 500);
+  const off = /^\d+$/.test(String(offset || '')) ? String(offset) : '0';
+
   let url;
   if (q) {
     // Recherche texte : GET /v2/{type}?q=...
-    url = `https://api.myanimelist.net/v2/${type}?q=${encodeURIComponent(q)}&limit=${limit||8}&fields=${listFields}`;
+    url = `https://api.myanimelist.net/v2/${type}?q=${encodeURIComponent(q)}&limit=${lim}&fields=${fieldsList}`;
   } else if (ranking) {
     // Classement : GET /v2/{type}/ranking?ranking_type=...
-    url = `https://api.myanimelist.net/v2/${type}/ranking?ranking_type=${encodeURIComponent(ranking)}&limit=${limit||8}&fields=${listFields}`;
+    url = `https://api.myanimelist.net/v2/${type}/ranking?ranking_type=${encodeURIComponent(ranking)}&limit=${lim}&offset=${off}&fields=${fieldsList}`;
   } else if (id && /^\d+$/.test(String(id))) {
     // Fiche unique : GET /v2/{type}/{id}
     url = `https://api.myanimelist.net/v2/${type}/${id}?fields=${detailFields}`;
