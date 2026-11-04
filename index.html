@@ -1090,19 +1090,19 @@ textarea.fi{resize:vertical;min-height:72px}
 .sv-head .sv-name-h{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sv-head button{background:none;border:none;color:var(--t3);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:6px}
 .sv-head button:hover{color:var(--text);background:rgba(255,255,255,.07)}
-.sv-body{overflow-y:auto;overflow-x:hidden;padding:8px}
+.sv-body{overflow:visible;padding:8px}
 .sv-row{display:flex;margin-bottom:5px;border-radius:7px;overflow:hidden}
 .sv-label{width:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-family:'Syne',sans-serif;font-size:11px;text-align:center}
 .sv-zone{flex:1;display:flex;flex-wrap:wrap;gap:5px;padding:5px;background:var(--bg3);align-items:flex-start;min-width:0;min-height:14px}
 .sv-row.sv-empty .sv-zone{min-height:14px;padding:2px 5px}
 .sv-row.sv-empty .sv-label{font-size:9px;opacity:.55}
 .sv-sep{width:100%;border-top:1px dashed var(--border2);margin:1px 0}
-.sv-item{width:var(--sw,80px);height:calc(var(--sw,80px)*1.4);border-radius:6px;overflow:hidden;position:relative;flex-shrink:0;background:var(--bg4)}
+.sv-item{width:var(--sw,80px);flex-shrink:0;display:flex;flex-direction:column;gap:3px}
+.sv-item .sv-cov{width:100%;height:calc(var(--sw,80px)*1.4);border-radius:6px;overflow:hidden;background:var(--bg4)}
 .sv-item img{width:100%;height:100%;object-fit:cover;display:block}
-.sv-item .sv-iname{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.8);color:#fff;font-size:10px;font-weight:700;text-align:center;padding:3px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .12s}
-.sv-item:hover .sv-iname{opacity:1}
+.sv-item .sv-iname{font-size:10.5px;font-weight:600;line-height:1.2;text-align:center;color:var(--t2);max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
 .sv-empty-msg{color:var(--t3);font-size:12px;font-style:italic;padding:14px;text-align:center}
-@media(max-width:700px){.sv-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:700px){.sv-grid{grid-template-columns:minmax(0,1fr)!important}}
 
 
 /* ── Roulette "Quoi lire/voir ensuite ?" ── */
@@ -2437,8 +2437,15 @@ body::after{
     <div class="modal-title"><span id="scat-modal-title">Nouvelle catégorie</span><span class="modal-close" onclick="closeM('m-scat-create')">✕</span></div>
     <input id="scat-name-input" class="inp" placeholder="Nom de la catégorie (ex: Attaque des Titans)" style="margin-bottom:12px">
     <textarea id="scat-desc-input" class="inp" placeholder="Description (optionnelle)…" style="height:70px;resize:vertical;margin-bottom:12px"></textarea>
-    <input id="scat-tags-input" class="inp" list="scat-tags-dl" placeholder="Tags (séparés par des virgules, ex : shonen, favoris)" style="margin-bottom:12px">
-    <datalist id="scat-tags-dl"></datalist>
+    <div style="margin-bottom:12px">
+      <div id="scat-tags-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:6px">
+        <input id="scat-tags-input" class="inp" list="scat-tags-dl" placeholder="Ajouter un tag… (Entrée pour valider)" style="flex:1;margin-bottom:0"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();scatTagAdd()}">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="scatTagAdd()">+</button>
+      </div>
+      <datalist id="scat-tags-dl"></datalist>
+    </div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <label style="font-size:12px;color:var(--t3);white-space:nowrap">Note globale</label>
       <select id="scat-rating-input" class="status-sel" style="margin-top:0;width:auto;flex:1"></select>
@@ -4666,7 +4673,7 @@ function renderListDetail(){
     const hasAny=groups.some(g=>g.length>0);
     const hasAnyLow=groupsLow.some(g=>g.length>0);
     const renderTierRows=(tiersArr, grps, variant)=>tiersArr.map((tier,i)=>{
-          const {low,high}=splitTierHalf(grps[i], i);
+          const {low,high}=splitTierHalf(grps[i], i, tiersArr);
           const renderItem=item=>`
                     <div class="tier-item" title="${esc(list.itemNames[item.id]||item.title)} ★${list.ratings[item.id]}">
                       <img src="${item.cover||''}" loading="lazy">
@@ -7479,8 +7486,8 @@ function getTierIndex(rating){
 }
 // Découpe les items d'une tier en deux sous-groupes (valeur basse / valeur haute, ex: 16 et 16.5)
 // pour permettre d'afficher un trait séparateur bien visible entre les deux.
-function splitTierHalf(items, tierIdx){
-  const tier=TIERS[tierIdx];
+function splitTierHalf(items, tierIdx, tiersArr){
+  const tier=(tiersArr||TIERS)[tierIdx];
   if(!tier||tier.high==null) return {low:items, high:[]};
   const high=items.filter(x=>x.rating===tier.high);
   const low=items.filter(x=>x.rating!==tier.high);
@@ -7489,11 +7496,11 @@ function splitTierHalf(items, tierIdx){
 
 // ─── TIER LIST BIS (notes 0 à 14, paliers d'un point entier) ───
 const TIERS_LOW=[
-  {label:'14', base:14, high:null, color:'#5eead4',bg:'rgba(94,234,212,.18)'},
-  {label:'13', base:13, high:null, color:'#67e8b8',bg:'rgba(103,232,184,.18)'},
-  {label:'12', base:12, high:null, color:'#86efac',bg:'rgba(134,239,172,.18)'},
-  {label:'11', base:11, high:null, color:'#bef264',bg:'rgba(190,242,100,.18)'},
-  {label:'10', base:10, high:null, color:'#fde047',bg:'rgba(253,224,71,.18)'},
+  {label:'14', base:14, high:14.5, color:'#5eead4',bg:'rgba(94,234,212,.18)'},
+  {label:'13', base:13, high:13.5, color:'#67e8b8',bg:'rgba(103,232,184,.18)'},
+  {label:'12', base:12, high:12.5, color:'#86efac',bg:'rgba(134,239,172,.18)'},
+  {label:'11', base:11, high:11.5, color:'#bef264',bg:'rgba(190,242,100,.18)'},
+  {label:'10', base:10, high:10.5, color:'#fde047',bg:'rgba(253,224,71,.18)'},
   {label:'9',  base:9,  high:null, color:'#fdba74',bg:'rgba(253,186,116,.18)'},
   {label:'8',  base:8,  high:null, color:'#fb923c',bg:'rgba(251,146,60,.18)'},
   {label:'7',  base:7,  high:null, color:'#f87171',bg:'rgba(248,113,113,.18)'},
@@ -7914,10 +7921,13 @@ function renderCtlSplitView(){
   const tops=S.customTierLists||[];
   const list=_ctlSplit.sel.map(id=>tops.find(l=>l.id===id)).filter(Boolean);
   const n=list.length;
-  const cols=n<=4?n:(n<=6?3:4);
-  const rows=Math.ceil(n/cols);
-  const sw=Math.max(44,Math.min(130,Math.floor((window.innerWidth-120)/cols/5.2)));
-  const bodyH=rows===1?'calc(100vh - 230px)':'calc((100vh - 250px)/2)';
+  // Largeur mini d'une tier list : 420px (on garde les images lisibles). Si ça ne tient pas
+  // côte à côte, on passe à la ligne et la page défile : chaque tier list reste affichée EN ENTIER.
+  const availW=window.innerWidth-48;
+  let cols=Math.max(1,Math.min(n,Math.floor(availW/420)));
+  cols=Math.ceil(n/Math.ceil(n/cols));
+  const paneW=(availW-10*(cols-1))/cols;
+  const sw=Math.max(60,Math.min(110,Math.floor((paneW-34-16-10)/6)-5));
   const wrapEl=document.querySelector('#pg-tierlists .wrap');
   if(wrapEl) wrapEl.style.maxWidth='none';
   const head=document.getElementById('ctl-head-btns'); if(head) head.style.display='none';
@@ -7927,7 +7937,6 @@ function renderCtlSplitView(){
     <button class="btn btn-ghost btn-sm" onclick="closeCtlSplitView()">← Changer la sélection</button>
     <button class="btn btn-ghost btn-sm" onclick="cancelCtlSplitSelect()">✕ Quitter la vue</button>
     <span style="flex:1"></span>
-    <button class="btn ${_ctlSplit.sync?'btn-primary':'btn-ghost'} btn-sm" id="sv-sync-btn" onclick="toggleCtlSplitSync()" title="Faire défiler toutes les tier lists en même temps">🔗 Défilement synchronisé</button>
     <span style="color:var(--t3)">${n} tier lists</span></div>`;
 
   const renderRow=(ctl,tier,tierIdx,block)=>{
@@ -7941,7 +7950,7 @@ function renderCtlSplitView(){
     if(block==='low' && total===0) return '';
     const itemHtml=id=>{
       const it=(ctl.items||{})[id]; if(!it) return '';
-      return `<div class="sv-item" title="${esc(it.name||'')}"><img src="${it.img||''}" loading="lazy" onerror="this.style.visibility='hidden'"><div class="sv-iname">${esc(it.name||'')}</div></div>`;
+      return `<div class="sv-item" title="${esc(it.name||'')}"><div class="sv-cov"><img src="${it.img||''}" loading="lazy" onerror="this.style.visibility='hidden'"></div><div class="sv-iname">${esc(it.name||'')}</div></div>`;
     };
     const zone=parts.map(p=>p.map(itemHtml).join('')).join(parts.length>1?'<div class="sv-sep"></div>':'');
     const lbl=tier.high!=null?`${tier.base}<br><span style="font-size:8px;opacity:.7">/${tier.high}</span>`:`${tier.base}`;
@@ -7957,7 +7966,7 @@ function renderCtlSplitView(){
       <div class="sv-head"><span class="sv-name-h" title="${esc(ctl.name)}">${esc(ctl.name)}</span>
         <button onclick="openCustomTierList('${ctl.id}')" title="Ouvrir pour modifier">✎</button>
         <button onclick="removeFromCtlSplit('${ctl.id}')" title="Retirer de la comparaison">✕</button></div>
-      <div class="sv-body" style="max-height:${bodyH};min-height:200px" onscroll="svOnScroll(event)">${body}</div>
+      <div class="sv-body">${body}</div>
     </div>`;
   }).join('')}</div>`;
 }
@@ -9268,13 +9277,34 @@ function scatDrop(toIdx){
   renderScatItems();
 }
 
-function scatTagsFill(tags){
-  const i=document.getElementById('scat-tags-input'); if(i) i.value=(tags||[]).join(', ');
-  const dl=document.getElementById('scat-tags-dl'); if(dl) dl.innerHTML=(S.allTags||[]).map(t=>`<option value="${esc(t)}">`).join('');
+let _scatTags=[];
+function scatTagsRender(){
+  const el=document.getElementById('scat-tags-chips'); if(!el) return;
+  el.innerHTML=_scatTags.length
+    ? _scatTags.map((tag,i)=>`<span class="gtag" style="display:inline-flex;align-items:center;gap:5px">${esc(tag)}<span style="cursor:pointer;opacity:.6" onclick="scatTagRemove(${i})" title="Retirer">✕</span></span>`).join('')
+    : '<span style="font-size:11.5px;color:var(--t3);font-style:italic">Aucun tag</span>';
 }
+function scatTagsFill(tags){
+  _scatTags=[...(tags||[])];
+  const i=document.getElementById('scat-tags-input'); if(i) i.value='';
+  const dl=document.getElementById('scat-tags-dl'); if(dl) dl.innerHTML=(S.allTags||[]).map(t=>`<option value="${esc(t)}">`).join('');
+  scatTagsRender();
+}
+function scatTagAdd(){
+  const i=document.getElementById('scat-tags-input'); if(!i) return;
+  i.value.split(',').map(x=>x.trim()).filter(Boolean).forEach(v=>{
+    if(LEN_TAGS.includes(v)) return;
+    if(!_scatTags.includes(v)) _scatTags.push(v);
+  });
+  i.value='';
+  scatTagsRender();
+  i.focus();
+}
+function scatTagRemove(idx){ _scatTags.splice(idx,1); scatTagsRender(); }
 function scatTagsRead(){
-  const raw=(document.getElementById('scat-tags-input')||{}).value||'';
-  const tags=[...new Set(raw.split(',').map(x=>x.trim()).filter(x=>x&&!LEN_TAGS.includes(x)))];
+  const i=document.getElementById('scat-tags-input');
+  if(i&&i.value.trim()) scatTagAdd(); // tag tapé mais pas encore validé : on le garde
+  const tags=[..._scatTags];
   if(!S.allTags) S.allTags=[]; tags.forEach(t=>{ if(!S.allTags.includes(t)) S.allTags.push(t); });
   return tags;
 }
