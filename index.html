@@ -3958,7 +3958,7 @@ function renderWorkPage(w){
       const authors = w.authors||[];
       if(!authors.length) return '—';
       const fixName = n => { const p=n.split(', '); return p.length===2?p[1]+' '+p[0]:n; };
-      return authors.map(a=>`<span data-aid="${a.mal_id||''}" data-aname="${esc(a.name)}" onclick="openAuthorFromEl(this)" style="cursor:pointer">${esc(fixName(a.name))}</span>`).join(', ');
+      return authors.map(a=>a.mal_id?`<span data-aid="${a.mal_id}" data-aname="${esc(a.name)}" onclick="openAuthorFromEl(this)" style="cursor:pointer">${esc(fixName(a.name))}</span>`:esc(fixName(a.name))).join(', ');
     })()}</span></div>
     <div class="wm-item"><span class="wm-label">Volumes</span><span class="wm-value">${w.volumes||'?'}</span></div>
     <div class="wm-item"><span class="wm-label">Chapitres</span><span class="wm-value">${w.chapters||'?'}</span></div>
@@ -9688,21 +9688,6 @@ function saveScatReview(){
   toast('Critique enregistrée ✓','ok');
 }
 
-// ─── Appel Jikan DIRECT : hors de la file d'attente globale (qui bloque quand une autre requête rame) ───
-async function jikanDirect(path, ms=6000){
-  let last;
-  for(let i=0;i<2;i++){
-    const ctl=new AbortController(); const tid=setTimeout(()=>ctl.abort(),ms);
-    try{
-      const r=await fetch(JIKAN+path,{signal:ctl.signal}); clearTimeout(tid);
-      if(r.ok) return await r.json();
-      last=new Error('Jikan HTTP '+r.status);
-      if(r.status!==429 && r.status<500) break;
-    }catch(e){ clearTimeout(tid); last=new Error(e&&e.name==='AbortError'?'Jikan trop lent':'Jikan injoignable'); break; }
-    await delay(500);
-  }
-  throw last;
-}
 function _proxyBase(name){
   return (MAL_PROXY && !MAL_PROXY.includes('TON-PROJET')) ? MAL_PROXY.replace(/\/api\/mal\/?$/,'/api/'+name) : '';
 }
@@ -9712,7 +9697,10 @@ async function proxyJson(name, qs, ms=7000){
   const ctl=new AbortController(); const tid=setTimeout(()=>ctl.abort(),ms);
   try{
     const r=await fetch(base+'?'+qs,{signal:ctl.signal});
-    if(!r.ok) throw new Error('relais /api/'+name+' : HTTP '+r.status+(r.status===404?' (fichier pas déployé sur Vercel ?)':''));
+    if(!r.ok){
+      let det=''; try{ const j=await r.json(); det=j.detail||j.error||''; }catch(e){}
+      throw new Error('relais /api/'+name+' : HTTP '+r.status+(r.status===404?' (fichier pas déployé sur Vercel ?)':'')+(det?' — '+det:''));
+    }
     return await r.json();
   }catch(e){
     if(e&&e.name==='AbortError') throw new Error('relais /api/'+name+' trop lent');
@@ -9725,8 +9713,8 @@ function _aggMsg(e){
 }
 
 // ─── RÉPARTITION DES NOTES (comme sur MyAnimeList) ───
-// Relais Vercel /api/malstats (rapide, cache CDN) ET Jikan direct en parallèle : le premier qui répond gagne.
-// Préchargement (relais seul) dès l'ouverture de la fiche ; mémoire + navigateur (7 jours).
+// Lue sur la page MyAnimeList par le relais Vercel /api/malstats (cache CDN).
+// Préchargement dès l'ouverture de la fiche ; mémoire + navigateur (7 jours).
 const _scoreStatsMem={}, _scoreStatsProxy={};
 const SCORE_STATS_TTL=7*24*3600*1000;
 function _ssNormalize(raw,total){
@@ -9747,26 +9735,19 @@ function _ssViaProxy(malId,type){
   }
   return _scoreStatsProxy[key];
 }
-async function _ssViaJikan(malId,type){
-  const d=await jikanDirect(`/${type}/${malId}/statistics`,7000);
-  if(!d?.data?.scores) throw new Error('Jikan : pas de stats');
-  return _ssNormalize(d.data.scores,d.data.total);
-}
-async function fetchScoreStats(malId,type,allowJikan){
+async function fetchScoreStats(malId,type){
   const key=type+'-'+malId;
   if(_scoreStatsMem[key]) return _scoreStatsMem[key];
   try{
     const c=JSON.parse(localStorage.getItem('ss:'+key)||'null');
     if(c&&c.t&&Date.now()-c.t<SCORE_STATS_TTL&&c.d){ _scoreStatsMem[key]=c.d; return c.d; }
   }catch(e){}
-  const tasks=[_ssViaProxy(malId,type)];
-  if(allowJikan) tasks.push(_ssViaJikan(malId,type));
-  const out=await Promise.any(tasks);
+  const out=await _ssViaProxy(malId,type);
   _scoreStatsMem[key]=out;
   try{ localStorage.setItem('ss:'+key,JSON.stringify({t:Date.now(),d:out})); }catch(e){}
   return out;
 }
-function prefetchScoreStats(malId,type){ fetchScoreStats(malId,type,false).catch(()=>{}); }
+function prefetchScoreStats(malId,type){ fetchScoreStats(malId,type).catch(()=>{}); }
 function renderScoreStatsBody(body,st){
   const maxPct=Math.max(...Object.values(st.byScore).map(s=>s.percentage||0),1);
   let html='<div class="score-stats-list">';
@@ -9792,7 +9773,7 @@ async function openScoreStats(malId, type){
   body.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div> Chargement…</div>';
   const malUrl=`https://myanimelist.net/${type}/${malId}/_/stats`;
   try{
-    const st=await fetchScoreStats(malId,type,true);
+    const st=await fetchScoreStats(malId,type);
     renderScoreStatsBody(body,st);
   }catch(e){
     console.error('openScoreStats a échoué:', e);
@@ -9828,18 +9809,6 @@ function authDateFr(d){
 }
 function openAuthorFromEl(el){ openAuthor(parseInt(el.dataset.aid)||0, el.dataset.aname||''); }
 
-// Auteur via Jikan direct (2 requêtes légères en parallèle)
-async function _authorViaJikan(id){
-  const [p,m]=await Promise.all([jikanDirect('/people/'+id), jikanDirect('/people/'+id+'/manga')]);
-  const d=p.data||{}, map=new Map();
-  (m.data||[]).forEach(x=>{
-    const mg=x.manga; if(!mg||!mg.mal_id) return;
-    if(!map.has(mg.mal_id)) map.set(mg.mal_id,{id:mg.mal_id,title:mg.title||'',img:mg.images?.jpg?.image_url||'',pos:[]});
-    if(x.position) map.get(mg.mal_id).pos.push(x.position);
-  });
-  return {mal_id:d.mal_id||id,name:d.name||'',given:d.given_name||'',family:d.family_name||'',about:d.about||'',birthday:d.birthday||'',favorites:d.favorites||0,image:d.images?.jpg?.image_url||'',works:[...map.values()],source:'jikan'};
-}
-
 async function openAuthor(id,name,push=true){
   const token=++_authorToken;
   nav('author',false);
@@ -9848,22 +9817,10 @@ async function openAuthor(id,name,push=true){
   const box=document.getElementById('author-layout');
   box.innerHTML='<div class="loading"><div class="spin"></div> Chargement de l\'auteur…</div>';
   try{
-    if(!id){ // pas d'identifiant MAL connu : on cherche l'auteur par son nom (sans passer par la file Jikan)
-      const q=String(name||'').replace(/,/g,' ').replace(/\s+/g,' ').trim();
-      const d=await jikanDirect('/people?q='+encodeURIComponent(q)+'&limit=5');
-      if(token!==_authorToken) return;
-      const norm=x=>String(x||'').replace(/,/g,' ').replace(/\s+/g,' ').trim().toLowerCase().split(' ').sort().join(' ');
-      const hit=(d.data||[]).find(x=>norm(x.name)===norm(q))||(d.data||[])[0];
-      if(!hit) throw new Error('auteur introuvable');
-      id=hit.mal_id;
-      history.replaceState({page:'author',id,name},'','#author-'+id);
-    }
+    if(!id) throw new Error('identifiant MyAnimeList de cet auteur inconnu — rouvre la fiche de l\'œuvre');
     let P=_authorCache[id];
     if(!P){
-      // Relais Vercel (rapide, en cache) ET Jikan direct en parallèle : le premier qui répond gagne
-      const tasks=[proxyJson('malperson','id='+id,9000)];
-      tasks.push(_authorViaJikan(id));
-      P=await Promise.any(tasks);
+      P=await proxyJson('malperson','id='+id,10000); // page MyAnimeList lue par le relais Vercel
       if(!P||!P.name) throw new Error('réponse vide');
       _authorCache[id]=P;
     }
