@@ -9688,10 +9688,46 @@ function saveScatReview(){
   toast('Critique enregistrée ✓','ok');
 }
 
+// ─── Appel Jikan DIRECT : hors de la file d'attente globale (qui bloque quand une autre requête rame) ───
+async function jikanDirect(path, ms=6000){
+  let last;
+  for(let i=0;i<2;i++){
+    const ctl=new AbortController(); const tid=setTimeout(()=>ctl.abort(),ms);
+    try{
+      const r=await fetch(JIKAN+path,{signal:ctl.signal}); clearTimeout(tid);
+      if(r.ok) return await r.json();
+      last=new Error('Jikan HTTP '+r.status);
+      if(r.status!==429 && r.status<500) break;
+    }catch(e){ clearTimeout(tid); last=new Error(e&&e.name==='AbortError'?'Jikan trop lent':'Jikan injoignable'); break; }
+    await delay(500);
+  }
+  throw last;
+}
+function _proxyBase(name){
+  return (MAL_PROXY && !MAL_PROXY.includes('TON-PROJET')) ? MAL_PROXY.replace(/\/api\/mal\/?$/,'/api/'+name) : '';
+}
+async function proxyJson(name, qs, ms=7000){
+  const base=_proxyBase(name);
+  if(!base) throw new Error('relais non configuré');
+  const ctl=new AbortController(); const tid=setTimeout(()=>ctl.abort(),ms);
+  try{
+    const r=await fetch(base+'?'+qs,{signal:ctl.signal});
+    if(!r.ok) throw new Error('relais /api/'+name+' : HTTP '+r.status+(r.status===404?' (fichier pas déployé sur Vercel ?)':''));
+    return await r.json();
+  }catch(e){
+    if(e&&e.name==='AbortError') throw new Error('relais /api/'+name+' trop lent');
+    throw e;
+  }finally{ clearTimeout(tid); }
+}
+function _aggMsg(e){
+  const list=(e&&e.errors)?e.errors:[e];
+  return list.map(x=>x&&x.message?x.message:String(x)).join(' · ');
+}
+
 // ─── RÉPARTITION DES NOTES (comme sur MyAnimeList) ───
-// Rapide : relais Vercel /api/malstats (page MAL + Jikan en parallèle, cache CDN 1 jour),
-// préchargé dès l'ouverture de la fiche, puis gardé en mémoire et dans le navigateur (7 jours).
-const _scoreStatsMem={}, _scoreStatsInflight={};
+// Relais Vercel /api/malstats (rapide, cache CDN) ET Jikan direct en parallèle : le premier qui répond gagne.
+// Préchargement (relais seul) dès l'ouverture de la fiche ; mémoire + navigateur (7 jours).
+const _scoreStatsMem={}, _scoreStatsProxy={};
 const SCORE_STATS_TTL=7*24*3600*1000;
 function _ssNormalize(raw,total){
   const byScore={};
@@ -9699,38 +9735,38 @@ function _ssNormalize(raw,total){
   else Object.entries(raw||{}).forEach(([k,s])=>{ byScore[k]={votes:s.votes||0,percentage:s.percentage||0}; });
   return {byScore,total:total||Object.values(byScore).reduce((a,s)=>a+(s.votes||0),0)};
 }
-async function fetchScoreStats(malId,type){
+function _ssViaProxy(malId,type){
+  const key=type+'-'+malId;
+  if(!_scoreStatsProxy[key]){
+    const p=proxyJson('malstats',`type=${type}&id=${malId}`,7000).then(j=>{
+      if(!j||!j.scores) throw new Error('relais : réponse vide');
+      return _ssNormalize(j.scores,j.total);
+    });
+    _scoreStatsProxy[key]=p;
+    p.catch(()=>{ delete _scoreStatsProxy[key]; });
+  }
+  return _scoreStatsProxy[key];
+}
+async function _ssViaJikan(malId,type){
+  const d=await jikanDirect(`/${type}/${malId}/statistics`,7000);
+  if(!d?.data?.scores) throw new Error('Jikan : pas de stats');
+  return _ssNormalize(d.data.scores,d.data.total);
+}
+async function fetchScoreStats(malId,type,allowJikan){
   const key=type+'-'+malId;
   if(_scoreStatsMem[key]) return _scoreStatsMem[key];
   try{
     const c=JSON.parse(localStorage.getItem('ss:'+key)||'null');
     if(c&&c.t&&Date.now()-c.t<SCORE_STATS_TTL&&c.d){ _scoreStatsMem[key]=c.d; return c.d; }
   }catch(e){}
-  if(_scoreStatsInflight[key]) return _scoreStatsInflight[key];
-  const p=(async()=>{
-    let out=null;
-    if(MAL_PROXY && !MAL_PROXY.includes('TON-PROJET')){
-      try{
-        const ctl=new AbortController(); const tid=setTimeout(()=>ctl.abort(),7000);
-        const r=await fetch(MAL_PROXY.replace(/\/api\/mal\/?$/,'/api/malstats')+`?type=${type}&id=${malId}`,{signal:ctl.signal});
-        clearTimeout(tid);
-        if(r.ok){ const j=await r.json(); if(j&&j.scores) out=_ssNormalize(j.scores,j.total); }
-      }catch(e){}
-    }
-    if(!out){ // repli : Jikan direct (plus lent)
-      const d=await jikan(`/${type}/${malId}/statistics`,3);
-      if(!d?.data?.scores) throw new Error('no stats');
-      out=_ssNormalize(d.data.scores,d.data.total);
-    }
-    _scoreStatsMem[key]=out;
-    try{ localStorage.setItem('ss:'+key,JSON.stringify({t:Date.now(),d:out})); }catch(e){}
-    return out;
-  })();
-  _scoreStatsInflight[key]=p;
-  p.then(()=>{delete _scoreStatsInflight[key];},()=>{delete _scoreStatsInflight[key];});
-  return p;
+  const tasks=[_ssViaProxy(malId,type)];
+  if(allowJikan) tasks.push(_ssViaJikan(malId,type));
+  const out=await Promise.any(tasks);
+  _scoreStatsMem[key]=out;
+  try{ localStorage.setItem('ss:'+key,JSON.stringify({t:Date.now(),d:out})); }catch(e){}
+  return out;
 }
-function prefetchScoreStats(malId,type){ fetchScoreStats(malId,type).catch(()=>{}); }
+function prefetchScoreStats(malId,type){ fetchScoreStats(malId,type,false).catch(()=>{}); }
 function renderScoreStatsBody(body,st){
   const maxPct=Math.max(...Object.values(st.byScore).map(s=>s.percentage||0),1);
   let html='<div class="score-stats-list">';
@@ -9756,12 +9792,13 @@ async function openScoreStats(malId, type){
   body.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div> Chargement…</div>';
   const malUrl=`https://myanimelist.net/${type}/${malId}/_/stats`;
   try{
-    const st=await fetchScoreStats(malId,type);
+    const st=await fetchScoreStats(malId,type,true);
     renderScoreStatsBody(body,st);
   }catch(e){
     console.error('openScoreStats a échoué:', e);
     body.innerHTML=`<div style="text-align:center;padding:16px 0">
-      <p style="color:var(--t3);font-size:13px;margin-bottom:12px">Impossible de charger la répartition pour le moment.</p>
+      <p style="color:var(--t3);font-size:13px;margin-bottom:6px">Impossible de charger la répartition pour le moment.</p>
+      <p style="color:var(--t3);font-size:11px;margin-bottom:12px;opacity:.8">${esc(_aggMsg(e))}</p>
       <button class="btn btn-ghost btn-sm" onclick="openScoreStats(${malId},'${type}')" style="margin-right:6px">🔄 Réessayer</button>
       <a class="btn btn-ghost btn-sm" href="${malUrl}" target="_blank" rel="noopener">Voir sur MyAnimeList ↗</a>
     </div>`;
@@ -9772,7 +9809,6 @@ async function openScoreStats(malId, type){
 let _authorToken=0;
 const _authorCache={};
 const AUTH_TYPE_FR={manga:'Manga',one_shot:'One-shot',novel:'Roman',light_novel:'Light novel',manhwa:'Manhwa',manhua:'Manhua',doujinshi:'Doujinshi',oel:'OEL'};
-const AUTH_JIKAN_TYPE={'Manga':'Manga','One-shot':'One-shot','Novel':'Roman','Light Novel':'Light novel','Manhwa':'Manhwa','Manhua':'Manhua','Doujinshi':'Doujinshi','OEL':'OEL'};
 function authRoleFr(pos){
   const p=(pos||'').toLowerCase();
   const story=/story|original|scenario/.test(p), art=/art|illustration|draw/.test(p);
@@ -9792,6 +9828,18 @@ function authDateFr(d){
 }
 function openAuthorFromEl(el){ openAuthor(parseInt(el.dataset.aid)||0, el.dataset.aname||''); }
 
+// Auteur via Jikan direct (2 requêtes légères en parallèle)
+async function _authorViaJikan(id){
+  const [p,m]=await Promise.all([jikanDirect('/people/'+id), jikanDirect('/people/'+id+'/manga')]);
+  const d=p.data||{}, map=new Map();
+  (m.data||[]).forEach(x=>{
+    const mg=x.manga; if(!mg||!mg.mal_id) return;
+    if(!map.has(mg.mal_id)) map.set(mg.mal_id,{id:mg.mal_id,title:mg.title||'',img:mg.images?.jpg?.image_url||'',pos:[]});
+    if(x.position) map.get(mg.mal_id).pos.push(x.position);
+  });
+  return {mal_id:d.mal_id||id,name:d.name||'',given:d.given_name||'',family:d.family_name||'',about:d.about||'',birthday:d.birthday||'',favorites:d.favorites||0,image:d.images?.jpg?.image_url||'',works:[...map.values()],source:'jikan'};
+}
+
 async function openAuthor(id,name,push=true){
   const token=++_authorToken;
   nav('author',false);
@@ -9800,50 +9848,53 @@ async function openAuthor(id,name,push=true){
   const box=document.getElementById('author-layout');
   box.innerHTML='<div class="loading"><div class="spin"></div> Chargement de l\'auteur…</div>';
   try{
-    if(!id){ // pas d'identifiant MAL connu : on cherche l'auteur par son nom
+    if(!id){ // pas d'identifiant MAL connu : on cherche l'auteur par son nom (sans passer par la file Jikan)
       const q=String(name||'').replace(/,/g,' ').replace(/\s+/g,' ').trim();
-      const d=await jikan('/people?q='+encodeURIComponent(q)+'&limit=5');
+      const d=await jikanDirect('/people?q='+encodeURIComponent(q)+'&limit=5');
       if(token!==_authorToken) return;
-      const toks=q.toLowerCase().split(' ').sort().join(' ');
-      const hit=(d.data||[]).find(x=>String(x.name||'').replace(/,/g,' ').replace(/\s+/g,' ').trim().toLowerCase().split(' ').sort().join(' ')===toks)||(d.data||[])[0];
+      const norm=x=>String(x||'').replace(/,/g,' ').replace(/\s+/g,' ').trim().toLowerCase().split(' ').sort().join(' ');
+      const hit=(d.data||[]).find(x=>norm(x.name)===norm(q))||(d.data||[])[0];
       if(!hit) throw new Error('auteur introuvable');
       id=hit.mal_id;
       history.replaceState({page:'author',id,name},'','#author-'+id);
     }
-    let person=_authorCache[id];
-    if(!person){ const d=await jikan('/people/'+id+'/full'); person=d.data; _authorCache[id]=person; }
+    let P=_authorCache[id];
+    if(!P){
+      // Relais Vercel (rapide, en cache) ET Jikan direct en parallèle : le premier qui répond gagne
+      const tasks=[proxyJson('malperson','id='+id,9000)];
+      tasks.push(_authorViaJikan(id));
+      P=await Promise.any(tasks);
+      if(!P||!P.name) throw new Error('réponse vide');
+      _authorCache[id]=P;
+    }
     if(token!==_authorToken) return;
-    renderAuthorPage(person,token);
+    renderAuthorPage(P,token);
   }catch(e){
     if(token!==_authorToken) return;
-    box.innerHTML='<p style="color:var(--t3)">Impossible de charger cet auteur pour le moment. <a href="#" onclick="openAuthor('+(id||0)+',\''+String(name||'').replace(/'/g,"\\'")+'\',false);return false" style="color:var(--acc2)">Réessayer</a></p>';
+    console.error('openAuthor a échoué:',e);
+    box.innerHTML='<p style="color:var(--t3);margin-bottom:6px">Impossible de charger cet auteur pour le moment.</p>'
+      +'<p style="color:var(--t3);font-size:11px;opacity:.8;margin-bottom:12px">'+esc(_aggMsg(e))+'</p>'
+      +'<button class="btn btn-ghost btn-sm" onclick="openAuthor('+(id||0)+',\''+String(name||'').replace(/'/g,"\\'")+'\',false)">🔄 Réessayer</button>'
+      +(id?' <a class="btn btn-ghost btn-sm" href="https://myanimelist.net/people/'+id+'" target="_blank" rel="noopener">Voir sur MyAnimeList ↗</a>':'');
   }
 }
 
-function renderAuthorPage(p,token){
+function renderAuthorPage(P,token){
   const box=document.getElementById('author-layout');
-  const photo=p.images?.jpg?.image_url||'';
-  const fullName=p.name||'';
-  const jp=[p.family_name,p.given_name].filter(Boolean).join(' ');
-  const bday=p.birthday?new Date(p.birthday).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}):'';
-  // œuvres manga (une même œuvre peut apparaître avec 2 rôles : on fusionne)
-  const map=new Map();
-  (p.manga||[]).forEach(x=>{
-    const m=x.manga; if(!m||!m.mal_id) return;
-    if(!map.has(m.mal_id)) map.set(m.mal_id,{id:m.mal_id,title:m.title||'',img:m.images?.jpg?.image_url||'',pos:[]});
-    if(x.position) map.get(m.mal_id).pos.push(x.position);
-  });
-  const works=[...map.values()];
-  works.forEach(w=>{ w.role=authRoleFr(w.pos.join(' & ')); });
+  const photo=P.image||'';
+  const fullName=P.name||'';
+  const jp=[P.family,P.given].filter(Boolean).join(' ');
+  const bday=P.birthday?new Date(P.birthday).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}):'';
+  const works=(P.works||[]).map(w=>({id:w.id,title:w.title,img:w.img,role:authRoleFr((w.pos||[]).join(' & '))}));
   box.innerHTML=`
     <div class="auth-head">
       ${photo?`<img class="auth-photo" src="${esc(photo)}" alt="${esc(fullName)}">`:'<div class="auth-photo"></div>'}
       <div class="auth-head-txt">
         <h1 class="work-title" style="margin-bottom:4px">${esc(fullName)}</h1>
         ${jp?`<div class="work-title-alt" style="margin-bottom:6px">${esc(jp)}</div>`:''}
-        <div style="font-size:12px;color:var(--t3);margin-bottom:10px">${[bday?'🎂 '+bday:'',p.favorites?'♥ '+p.favorites.toLocaleString()+' favoris':'',works.length+' œuvre'+(works.length>1?'s':'')].filter(Boolean).join(' · ')}</div>
-        ${p.about?`<div class="auth-about" id="auth-about">${esc(p.about.trim())}</div><a href="#" id="auth-about-toggle" onclick="document.getElementById('auth-about').classList.toggle('open');this.textContent=document.getElementById('auth-about').classList.contains('open')?'Réduire':'Voir plus';return false" style="font-size:12px;color:var(--acc2)">Voir plus</a>`:''}
-        <div style="margin-top:12px"><a class="btn btn-ghost btn-sm" href="https://myanimelist.net/people/${p.mal_id}" target="_blank" rel="noopener" style="color:#7b9cf0;border-color:rgba(123,156,240,.35)">↗ MyAnimeList</a></div>
+        <div style="font-size:12px;color:var(--t3);margin-bottom:10px">${[bday?'🎂 '+bday:'',P.favorites?'♥ '+P.favorites.toLocaleString()+' favoris':'',works.length+' œuvre'+(works.length>1?'s':'')].filter(Boolean).join(' · ')}</div>
+        ${P.about?`<div class="auth-about" id="auth-about">${esc(P.about.trim())}</div><a href="#" id="auth-about-toggle" onclick="document.getElementById('auth-about').classList.toggle('open');this.textContent=document.getElementById('auth-about').classList.contains('open')?'Réduire':'Voir plus';return false" style="font-size:12px;color:var(--acc2)">Voir plus</a>`:''}
+        <div style="margin-top:12px"><a class="btn btn-ghost btn-sm" href="https://myanimelist.net/people/${P.mal_id}" target="_blank" rel="noopener" style="color:#7b9cf0;border-color:rgba(123,156,240,.35)">↗ MyAnimeList</a></div>
       </div>
     </div>
     <h2 class="sh-title" style="margin:26px 0 12px">Œuvres</h2>
@@ -9861,20 +9912,11 @@ function renderAuthorPage(p,token){
   enrichAuthorWorks(works,token);
 }
 
+// Détail léger (note, type, date) d'une œuvre : relais MAL officiel uniquement (rapide, en cache)
 async function authorWorkDetail(id){
-  // Détail léger (note, type, date) : relais MAL officiel, repli Jikan
-  if(MAL_PROXY && !MAL_PROXY.includes('TON-PROJET')){
-    try{
-      const ctl=new AbortController(); const tid=setTimeout(()=>ctl.abort(),8000);
-      const r=await fetch(`${MAL_PROXY}?type=manga&id=${id}&light=1`,{signal:ctl.signal});
-      clearTimeout(tid);
-      if(r.ok){ const m=await r.json(); if(m&&m.id) return {score:m.mean||null,type:AUTH_TYPE_FR[m.media_type]||'',date:m.start_date||''}; }
-    }catch(e){}
-  }
-  const d=await jikan('/manga/'+id,2);
-  const m=d.data||{};
-  const f=m.published?.from?String(m.published.from).slice(0,10):'';
-  return {score:m.score||null,type:AUTH_JIKAN_TYPE[m.type]||m.type||'',date:f};
+  const m=await proxyJson('mal',`type=manga&id=${id}&light=1`,8000);
+  if(!m||!m.id) throw new Error('vide');
+  return {score:m.mean||null,type:AUTH_TYPE_FR[m.media_type]||'',date:m.start_date||''};
 }
 
 async function enrichAuthorWorks(works,token){
@@ -9893,7 +9935,7 @@ async function enrichAuthorWorks(works,token){
       if(sc) sc.textContent=d&&d.score?'★ '+d.score:'—';
     }
   };
-  await Promise.all(Array.from({length:Math.min(6,works.length)},worker));
+  await Promise.all(Array.from({length:Math.min(8,works.length)},worker));
   if(token!==_authorToken) return;
   // Une fois tout chargé : tri par date de sortie, la plus récente d'abord
   const list=document.getElementById('auth-works'); if(!list) return;
