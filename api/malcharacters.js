@@ -9,56 +9,69 @@
 const CHROME = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const decode = s => String(s || '').replace(/&amp;/g, '&').replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').trim();
 
-function parseCharacters(html, label) {
-  const re = /href="https:\/\/myanimelist\.net\/character\/(\d+)\/[^"]*"/gi;
+const stripTags = x => decode(String(x || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '));
+
+function parseCharacters(html, type, id, label) {
+  const re = /href="(?:https:\/\/myanimelist\.net)?\/character\/(\d+)\/([^"]*)"/gi;
   const starts = [], seen = new Set();
   let m;
   while ((m = re.exec(html))) {
-    const id = +m[1];
-    if (seen.has(id)) continue;
-    seen.add(id);
-    starts.push({ id, at: m.index });
+    const cid = +m[1];
+    if (seen.has(cid)) continue;
+    seen.add(cid);
+    starts.push({ id: cid, slug: m[2], at: m.index });
+  }
+  if (!starts.length) {
+    // Page de l'œuvre bien chargée mais sans aucun personnage : liste vide (rien à afficher)
+    if (new RegExp(`/${type}/${id}`, 'i').test(html)) return { characters: [] };
+    const title = (html.match(/<title>([^<]{0,80})/i) || [])[1] || '?';
+    throw new Error(`${label}: contenu reçu (${html.length} caractères, titre « ${String(title).trim()} ») mais ce n'est pas la page des personnages`);
   }
   const characters = [];
   starts.forEach((st, k) => {
     const seg = html.slice(st.at, k + 1 < starts.length ? starts[k + 1].at : st.at + 6000);
-    const nameM = seg.match(/href="https:\/\/myanimelist\.net\/character\/\d+\/[^"]*"[^>]*>\s*([^<]+?)\s*<\/a>/i);
-    if (!nameM) return;
-    // MyAnimeList écrit « Famille, Prénom » : on garde l'ordre et on retire juste la virgule (ex. « Monkey D. Luffy »)
-    const name = decode(nameM[1]).replace(/,\s*/g, ' ').replace(/\s+/g, ' ').trim();
-    const role = ((seg.match(/<small>\s*(Main|Supporting)\s*<\/small>/i) || [])[1] || '').toLowerCase();
-    // Image du personnage : on regarde chaque <img> (data-src d'abord, car src peut être un pixel vide)
-    // et on garde la première qui pointe vers /images/characters/ (pas les photos des doubleurs).
+
+    // Nom : <h3>, sinon texte d'un lien du personnage, sinon alt de l'image, sinon le nom dans l'adresse
+    let name = '';
+    const h3 = seg.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i);
+    if (h3) name = stripTags(h3[1]);
+    if (!name) {
+      const are = /<a[^>]*href="[^"]*\/character\/\d+\/[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+      let am;
+      while ((am = are.exec(seg))) { const t = stripTags(am[1]); if (t) { name = t; break; } }
+    }
+    if (!name) { const alt = seg.match(/<img[^>]*\salt="([^"]+)"/i); if (alt) name = decode(alt[1]); }
+    if (!name) { try { name = decodeURIComponent(st.slug.split(/[?#]/)[0]).replace(/_/g, ' '); } catch (e) { name = st.slug.replace(/_/g, ' '); } }
+    // MyAnimeList écrit « Famille, Prénom » : on garde l'ordre et on retire juste la virgule
+    name = name.replace(/,\s*/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!name) return;
+
+    const role = (((seg.match(/<small>\s*(Main|Supporting)\s*<\/small>/i) || stripTags(seg).match(/\b(Main|Supporting)\b/i)) || [])[1] || '').toLowerCase();
+
+    // Image du personnage : data-src d'abord (src peut être un pixel vide), uniquement /images/characters/
     let img = '';
-    const tags = seg.match(/<img[^>]*>/gi) || [];
-    for (const tag of tags) {
-      const u = (tag.match(/data-src="([^"]+)"/i) || tag.match(/\ssrc="([^"]+)"/i) || [])[1] || '';
-      if (/\/images\/characters\//i.test(u)) { img = u; break; }
+    for (const tag of (seg.match(/<img[^>]*>/gi) || [])) {
+      const cands = [(tag.match(/data-src="([^"]+)"/i) || [])[1], (tag.match(/\ssrc="([^"]+)"/i) || [])[1], (tag.match(/data-srcset="([^"\s]+)/i) || [])[1]];
+      const u = cands.find(x => x && /\/images\/characters\//i.test(x));
+      if (u) { img = u; break; }
     }
     if (!img) { const md = seg.match(/https:\/\/cdn\.myanimelist\.net\/[^\s"')]*\/images\/characters\/[^\s"')]+/i); if (md) img = md[0]; }
-    // URL sans redimensionnement ni signature : https://cdn.myanimelist.net/images/characters/9/310307.jpg
-    img = img.replace(/\/r\/\d+x\d+\//, '/').replace(/\?.*$/, '');
-    const favM = seg.match(/([\d,]+)\s*(?:favorites?|Favorites?)/i);
+    img = img.replace(/\/r\/\d+x\d+\//, '/').replace(/\?.*$/, ''); // lien simple, sans signature
+
+    const favM = seg.match(/([\d,]+)\s*favorites?/i);
     const va = [];
-    const vre = /href="https:\/\/myanimelist\.net\/people\/(\d+)\/[^"]*"[^>]*>\s*([^<]+?)\s*<\/a>[\s\S]{0,300}?<small>\s*([^<]*?)\s*<\/small>/gi;
+    const vre = /href="(?:https:\/\/myanimelist\.net)?\/people\/(\d+)\/[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
     let v;
     while ((v = vre.exec(seg))) {
-      let vn = decode(v[2]);
+      let vn = stripTags(v[2]);
+      if (!vn) continue;
       const q = vn.split(', ');
       if (q.length === 2) vn = q[1] + ' ' + q[0];
-      va.push({ id: +v[1], name: vn, lang: decode(v[3]) });
+      const lang = (seg.slice(vre.lastIndex, vre.lastIndex + 300).match(/<small>\s*([^<]*?)\s*<\/small>/i) || [])[1] || '';
+      va.push({ id: +v[1], name: vn, lang: decode(lang) });
     }
-    characters.push({
-      id: st.id, name, role,
-      img,
-      favorites: favM ? parseInt(favM[1].replace(/[^\d]/g, ''), 10) : null,
-      va
-    });
+    characters.push({ id: st.id, name, role, img, favorites: favM ? parseInt(favM[1].replace(/[^\d]/g, ''), 10) : null, va });
   });
-  if (!characters.length) {
-    const title = (html.match(/<title>([^<]{0,80})/i) || [])[1] || '?';
-    throw new Error(`${label}: contenu reçu (${html.length} caractères, titre « ${String(title).trim()} ») mais aucun personnage lu`);
-  }
   return { characters };
 }
 
@@ -82,8 +95,8 @@ export default async function handler(req, res) {
     res.status(400).json({ error: 'Attendu : type=anime|manga et id numérique.' }); return;
   }
   const page = `https://myanimelist.net/${type}/${id}/_/characters`;
-  const direct = async () => parseCharacters(await get(page, { 'User-Agent': CHROME, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'en-US,en;q=0.9', 'Referer': 'https://myanimelist.net/' }, 5000, 'direct'), 'direct');
-  const reader = async () => parseCharacters(await get('https://r.jina.ai/' + page, { 'Accept': 'text/html', 'X-Return-Format': 'html', 'X-Timeout': '8' }, 9000, 'reader'), 'reader');
+  const direct = async () => parseCharacters(await get(page, { 'User-Agent': CHROME, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'en-US,en;q=0.9', 'Referer': 'https://myanimelist.net/' }, 5000, 'direct'), type, id, 'direct');
+  const reader = async () => parseCharacters(await get('https://r.jina.ai/' + page, { 'Accept': 'text/html', 'X-Return-Format': 'html', 'X-Timeout': '8' }, 9000, 'reader'), type, id, 'reader');
   try {
     const out = await Promise.any([direct(), reader()]);
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
