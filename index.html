@@ -417,7 +417,26 @@ body::after{
 .wm-item{display:flex;flex-direction:column;gap:2px}
 .wm-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.7px;font-weight:700}
 .wm-value{font-size:13.5px;font-weight:600}
-.genres-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:18px}
+.genres-row{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-bottom:18px}
+.genre-group{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+.genre-group-label{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);width:92px;flex-shrink:0}
+.wb-card{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:16px}
+.wb-sub{font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);margin:0 0 10px}
+.sum-row{display:grid;grid-template-columns:140px 1fr 84px 54px;align-items:center;gap:10px;padding:5px 0;font-size:13px}
+.sum-bar-wrap{height:8px;background:var(--bg4);border-radius:99px;overflow:hidden}
+.sum-bar{height:100%;border-radius:99px}
+.sum-n{text-align:right;color:var(--t2);font-variant-numeric:tabular-nums}
+.sum-pct{text-align:right;font-weight:700}
+.char-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.char-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.char-card{display:flex;gap:12px;align-items:center;padding:8px;border-radius:12px;background:var(--bg3);border:1px solid var(--border);cursor:pointer;text-decoration:none;color:inherit}
+.char-card:hover{border-color:var(--acc)}
+.char-card img{width:54px;height:76px;object-fit:cover;border-radius:7px;background:var(--bg4);flex-shrink:0}
+.char-name{font-size:13.5px;font-weight:700;margin-bottom:5px}
+.char-role{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:700;background:var(--bg4);color:var(--t2)}
+.char-role.main{background:rgba(255,68,56,.14);color:var(--acc2)}
+.char-va{font-size:11.5px;color:var(--t3);margin-top:5px}
+.tier-item-cat{outline:2px solid var(--acc3);outline-offset:-2px}
 .gtag{
   padding:4px 11px;border-radius:7px;
   background:rgba(255,255,255,.04);border:1px solid var(--border);
@@ -2006,6 +2025,7 @@ body::after{
         <button class="tab on" onclick="switchTab(this,'tp-progress')">Progression</button>
         <button class="tab" onclick="switchTab(this,'tp-reviews')">Critiques</button>
         <button class="tab" id="tab-editions" style="display:none" onclick="switchTab(this,'tp-editions');mcRenderEditions()">📚 Éditions physiques</button>
+        <button class="tab" onclick="switchTab(this,'tp-chars');loadCharacters()">👥 Personnages</button>
         <button class="tab" onclick="switchTab(this,'tp-similar')">Similaires</button>
         <button class="tab" onclick="switchTab(this,'tp-relations')">Relations</button>
       </div>
@@ -2015,6 +2035,7 @@ body::after{
         <button class="btn btn-ghost" onclick="openM('m-review')" style="margin-top:10px">+ Écrire une critique</button>
       </div>
       <div class="tp" id="tp-editions"><div id="mc-ed-section"></div></div>
+      <div class="tp" id="tp-chars"><div id="chars-section"></div></div>
       <div class="tp" id="tp-similar"><div class="cg" id="similar-section"></div></div>
       <div class="tp" id="tp-relations"><div id="relations-section"></div></div>
     </div>
@@ -2729,6 +2750,8 @@ function malDateStr(d){
 }
 // Transforme une réponse de l'API officielle MAL en objet compatible avec renderWorkPage
 // (qui a été écrit pour le format Jikan). Ça évite de toucher au reste du code.
+const MAL_DEMO_IDS=new Set([15,25,27,42,43]); // Kids, Shoujo, Shounen, Seinen, Josei
+const MAL_THEME_IDS=new Set([50,51,52,53,54,81,55,39,56,57,58,35,59,13,60,61,62,63,64,65,66,17,18,67,38,19,6,68,69,20,70,71,40,3,72,73,74,21,23,75,29,11,31,76,77,78,32,79,80,48,82,83]);
 function malToWorkShape(mal, type){
   const w={};
   w.mal_id=mal.id;
@@ -2737,8 +2760,10 @@ function malToWorkShape(mal, type){
   w.title_japanese=mal.alternative_titles?.ja||null;
   w.titles=[];
   w.images={jpg:{image_url:mal.main_picture?.medium||'', large_image_url:mal.main_picture?.large||mal.main_picture?.medium||''}};
-  w.genres=(mal.genres||[]).map(g=>({name:g.name}));
-  w.themes=[]; w.demographics=[];
+  const _gs=mal.genres||[];
+  w.genres=_gs.filter(g=>!MAL_THEME_IDS.has(g.id)&&!MAL_DEMO_IDS.has(g.id)).map(g=>({name:g.name}));
+  w.themes=_gs.filter(g=>MAL_THEME_IDS.has(g.id)).map(g=>({name:g.name}));
+  w.demographics=_gs.filter(g=>MAL_DEMO_IDS.has(g.id)).map(g=>({name:g.name}));
   w.synopsis=mal.synopsis||'';
   w.score=mal.mean||null;
   w.scored_by=mal.num_scoring_users||null;
@@ -2754,6 +2779,7 @@ function malToWorkShape(mal, type){
   if(type==='manga'){
     w.volumes=mal.num_volumes||null;
     w.chapters=mal.num_chapters||null;
+    w.serialization=(mal.serialization||[]).map(x=>x.node?.name).filter(Boolean);
     w.authors=(mal.authors||[]).map(a=>({mal_id:a.node?.id||null, role:a.role||'', name:[a.node?.last_name,a.node?.first_name].filter(Boolean).join(', ')}));
     w.published={string: mal.start_date? `${malDateStr(mal.start_date)} to ${mal.end_date?malDateStr(mal.end_date):'?'}`:'—'};
   }else{
@@ -3950,7 +3976,9 @@ function renderWorkPage(w){
     : '<div class="rating-box"><select class="rating-select" onchange="rateWork('+w.mal_id+',\''+type+'\',parseFloat(this.value))">'+buildRatingOptions(myRating,'— Non noté')+'</select>'+(myRating>0?'<span class="rating-display">★ '+myRating+'<span style="color:var(--t3);font-size:12px"> /20</span></span>':'')+'</div>';
 
   // Genres
-  const genres=(w.genres||[]).concat(w.themes||[]).map(g=>`<span class="gtag">${g.name}</span>`).join('');
+  const gRow=(label,arr)=>(arr&&arr.length)?`<div class="genre-group"><span class="genre-group-label">${label}</span>${arr.map(g=>`<span class="gtag">${esc(g.name)}</span>`).join('')}</div>`:'';
+  const genres=gRow('Genres',w.genres)+gRow('Thèmes',w.themes)+gRow('Démographie',w.demographics);
+  const magazines=(w.serialization&&w.serialization.length)?w.serialization:(w.serializations||[]).map(x=>x.name).filter(Boolean);
 
   // Meta
   const metaHtml = type==='manga' ? `
@@ -3960,6 +3988,7 @@ function renderWorkPage(w){
       const fixName = n => { const p=n.split(', '); return p.length===2?p[1]+' '+p[0]:n; };
       return authors.map(a=>a.mal_id?`<span data-aid="${a.mal_id}" data-aname="${esc(a.name)}" onclick="openAuthorFromEl(this)" style="cursor:pointer">${esc(fixName(a.name))}</span>`:esc(fixName(a.name))).join(', ');
     })()}</span></div>
+    <div class="wm-item"><span class="wm-label">Magazine</span><span class="wm-value">${magazines.length?esc(magazines.join(', ')):'—'}</span></div>
     <div class="wm-item"><span class="wm-label">Volumes</span><span class="wm-value">${w.volumes||'?'}</span></div>
     <div class="wm-item"><span class="wm-label">Chapitres</span><span class="wm-value">${w.chapters||'?'}</span></div>
     <div class="wm-item"><span class="wm-label">Publication</span><span class="wm-value">${({'Finished':'Terminée','Publishing':'En cours','On Hiatus':'En pause','Discontinued':'Arrêtée'}[w.status]||w.status||'—')}</span></div>
@@ -4032,6 +4061,8 @@ function renderWorkPage(w){
   loadRelations(w);
   renderWorkSidebar(w, t);
   window._currentMalId = w.mal_id;
+  window._currentWork={id:w.mal_id,type};
+  resetCharacters();
   updateWorkNavArrows(w, type);
 }
 
@@ -6937,7 +6968,7 @@ function deleteTagEverywhere(tag){
   Object.values(S.tracking||{}).forEach(t=>{ if(t._tags) t._tags=t._tags.filter(x=>x!==tag); });
   (S.suiviCategories||[]).forEach(c=>{ if(c.tags) c.tags=c.tags.filter(x=>x!==tag); });
   S.allTags=(S.allTags||[]).filter(x=>x!==tag);
-  _safTags.delete(tag); _safTagsExcl.delete(tag); _tlTags.delete(tag);
+  _safTags.delete(tag); _safTagsExcl.delete(tag); _tlTags.delete(tag); _tlTagsExcl.delete(tag);
   save(); populateSuiviTagFilter(); renderSuivi(); toast('Tag « '+tag+' » supprimé','ok');
 }
 (function(){
@@ -7545,6 +7576,7 @@ function getTierIndexLow(rating){
 let _lowTierOpen=false;
 let _showAbandoned=false;
 let _tlTags=new Set();
+let _tlTagsExcl=new Set();
 function toggleTLTagPanel(){
   const wrap=document.getElementById('tl-tag-pills-wrap');
   const open=wrap.style.display==='none'||!wrap.style.display;
@@ -7557,17 +7589,20 @@ function renderTLTagPills(){
   const wrap=document.getElementById('tl-tag-pills-wrap');
   const sorted=allTagChoices();
   if(!sorted.length){ wrap.innerHTML='<span style="font-size:11.5px;color:var(--t3);font-style:italic">Aucun tag créé pour le moment.</span>'; return; }
-  wrap.innerHTML='<button class="saf-pill'+(_tlTags.size===0?' on':'')+'" onclick="clearTLTags()">Tous</button>'
-    +sorted.map(g=>`<button class="saf-pill${_tlTags.has(g)?' on':''}" onclick="toggleTLTag('${esc(g).replace(/'/g,"\\'")}',this)">${esc(g)}</button>`).join('');
+  wrap.innerHTML='<button class="saf-pill'+(_tlTags.size===0&&_tlTagsExcl.size===0?' on':'')+'" onclick="clearTLTags()">Tous</button>'
+    +sorted.map(g=>`<button class="saf-pill${_tlTags.has(g)?' on':_tlTagsExcl.has(g)?' excl':''}" onclick="toggleTLTag('${esc(g).replace(/'/g,"\\'")}',this)">${esc(g)}</button>`).join('');
 }
 function toggleTLTag(tag, btn){
-  if(_tlTags.has(tag)) _tlTags.delete(tag); else _tlTags.add(tag);
+  // Cycle : neutre → inclure → exclure → neutre
+  if(_tlTags.has(tag)){ _tlTags.delete(tag); _tlTagsExcl.add(tag); }
+  else if(_tlTagsExcl.has(tag)){ _tlTagsExcl.delete(tag); }
+  else _tlTags.add(tag);
   renderTLTagPills();
   renderTierList('main');
   if(_lowTierOpen) renderTierList('low');
 }
 function clearTLTags(){
-  _tlTags.clear();
+  _tlTags.clear(); _tlTagsExcl.clear();
   renderTLTagPills();
   renderTierList('main');
   if(_lowTierOpen) renderTierList('low');
@@ -7631,7 +7666,8 @@ function renderTierList(variant='main'){
   const cats=(S.suiviCategories||[]).filter(c=>
     c.rating>0 &&
     (filter==='all'||c.type===filter) &&
-    (_tlTags.size===0 || (![..._tlTags].some(g=>LEN_TAGS.includes(g)) && [..._tlTags].every(g=>(c.tags||[]).includes(g))))
+    (_tlTags.size===0 || (![..._tlTags].some(g=>LEN_TAGS.includes(g)) && [..._tlTags].every(g=>(c.tags||[]).includes(g)))) &&
+    (_tlTagsExcl.size===0 || [..._tlTagsExcl].every(g=>!(c.tags||[]).includes(g)))
   );
 
   const all=Object.values(S.tracking).filter(t=>{
@@ -7640,6 +7676,7 @@ function renderTierList(variant='main'){
     if(filter!=='all'&&t.type!==filter) return false;
     if(linkedSrcs.has(String(t.mal_id)+'_'+t.type)) return false;
     if(_tlTags.size>0 && ![..._tlTags].every(g=>effTags(t).includes(g))) return false;
+    if(_tlTagsExcl.size>0 && [..._tlTagsExcl].some(g=>effTags(t).includes(g))) return false;
     // Remarque : une œuvre qui appartient à une catégorie notée s'affiche quand même
     // individuellement ici, EN PLUS de la tuile de la catégorie plus bas — c'est voulu :
     // l'utilisateur veut voir l'œuvre par elle-même même si elle fait aussi partie d'un groupe.
@@ -7647,12 +7684,15 @@ function renderTierList(variant='main'){
   });
 
   const groups=TIERS_ACTIVE.map(()=>[]);
+  const placedKeys=new Set(); // garde-fou : une œuvre n'est jamais placée deux fois
   const overrides=S.profile[overridesKey]||{};
   const orders=S.profile[ordersKey]||{};
   const customLabels=S.profile[labelsKey]||{};
 
   all.forEach(t=>{
     const key=t.mal_id+'_'+t.type;
+    if(placedKeys.has(key)) return;
+    placedKeys.add(key);
     const idx=overrides[key]!==undefined?overrides[key]:idxFn(t.rating);
     if(idx>=0&&idx<groups.length) groups[idx].push({...t,_isCat:false});
   });
@@ -7720,7 +7760,7 @@ function renderTierList(variant='main'){
                   ondragend="tierDragEnd(event)"
                   onclick="openSuiviCategory('${t.id}')"
                   title="${esc(t.title)} ★${t.rating} (catégorie)">
-                  <div style="position:absolute;top:2px;left:2px;background:var(--acc3);border-radius:3px;font-size:6px;font-weight:900;color:#fff;padding:1px 3px;z-index:2">CAT</div>
+                  <div style="position:absolute;top:2px;left:2px;background:var(--acc3);border-radius:3px;font-size:8px;font-weight:900;color:#fff;padding:2px 4px;z-index:2">CATÉGORIE</div>
                   <img src="${t.cover||''}" loading="lazy" style="width:100%;height:100%;object-fit:cover">
                   <div class="tier-item-title">${esc(t.title.slice(0,12))}</div>
                 </div>`;
@@ -8353,6 +8393,10 @@ function tierDrop(e,newTierIdx,variant='main'){
   }
   if(!newOrder.includes(dragKey)) newOrder.push(dragKey);
   S.profile[ordersKey][newTierIdx]=newOrder;
+  // L'œuvre ne doit exister que dans UNE tier : on la retire de l'ordre manuel de toutes les autres
+  Object.keys(S.profile[ordersKey]).forEach(k=>{
+    if(String(k)!==String(newTierIdx) && Array.isArray(S.profile[ordersKey][k])) S.profile[ordersKey][k]=S.profile[ordersKey][k].filter(x=>x!==dragKey);
+  });
   save();
   renderTierList(variant);
 }
@@ -9728,7 +9772,7 @@ function _ssViaProxy(malId,type){
   if(!_scoreStatsProxy[key]){
     const p=proxyJson('malstats',`type=${type}&id=${malId}`,12000).then(j=>{
       if(!j||!j.scores) throw new Error('relais : réponse vide');
-      return _ssNormalize(j.scores,j.total);
+      const o=_ssNormalize(j.scores,j.total); o.summary=j.summary||null; o.v=2; return o;
     });
     _scoreStatsProxy[key]=p;
     p.catch(()=>{ delete _scoreStatsProxy[key]; });
@@ -9739,16 +9783,32 @@ async function fetchScoreStats(malId,type){
   const key=type+'-'+malId;
   if(_scoreStatsMem[key]) return _scoreStatsMem[key];
   try{
-    const c=JSON.parse(localStorage.getItem('ss:'+key)||'null');
-    if(c&&c.t&&Date.now()-c.t<SCORE_STATS_TTL&&c.d){ _scoreStatsMem[key]=c.d; return c.d; }
+    const c=JSON.parse(localStorage.getItem('ss2:'+key)||'null');
+    if(c&&c.t&&Date.now()-c.t<SCORE_STATS_TTL&&c.d&&c.d.v===2){ _scoreStatsMem[key]=c.d; return c.d; }
   }catch(e){}
   const out=await _ssViaProxy(malId,type);
   _scoreStatsMem[key]=out;
-  try{ localStorage.setItem('ss:'+key,JSON.stringify({t:Date.now(),d:out})); }catch(e){}
+  try{ localStorage.setItem('ss2:'+key,JSON.stringify({t:Date.now(),d:out})); }catch(e){}
   return out;
 }
 function prefetchScoreStats(malId,type){ fetchScoreStats(malId,type).catch(()=>{}); }
-function renderScoreStatsBody(body,st){
+function summaryStatsHtml(sm,type){
+  if(!sm) return '';
+  const isM=type==='manga';
+  const rows=[
+    [isM?'En cours de lecture':'En cours de visionnage',sm.current,'#2db039'],
+    ['Terminé',sm.completed,'#4a76d9'],
+    ['En pause',sm.on_hold,'#e8c547'],
+    ['Abandonné',sm.dropped,'#e0575a'],
+    [isM?'À lire':'À regarder',sm.planned,'#9aa0aa']
+  ].filter(r=>r[1]!=null);
+  const total=sm.total||rows.reduce((a,r)=>a+r[1],0)||1;
+  return '<div class="sum-list">'+rows.map(([l,n,c])=>{
+    const pct=n/total*100;
+    return `<div class="sum-row"><span>${l}</span><div class="sum-bar-wrap"><div class="sum-bar" style="width:${pct}%;background:${c}"></div></div><span class="sum-n">${n.toLocaleString('fr-FR')}</span><span class="sum-pct">${pct.toFixed(1)}%</span></div>`;
+  }).join('')+`<div class="sum-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:9px"><span style="font-weight:700">Total</span><span></span><span class="sum-n" style="font-weight:700;color:var(--text)">${total.toLocaleString('fr-FR')}</span><span></span></div></div>`;
+}
+function renderScoreStatsBody(body,st,type){
   const maxPct=Math.max(...Object.values(st.byScore).map(s=>s.percentage||0),1);
   let html='<div class="score-stats-list">';
   for(let n=10;n>=1;n--){
@@ -9763,6 +9823,7 @@ function renderScoreStatsBody(body,st){
   }
   html+='</div>';
   if(st.total) html+=`<p style="color:var(--t3);font-size:12px;margin-top:14px;text-align:center">${st.total.toLocaleString()} votes au total</p>`;
+  if(st.summary) html+='<div class="wb-sub" style="margin-top:20px">Statistiques</div>'+summaryStatsHtml(st.summary,type);
   body.innerHTML=html;
 }
 async function openScoreStats(malId, type){
@@ -9770,12 +9831,12 @@ async function openScoreStats(malId, type){
   const body=document.getElementById('score-stats-body');
   const key=type+'-'+malId;
   body.dataset.key=key;
-  if(_scoreStatsMem[key]){ renderScoreStatsBody(body,_scoreStatsMem[key]); return; }
+  if(_scoreStatsMem[key]){ renderScoreStatsBody(body,_scoreStatsMem[key],type); return; }
   body.innerHTML='<div class="loading" style="padding:20px"><div class="spin"></div> Chargement…</div>';
   const malUrl=`https://myanimelist.net/${type}/${malId}/_/stats`;
   try{
     const st=await fetchScoreStats(malId,type);
-    if(body.dataset.key===key) renderScoreStatsBody(body,st);
+    if(body.dataset.key===key) renderScoreStatsBody(body,st,type);
   }catch(e){
     if(body.dataset.key!==key) return;
     console.error('openScoreStats a échoué:', e);
@@ -9786,6 +9847,71 @@ async function openScoreStats(malId, type){
       <a class="btn btn-ghost btn-sm" href="${malUrl}" target="_blank" rel="noopener">Voir sur MyAnimeList ↗</a>
     </div>`;
   }
+}
+
+// ─── ONGLET PERSONNAGES (page /characters de MyAnimeList lue par le relais) ───
+const _charsCache={};
+let _charsSort='mal', _charsRole='all';
+function resetCharacters(){
+  const el=document.getElementById('chars-section');
+  if(el){ el.innerHTML=''; el.dataset.loaded=''; }
+}
+async function loadCharacters(){
+  const cur=window._currentWork; if(!cur) return;
+  const el=document.getElementById('chars-section'); if(!el) return;
+  const key=cur.type+'-'+cur.id;
+  if(el.dataset.loaded===key) return;
+  el.innerHTML='<div class="loading"><div class="spin"></div> Chargement des personnages…</div>';
+  try{
+    if(!_charsCache[key]){
+      const j=await proxyJson('malcharacters',`type=${cur.type}&id=${cur.id}`,12000);
+      _charsCache[key]=j.characters||[];
+    }
+    if(!window._currentWork||window._currentWork.id!==cur.id) return;
+    el.dataset.loaded=key;
+    renderCharacters();
+  }catch(e){
+    if(!window._currentWork||window._currentWork.id!==cur.id) return;
+    el.innerHTML=`<p style="color:var(--t3);margin-bottom:6px">Impossible de charger les personnages pour le moment.</p>
+      <p style="color:var(--t3);font-size:11px;opacity:.8;margin-bottom:12px">${esc(_aggMsg(e))}</p>
+      <button class="btn btn-ghost btn-sm" onclick="loadCharacters()">🔄 Réessayer</button>`;
+  }
+}
+function renderCharacters(){
+  const cur=window._currentWork; if(!cur) return;
+  const el=document.getElementById('chars-section'); if(!el) return;
+  const key=cur.type+'-'+cur.id;
+  const all=(_charsCache[key]||[]).map((c,i)=>({...c,_i:i}));
+  const hasFav=all.some(c=>c.favorites!=null);
+  if(_charsSort==='fav'&&!hasFav) _charsSort='mal';
+  let list=all.filter(c=>_charsRole==='all'||c.role===_charsRole);
+  const cmpName=(a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'});
+  const sorters={
+    mal:(a,b)=>a._i-b._i,
+    role:(a,b)=>((a.role==='main'?0:1)-(b.role==='main'?0:1))||(a._i-b._i),
+    az:cmpName,
+    za:(a,b)=>cmpName(b,a),
+    fav:(a,b)=>((b.favorites==null?-1:b.favorites)-(a.favorites==null?-1:a.favorites))||(a._i-b._i)
+  };
+  list.sort(sorters[_charsSort]||sorters.mal);
+  const sorts=[['mal','Ordre MyAnimeList'],['role','Principaux d\'abord'],['az','Nom A → Z'],['za','Nom Z → A']].concat(hasFav?[['fav','Popularité (favoris)']]:[]);
+  const nMain=all.filter(c=>c.role==='main').length, nSup=all.filter(c=>c.role==='supporting').length;
+  el.innerHTML=`<div class="char-toolbar">
+      <select class="inp" style="width:auto;margin:0" onchange="_charsSort=this.value;renderCharacters()">${sorts.map(([v,l])=>`<option value="${v}"${_charsSort===v?' selected':''}>${l}</option>`).join('')}</select>
+      <button class="saf-pill${_charsRole==='all'?' on':''}" onclick="_charsRole='all';renderCharacters()">Tous (${all.length})</button>
+      <button class="saf-pill${_charsRole==='main'?' on':''}" onclick="_charsRole='main';renderCharacters()">Principaux (${nMain})</button>
+      <button class="saf-pill${_charsRole==='supporting'?' on':''}" onclick="_charsRole='supporting';renderCharacters()">Secondaires (${nSup})</button>
+    </div>
+    <div class="char-grid">${list.map(c=>{
+      const jp=(c.va||[]).find(v=>/japanese/i.test(v.lang))||(c.va||[])[0];
+      return `<a class="char-card" href="https://myanimelist.net/character/${c.id}" target="_blank" rel="noopener noreferrer">
+        <img src="${esc(c.img)}" loading="lazy" onerror="this.style.visibility='hidden'">
+        <div style="min-width:0">
+          <div class="char-name">${esc(c.name)}</div>
+          <span class="char-role${c.role==='main'?' main':''}">${c.role==='main'?'Principal':c.role==='supporting'?'Secondaire':'—'}</span>
+          ${jp?`<div class="char-va">🎙 ${esc(jp.name)}</div>`:''}
+        </div></a>`;
+    }).join('')||'<p style="color:var(--t3)">Aucun personnage.</p>'}</div>`;
 }
 
 // ─── PAGE AUTEUR (page MyAnimeList de l'auteur lue par le relais /api/malperson) ───
