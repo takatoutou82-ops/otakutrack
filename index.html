@@ -4458,6 +4458,7 @@ function rateWork(malId, type, rating){
       });
     }
   });
+  if(S.profile?.tierHome) delete S.profile.tierHome[key];
   save();
   renderTierList('main'); // rafraîchit immédiatement si la tier list est déjà à l'écran
   if(_lowTierOpen) renderTierList('low');
@@ -7650,18 +7651,24 @@ function renderTierList(variant='main'){
 
   // Construire l'ensemble de toutes les œuvres qui sont "dans" une autre (liées)
   const linkedSrcs=new Set();
-  Object.values(tierLinks).forEach(arr=>arr.forEach(k=>linkedSrcs.add(String(k))));
+  // Une œuvre liée est cachée dans les DEUX listes (principale et bis), d'où qu'elle vienne
+  [S.profile.tierLinks,S.profile.tierLinksLow].forEach(m=>Object.values(m||{}).forEach(arr=>arr.forEach(k=>linkedSrcs.add(String(k)))));
 
   // Statuts autorisés dans la tierlist : seulement Terminé et À jour
   const ALLOWED_STATUSES = new Set(['Terminé','À jour']);
   if(_showAbandoned){ ALLOWED_STATUSES.add('Abandonné'); ALLOWED_STATUSES.add('Non continué'); }
+
+  // Une œuvre n'appartient qu'à UNE liste : celle où on l'a déposée (tierHome), sinon celle de sa note
+  const tierHome=S.profile.tierHome||{};
+  const inThisList=(key,rating)=> tierHome[key] ? tierHome[key]===variant : idxFn(rating)>=0;
 
   // Catégories de suivi qui ont une note → apparaissent comme éléments
   const cats=(S.suiviCategories||[]).filter(c=>
     c.rating>0 &&
     (filter==='all'||c.type===filter) &&
     (_tlTags.size===0 || (![..._tlTags].some(g=>LEN_TAGS.includes(g)) && [..._tlTags].every(g=>(c.tags||[]).includes(g)))) &&
-    (_tlTagsExcl.size===0 || [..._tlTagsExcl].every(g=>!(c.tags||[]).includes(g)))
+    (_tlTagsExcl.size===0 || [..._tlTagsExcl].every(g=>!(c.tags||[]).includes(g))) &&
+    inThisList('cat_'+c.id,c.rating)
   );
 
   const all=Object.values(S.tracking).filter(t=>{
@@ -7669,6 +7676,7 @@ function renderTierList(variant='main'){
     if(!ALLOWED_STATUSES.has(t.status)) return false; // En cours et Abandonné exclus
     if(filter!=='all'&&t.type!==filter) return false;
     if(linkedSrcs.has(String(t.mal_id)+'_'+t.type)) return false;
+    if(!inThisList(String(t.mal_id)+'_'+t.type,t.rating)) return false;
     if(_tlTags.size>0 && ![..._tlTags].every(g=>effTags(t).includes(g))) return false;
     if(_tlTagsExcl.size>0 && [..._tlTagsExcl].some(g=>effTags(t).includes(g))) return false;
     // Remarque : une œuvre qui appartient à une catégorie notée s'affiche quand même
@@ -7754,7 +7762,7 @@ function renderTierList(variant='main'){
                   ondragend="tierDragEnd(event)"
                   onclick="openSuiviCategory('${t.id}')"
                   title="${esc(t.title)} ★${t.rating} (catégorie)">
-                  <div style="position:absolute;top:2px;left:2px;background:var(--acc3);border-radius:3px;font-size:8px;font-weight:900;color:#fff;padding:2px 4px;z-index:2">CATÉGORIE</div>
+                  <div style="position:absolute;top:2px;left:2px;background:var(--acc3);border-radius:3px;font-size:6px;font-weight:900;color:#fff;padding:1px 3px;z-index:2">CAT</div>
                   <img src="${t.cover||''}" loading="lazy" style="width:100%;height:100%;object-fit:cover">
                   <div class="tier-item-title">${esc(t.title.slice(0,12))}</div>
                 </div>`;
@@ -8324,6 +8332,7 @@ function tierDrop(e,newTierIdx,variant='main'){
   e.preventDefault();
   e.currentTarget.classList.remove('tier-drag-over');
   const {malId,type,fromTier}=_tierDragging;
+  const srcVariant=_tierDragging.variant||variant;
   if(!malId) return;
   const isLow = variant==='low';
   const overridesKey = isLow ? 'tierOverridesLow' : 'tierOverrides';
@@ -8357,7 +8366,7 @@ function tierDrop(e,newTierIdx,variant='main'){
           S.profile[linksKey][targetKey].push(srcKey);
           item.classList.add('tier-item-drop-target');
           setTimeout(()=>item.classList.remove('tier-item-drop-target'),600);
-          save(); renderTierList(variant);
+          save(); renderTierList('main'); if(_lowTierOpen) renderTierList('low');
           toast('Œuvre liée ✓','ok');
         }
         return;
@@ -8387,12 +8396,22 @@ function tierDrop(e,newTierIdx,variant='main'){
   }
   if(!newOrder.includes(dragKey)) newOrder.push(dragKey);
   S.profile[ordersKey][newTierIdx]=newOrder;
+  // Déplacée d'une liste à l'autre (principale ↔ bis) : elle change de « domicile » et disparaît de l'ancienne liste
+  if(!S.profile.tierHome) S.profile.tierHome={};
+  S.profile.tierHome[dragKey]=variant;
+  if(srcVariant!==variant){
+    const srcOv=srcVariant==='low'?'tierOverridesLow':'tierOverrides';
+    const srcOrd=srcVariant==='low'?'tierOrdersLow':'tierOrders';
+    if(S.profile[srcOv]) delete S.profile[srcOv][dragKey];
+    if(S.profile[srcOrd]) Object.keys(S.profile[srcOrd]).forEach(k=>{ if(Array.isArray(S.profile[srcOrd][k])) S.profile[srcOrd][k]=S.profile[srcOrd][k].filter(x=>x!==dragKey); });
+  }
   // L'œuvre ne doit exister que dans UNE tier : on la retire de l'ordre manuel de toutes les autres
   Object.keys(S.profile[ordersKey]).forEach(k=>{
     if(String(k)!==String(newTierIdx) && Array.isArray(S.profile[ordersKey][k])) S.profile[ordersKey][k]=S.profile[ordersKey][k].filter(x=>x!==dragKey);
   });
   save();
   renderTierList(variant);
+  if(srcVariant!==variant) renderTierList(srcVariant);
 }
 
 // ─── TIER ITEM CLICK → popup œuvres liées ───
@@ -8900,6 +8919,16 @@ function removeTracking(malId){
       if(!S.profile.tierLinks[k].length) delete S.profile.tierLinks[k];
     });
   }
+  // Idem pour les liens de la liste bis, ses placements et le « domicile »
+  if(S.profile.tierLinksLow){
+    delete S.profile.tierLinksLow[srcKey];
+    Object.keys(S.profile.tierLinksLow).forEach(k=>{
+      S.profile.tierLinksLow[k]=(S.profile.tierLinksLow[k]||[]).filter(v=>v!==srcKey);
+      if(!S.profile.tierLinksLow[k].length) delete S.profile.tierLinksLow[k];
+    });
+  }
+  if(S.profile.tierOverridesLow) delete S.profile.tierOverridesLow[srcKey];
+  if(S.profile.tierHome) delete S.profile.tierHome[srcKey];
   // Nettoyer les tierOverrides orphelins
   if(S.profile.tierOverrides) delete S.profile.tierOverrides[srcKey];
   delete S.tracking[malId];
@@ -9398,6 +9427,7 @@ function saveSuiviCategory(){
             });
           }
         });
+        if(S.profile?.tierHome) delete S.profile.tierHome[key];
       }
       S.suiviCategories[idx]={...S.suiviCategories[idx],tags:scatTagsRead(),name,rating,description,cover,coverKey,type:_scatType,section:_scatSection,items:_scatItems.map((i,o)=>({...i,order:o}))};
     }
@@ -9857,6 +9887,7 @@ function renderCharacters(){
   const cur=window._currentWork; if(!cur) return;
   const el=document.getElementById('chars-section'); if(!el) return;
   const list=_charsCache[cur.type+'-'+cur.id]||[];
+  if(!list.length){ el.innerHTML=''; return; } // aucun personnage sur MyAnimeList : on n'affiche rien
   el.innerHTML=`<div style="font-size:12px;color:var(--t3);margin-bottom:12px">${list.length} personnage${list.length>1?'s':''}</div>
     <div class="char-grid">${list.map(c=>{
       const jp=(c.va||[]).find(v=>/japanese/i.test(v.lang))||(c.va||[])[0];
