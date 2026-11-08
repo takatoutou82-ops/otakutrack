@@ -21,7 +21,8 @@ function parsePerson(html, id, label) {
              || html.match(/<title>\s*([^<]+?)\s*-\s*MyAnimeList/i);
   if (!nameM) {
     const title = (html.match(/<title>([^<]{0,80})/i) || [])[1] || '?';
-    throw new Error(`${label}: contenu reçu (${html.length} caractères, titre « ${title.trim()} ») mais nom de l'auteur introuvable`);
+    const blocked = /just a moment|verify you are human|unusual traffic|access denied/i.test(html.slice(0, 8000)) ? ' — ressemble à une page de vérification anti-robot' : '';
+    throw new Error(`${label}: contenu reçu (${html.length} caractères, titre « ${title.trim()} ») mais nom de l'auteur introuvable${blocked}`);
   }
   const imgM = html.match(/<meta property="og:image" content="([^"]+)"/i);
   const field = (lbl) => {
@@ -54,7 +55,10 @@ function parsePerson(html, id, label) {
       add(+link[1], link[2], (b.match(/<img[^>]*?(?:data-src|src)="([^"]+)"/i) || [])[1], (b.match(/<small>\s*([^<]*?)\s*<\/small>/i) || [])[1]);
     }
   }
-  if (!works.length) throw new Error(`${label}: contenu reçu (${html.length} caractères) mais aucune œuvre lue dedans`);
+  if (!works.length) {
+    const j = html.search(/Published Manga/i);
+    throw new Error(`${label}: nom « ${decode(nameM[1])} » lu (${html.length} caractères) mais aucune œuvre lue — section « Published Manga » ${j >= 0 ? 'présente, extrait : ' + JSON.stringify(html.slice(j, j + 400).replace(/\s+/g, ' ')) : 'absente'}`);
+  }
   return { mal_id: +id, name: decode(nameM[1]), given, family, about, birthday, favorites, image: imgM ? imgM[1] : '', works };
 }
 
@@ -66,10 +70,7 @@ async function get(url, headers, ms, label) {
   catch (e) { throw new Error(`${label}: ${e && e.name === 'AbortError' ? 'délai dépassé' : 'connexion impossible'}`); }
   finally { clearTimeout(t); }
   if (!r.ok) throw new Error(`${label}: HTTP ${r.status}`);
-  const text = await r.text();
-  if (/just a moment|captcha|verify you are human|unusual traffic/i.test(text.slice(0, 6000)))
-    throw new Error(`${label}: vérification anti-robot`);
-  return text;
+  return await r.text(); // pas de détection « anti-robot » ici : c'est la lecture des données qui décide
 }
 
 export default async function handler(req, res) {

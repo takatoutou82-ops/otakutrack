@@ -39,10 +39,7 @@ async function get(url, headers, ms, label) {
   catch (e) { throw new Error(`${label}: ${e && e.name === 'AbortError' ? 'délai dépassé' : 'connexion impossible'}`); }
   finally { clearTimeout(t); }
   if (!r.ok) throw new Error(`${label}: HTTP ${r.status}`);
-  const text = await r.text();
-  if (/just a moment|captcha|verify you are human|unusual traffic/i.test(text.slice(0, 6000)))
-    throw new Error(`${label}: vérification anti-robot`);
-  return text;
+  return await r.text(); // pas de détection « anti-robot » ici : c'est la lecture des données qui décide
 }
 
 export default async function handler(req, res) {
