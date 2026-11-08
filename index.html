@@ -422,12 +422,6 @@ body::after{
 .genre-group-label{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);width:92px;flex-shrink:0}
 .wb-card{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:16px}
 .wb-sub{font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);margin:0 0 10px}
-.sum-row{display:grid;grid-template-columns:140px 1fr 84px 54px;align-items:center;gap:10px;padding:5px 0;font-size:13px}
-.sum-bar-wrap{height:8px;background:var(--bg4);border-radius:99px;overflow:hidden}
-.sum-bar{height:100%;border-radius:99px}
-.sum-n{text-align:right;color:var(--t2);font-variant-numeric:tabular-nums}
-.sum-pct{text-align:right;font-weight:700}
-.char-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
 .char-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
 .char-card{display:flex;gap:12px;align-items:center;padding:8px;border-radius:12px;background:var(--bg3);border:1px solid var(--border);cursor:pointer;text-decoration:none;color:inherit}
 .char-card:hover{border-color:var(--acc)}
@@ -9772,7 +9766,7 @@ function _ssViaProxy(malId,type){
   if(!_scoreStatsProxy[key]){
     const p=proxyJson('malstats',`type=${type}&id=${malId}`,12000).then(j=>{
       if(!j||!j.scores) throw new Error('relais : réponse vide');
-      const o=_ssNormalize(j.scores,j.total); o.summary=j.summary||null; o.v=2; return o;
+      const o=_ssNormalize(j.scores,j.total); o.v=2; return o;
     });
     _scoreStatsProxy[key]=p;
     p.catch(()=>{ delete _scoreStatsProxy[key]; });
@@ -9792,22 +9786,6 @@ async function fetchScoreStats(malId,type){
   return out;
 }
 function prefetchScoreStats(malId,type){ fetchScoreStats(malId,type).catch(()=>{}); }
-function summaryStatsHtml(sm,type){
-  if(!sm) return '';
-  const isM=type==='manga';
-  const rows=[
-    [isM?'En cours de lecture':'En cours de visionnage',sm.current,'#2db039'],
-    ['Terminé',sm.completed,'#4a76d9'],
-    ['En pause',sm.on_hold,'#e8c547'],
-    ['Abandonné',sm.dropped,'#e0575a'],
-    [isM?'À lire':'À regarder',sm.planned,'#9aa0aa']
-  ].filter(r=>r[1]!=null);
-  const total=sm.total||rows.reduce((a,r)=>a+r[1],0)||1;
-  return '<div class="sum-list">'+rows.map(([l,n,c])=>{
-    const pct=n/total*100;
-    return `<div class="sum-row"><span>${l}</span><div class="sum-bar-wrap"><div class="sum-bar" style="width:${pct}%;background:${c}"></div></div><span class="sum-n">${n.toLocaleString('fr-FR')}</span><span class="sum-pct">${pct.toFixed(1)}%</span></div>`;
-  }).join('')+`<div class="sum-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:9px"><span style="font-weight:700">Total</span><span></span><span class="sum-n" style="font-weight:700;color:var(--text)">${total.toLocaleString('fr-FR')}</span><span></span></div></div>`;
-}
 function renderScoreStatsBody(body,st,type){
   const maxPct=Math.max(...Object.values(st.byScore).map(s=>s.percentage||0),1);
   let html='<div class="score-stats-list">';
@@ -9823,7 +9801,6 @@ function renderScoreStatsBody(body,st,type){
   }
   html+='</div>';
   if(st.total) html+=`<p style="color:var(--t3);font-size:12px;margin-top:14px;text-align:center">${st.total.toLocaleString()} votes au total</p>`;
-  if(st.summary) html+='<div class="wb-sub" style="margin-top:20px">Statistiques</div>'+summaryStatsHtml(st.summary,type);
   body.innerHTML=html;
 }
 async function openScoreStats(malId, type){
@@ -9851,7 +9828,6 @@ async function openScoreStats(malId, type){
 
 // ─── ONGLET PERSONNAGES (page /characters de MyAnimeList lue par le relais) ───
 const _charsCache={};
-let _charsSort='mal', _charsRole='all';
 function resetCharacters(){
   const el=document.getElementById('chars-section');
   if(el){ el.innerHTML=''; el.dataset.loaded=''; }
@@ -9880,28 +9856,8 @@ async function loadCharacters(){
 function renderCharacters(){
   const cur=window._currentWork; if(!cur) return;
   const el=document.getElementById('chars-section'); if(!el) return;
-  const key=cur.type+'-'+cur.id;
-  const all=(_charsCache[key]||[]).map((c,i)=>({...c,_i:i}));
-  const hasFav=all.some(c=>c.favorites!=null);
-  if(_charsSort==='fav'&&!hasFav) _charsSort='mal';
-  let list=all.filter(c=>_charsRole==='all'||c.role===_charsRole);
-  const cmpName=(a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'});
-  const sorters={
-    mal:(a,b)=>a._i-b._i,
-    role:(a,b)=>((a.role==='main'?0:1)-(b.role==='main'?0:1))||(a._i-b._i),
-    az:cmpName,
-    za:(a,b)=>cmpName(b,a),
-    fav:(a,b)=>((b.favorites==null?-1:b.favorites)-(a.favorites==null?-1:a.favorites))||(a._i-b._i)
-  };
-  list.sort(sorters[_charsSort]||sorters.mal);
-  const sorts=[['mal','Ordre MyAnimeList'],['role','Principaux d\'abord'],['az','Nom A → Z'],['za','Nom Z → A']].concat(hasFav?[['fav','Popularité (favoris)']]:[]);
-  const nMain=all.filter(c=>c.role==='main').length, nSup=all.filter(c=>c.role==='supporting').length;
-  el.innerHTML=`<div class="char-toolbar">
-      <select class="inp" style="width:auto;margin:0" onchange="_charsSort=this.value;renderCharacters()">${sorts.map(([v,l])=>`<option value="${v}"${_charsSort===v?' selected':''}>${l}</option>`).join('')}</select>
-      <button class="saf-pill${_charsRole==='all'?' on':''}" onclick="_charsRole='all';renderCharacters()">Tous (${all.length})</button>
-      <button class="saf-pill${_charsRole==='main'?' on':''}" onclick="_charsRole='main';renderCharacters()">Principaux (${nMain})</button>
-      <button class="saf-pill${_charsRole==='supporting'?' on':''}" onclick="_charsRole='supporting';renderCharacters()">Secondaires (${nSup})</button>
-    </div>
+  const list=_charsCache[cur.type+'-'+cur.id]||[];
+  el.innerHTML=`<div style="font-size:12px;color:var(--t3);margin-bottom:12px">${list.length} personnage${list.length>1?'s':''}</div>
     <div class="char-grid">${list.map(c=>{
       const jp=(c.va||[]).find(v=>/japanese/i.test(v.lang))||(c.va||[])[0];
       return `<a class="char-card" href="https://myanimelist.net/character/${c.id}" target="_blank" rel="noopener noreferrer">
