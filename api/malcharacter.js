@@ -40,13 +40,23 @@ function parseCharacter(html, id, label) {
     let rest = text.slice(fm.index + fm[0].length).replace(/^[\s|]+/, '');
     const cut = rest.search(/\n\s*(Voice Actors|Recent Featured Articles|Recent Forum Discussion|Reviews|Recommendations)\b/i);
     if (cut >= 0) rest = rest.slice(0, cut);
-    const lines = rest.split('\n');
-    // 1re ligne = « Nom (名前) » : on en tire le nom japonais, le reste est la description
-    const first = (lines[0] || '').trim();
-    if (first && first.length < 160) {
-      const jp = first.match(/\(([^()]*[\u3000-\u9fff\uff00-\uffef][^()]*)\)/);
-      if (jp) native = jp[1].trim();
-      lines.shift();
+    let lines = rest.split('\n').map(l => l.trim());
+    // En tête, MyAnimeList met un menu (Clubs, Pictures, Top…) et un fil d'Ariane (> Characters > Nom),
+    // puis une ligne « Nom (名前) » : la vraie description commence APRÈS cette ligne.
+    const jpRe = /\(([^()]*[\u3000-\u9fff\uff00-\uffef][^()]*)\)/;
+    const jpIdx = lines.slice(0, 25).findIndex(l => l && l.length < 160 && jpRe.test(l));
+    if (jpIdx >= 0) {
+      native = lines[jpIdx].match(jpRe)[1].trim();
+      lines = lines.slice(jpIdx + 1);
+    } else {
+      const nav = new Set(['clubs', 'pictures', 'top', '>', 'characters', 'details', 'recommendations', 'reviews', 'edit', '']);
+      const nm = name.toLowerCase();
+      let i = 0;
+      while (i < lines.length && i < 25) {
+        const l = lines[i].toLowerCase();
+        if (nav.has(l) || l === nm || l.startsWith(nm + ' (')) i++; else break;
+      }
+      lines = lines.slice(i);
     }
     about = lines.join('\n').trim().slice(0, 5000);
   }

@@ -12,6 +12,9 @@ const decode = s => String(s || '').replace(/&amp;/g, '&').replace(/&#0?39;|&apo
 const stripTags = x => decode(String(x || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '));
 
 function parseCharacters(html, type, id, label) {
+  // Si la page balise la liste des personnages, on ne lit que cette zone (évite le bandeau / le pied de page)
+  const zone = html.search(/detail-characters-list/i);
+  if (zone >= 0) html = html.slice(zone);
   const re = /href="(?:https:\/\/myanimelist\.net)?\/character\/(\d+)\/([^"]*)"/gi;
   const starts = [], seen = new Set();
   let m;
@@ -29,7 +32,7 @@ function parseCharacters(html, type, id, label) {
   }
   const characters = [];
   starts.forEach((st, k) => {
-    const seg = html.slice(st.at, k + 1 < starts.length ? starts[k + 1].at : st.at + 6000);
+    const seg = html.slice(st.at, Math.min(k + 1 < starts.length ? starts[k + 1].at : st.at + 6000, st.at + 4000));
 
     // Nom : <h3>, sinon texte d'un lien du personnage, sinon alt de l'image, sinon le nom dans l'adresse
     let name = '';
@@ -46,7 +49,10 @@ function parseCharacters(html, type, id, label) {
     name = name.replace(/,\s*/g, ' ').replace(/\s+/g, ' ').trim();
     if (!name) return;
 
-    const role = (((seg.match(/<small>\s*(Main|Supporting)\s*<\/small>/i) || stripTags(seg).match(/\b(Main|Supporting)\b/i)) || [])[1] || '').toLowerCase();
+    const role = ((seg.match(/>\s*(Main|Supporting)\s*</i) || [])[1] || '').toLowerCase();
+    // Un vrai personnage de l'œuvre a TOUJOURS un rôle (Main / Supporting) : sans rôle, c'est un lien du
+    // bandeau ou du pied de page de MyAnimeList (« personnages populaires »…), on l'ignore.
+    if (!role) return;
 
     // Image du personnage : data-src d'abord (src peut être un pixel vide), uniquement /images/characters/
     let img = '';
@@ -72,6 +78,9 @@ function parseCharacters(html, type, id, label) {
     }
     characters.push({ id: st.id, name, role, img, favorites: favM ? parseInt(favM[1].replace(/[^\d]/g, ''), 10) : null, va });
   });
+  if (!characters.length) {
+    throw new Error(`${label}: ${starts.length} lien(s) de personnage trouvé(s) mais aucun avec un rôle Main/Supporting — page lue (${html.length} caractères) : ${JSON.stringify(html.slice(starts[0].at, starts[0].at + 300).replace(/\s+/g, ' '))}`);
+  }
   return { characters };
 }
 
