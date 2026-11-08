@@ -422,14 +422,24 @@ body::after{
 .genre-group-label{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);width:92px;flex-shrink:0}
 .wb-card{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:16px}
 .wb-sub{font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--t3);margin:0 0 10px}
-.char-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
-.char-card{display:flex;gap:12px;align-items:center;padding:8px;border-radius:12px;background:var(--bg3);border:1px solid var(--border);cursor:pointer;text-decoration:none;color:inherit}
-.char-card:hover{border-color:var(--acc)}
-.char-card img{width:54px;height:76px;object-fit:cover;border-radius:7px;background:var(--bg4);flex-shrink:0}
-.char-name{font-size:13.5px;font-weight:700;margin-bottom:5px}
-.char-role{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:700;background:var(--bg4);color:var(--t2)}
-.char-role.main{background:rgba(255,68,56,.14);color:var(--acc2)}
-.char-va{font-size:11.5px;color:var(--t3);margin-top:5px}
+.chr-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px}
+.chr-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+@media(max-width:1000px){.chr-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:760px){.chr-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:520px){.chr-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.chr-card{display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:12px;background:var(--bg3);border:1px solid var(--border);cursor:pointer;color:inherit;min-width:0}
+.chr-card:hover{border-color:var(--acc)}
+.chr-img{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:8px;background:var(--bg4);display:block}
+.chr-name{font-size:12.5px;font-weight:700;line-height:1.25;text-align:center;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:2.5em}
+.chr-meta{display:flex;justify-content:center;align-items:center;gap:6px;flex-wrap:wrap}
+.chr-role{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:700;background:var(--bg4);color:var(--t2)}
+.chr-role.main{background:rgba(255,68,56,.14);color:var(--acc2)}
+.chr-fav{font-size:11px;color:var(--t3)}
+.chr-va{font-size:11px;color:var(--t3);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chm-wrap{display:flex;gap:20px;flex-wrap:wrap}
+.chm-img{width:230px;max-width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--bg4);flex-shrink:0}
+.chm-info{flex:1;min-width:230px}
+.chm-about{font-size:13px;line-height:1.65;color:var(--t2);white-space:pre-line;margin-top:12px}
 .tier-item-cat{outline:2px solid var(--acc3);outline-offset:-2px}
 .gtag{
   padding:4px 11px;border-radius:7px;
@@ -2394,6 +2404,12 @@ body::after{
   </div>
 </div>
 <!-- ═══════════════════════════════════════════ -->
+<div class="modal-bg" id="m-character">
+  <div class="modal" style="max-width:760px;max-height:88vh;overflow-y:auto">
+    <div class="modal-title"><span id="chm-title">Personnage</span><span class="modal-close" onclick="closeM('m-character')">✕</span></div>
+    <div id="chm-body"></div>
+  </div>
+</div>
 <div class="modal-bg" id="m-score-stats">
   <div class="modal" style="max-width:420px;max-height:80vh;overflow-y:auto">
     <div class="modal-title"><span>Répartition des notes</span><span class="modal-close" onclick="closeM('m-score-stats')">✕</span></div>
@@ -9872,6 +9888,7 @@ async function loadCharacters(){
     if(!_charsCache[key]){
       const j=await proxyJson('malcharacters',`type=${cur.type}&id=${cur.id}`,12000);
       _charsCache[key]=j.characters||[];
+      _charsCache[key].forEach(c=>{ const d=readCharCache(c.id); if(d&&d.favorites!=null) c.favorites=d.favorites; });
     }
     if(!window._currentWork||window._currentWork.id!==cur.id) return;
     el.dataset.loaded=key;
@@ -9883,22 +9900,107 @@ async function loadCharacters(){
       <button class="btn btn-ghost btn-sm" onclick="loadCharacters()">🔄 Réessayer</button>`;
   }
 }
+let _charsSort='mal';
+const _charsFavTried={};
 function renderCharacters(){
   const cur=window._currentWork; if(!cur) return;
   const el=document.getElementById('chars-section'); if(!el) return;
-  const list=_charsCache[cur.type+'-'+cur.id]||[];
-  if(!list.length){ el.innerHTML=''; return; } // aucun personnage sur MyAnimeList : on n'affiche rien
-  el.innerHTML=`<div style="font-size:12px;color:var(--t3);margin-bottom:12px">${list.length} personnage${list.length>1?'s':''}</div>
-    <div class="char-grid">${list.map(c=>{
+  const key=cur.type+'-'+cur.id;
+  const all=(_charsCache[key]||[]).map((c,i)=>({...c,_i:i,_src:c}));
+  if(!all.length){ el.innerHTML=''; return; } // aucun personnage sur MyAnimeList : on n'affiche rien
+  const cmpName=(a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'});
+  const sorters={
+    mal:(a,b)=>a._i-b._i,
+    az:cmpName,
+    role:(a,b)=>((a.role==='main'?0:1)-(b.role==='main'?0:1))||(a._i-b._i),
+    fav:(a,b)=>((b.favorites==null?-1:b.favorites)-(a.favorites==null?-1:a.favorites))||(a._i-b._i)
+  };
+  const list=[...all].sort(sorters[_charsSort]||sorters.mal);
+  const sorts=[['mal','Ordre MyAnimeList'],['az','Ordre alphabétique'],['role','Rôle principal d\'abord'],['fav','Favoris']];
+  el.innerHTML=`<div class="chr-toolbar">
+      <select class="inp" style="width:auto;margin:0" onchange="_charsSort=this.value;renderCharacters()">${sorts.map(([v,l])=>`<option value="${v}"${_charsSort===v?' selected':''}>${l}</option>`).join('')}</select>
+      <span class="chr-fav" id="chr-status">${all.length} personnage${all.length>1?'s':''}</span>
+    </div>
+    <div class="chr-grid">${list.map(c=>{
       const jp=(c.va||[]).find(v=>/japanese/i.test(v.lang))||(c.va||[])[0];
-      return `<a class="char-card" href="https://myanimelist.net/character/${c.id}" target="_blank" rel="noopener noreferrer">
-        <img src="${esc(c.img)}" loading="lazy" onerror="this.style.visibility='hidden'">
-        <div style="min-width:0">
-          <div class="char-name">${esc(c.name)}</div>
-          <span class="char-role${c.role==='main'?' main':''}">${c.role==='main'?'Principal':c.role==='supporting'?'Secondaire':'—'}</span>
-          ${jp?`<div class="char-va">🎙 ${esc(jp.name)}</div>`:''}
-        </div></a>`;
-    }).join('')||'<p style="color:var(--t3)">Aucun personnage.</p>'}</div>`;
+      return `<div class="chr-card" onclick="openCharacter(${c.id})" title="${esc(c.name)}">
+        <img class="chr-img" src="${esc(c.img)}" loading="lazy" onerror="this.style.visibility='hidden'">
+        <div class="chr-name">${esc(c.name)}</div>
+        <div class="chr-meta"><span class="chr-role${c.role==='main'?' main':''}">${c.role==='main'?'Principal':c.role==='supporting'?'Secondaire':'—'}</span>${c.favorites!=null?`<span class="chr-fav">♥ ${c.favorites.toLocaleString('fr-FR')}</span>`:''}</div>
+        ${jp?`<div class="chr-va">🎙 ${esc(jp.name)}</div>`:''}
+      </div>`;
+    }).join('')}</div>`;
+  // Tri par favoris : MyAnimeList ne donne les favoris que sur la page de chaque personnage → chargés petit à petit
+  if(_charsSort==='fav' && !_charsFavTried[key] && all.some(c=>c.favorites==null)){
+    _charsFavTried[key]=true;
+    loadCharFavorites(key);
+  }
+}
+async function loadCharFavorites(key){
+  const list=(_charsCache[key]||[]);
+  const todo=list.filter(c=>c.favorites==null).slice(0,120);
+  const total=todo.length; let done=0;
+  const status=()=>{ const st=document.getElementById('chr-status'); if(st&&window._currentWork&&window._currentWork.type+'-'+window._currentWork.id===key) st.textContent=done<total?`Chargement des favoris… ${done}/${total}`:`${list.length} personnages`; };
+  status();
+  const queue=[...todo];
+  const worker=async()=>{
+    while(queue.length){
+      const c=queue.shift();
+      try{ const d=await getCharDetail(c.id); if(d&&d.favorites!=null) c.favorites=d.favorites; }catch(e){}
+      done++; status();
+    }
+  };
+  await Promise.all([worker(),worker(),worker()]);
+  if(window._currentWork&&window._currentWork.type+'-'+window._currentWork.id===key&&_charsSort==='fav') renderCharacters();
+}
+
+// ── Fiche d'un personnage (description lue sur sa page MyAnimeList par le relais /api/malcharacter) ──
+const _chDetail={}, _chInflight={};
+function readCharCache(id){
+  try{ const c=JSON.parse(localStorage.getItem('ch1:'+id)||'null'); if(c&&c.t&&Date.now()-c.t<7*24*3600*1000&&c.d) return c.d; }catch(e){}
+  return null;
+}
+function getCharDetail(id){
+  if(_chDetail[id]) return Promise.resolve(_chDetail[id]);
+  const c=readCharCache(id); if(c){ _chDetail[id]=c; return Promise.resolve(c); }
+  if(_chInflight[id]) return _chInflight[id];
+  const p=proxyJson('malcharacter','id='+id,12000).then(j=>{
+    if(!j||!j.name) throw new Error('réponse vide');
+    _chDetail[id]=j;
+    try{ localStorage.setItem('ch1:'+id,JSON.stringify({t:Date.now(),d:j})); }catch(e){}
+    return j;
+  });
+  _chInflight[id]=p;
+  p.then(()=>{ delete _chInflight[id]; },()=>{ delete _chInflight[id]; });
+  return p;
+}
+function openCharacter(id){
+  const cur=window._currentWork; if(!cur) return;
+  const c=(_charsCache[cur.type+'-'+cur.id]||[]).find(x=>x.id===id); if(!c) return;
+  openM('m-character');
+  document.getElementById('chm-title').textContent=c.name;
+  const body=document.getElementById('chm-body');
+  body.dataset.id=String(id);
+  const jp=(c.va||[]).find(v=>/japanese/i.test(v.lang))||(c.va||[])[0];
+  const draw=(d,state,err)=>{
+    const fav=(d&&d.favorites!=null)?d.favorites:c.favorites;
+    const about=state==='loading'?'<div class="loading" style="padding:10px 0"><div class="spin"></div></div>'
+      :state==='error'?`<p style="color:var(--t3);font-size:12.5px;margin:12px 0 4px">Description indisponible pour le moment.</p><p style="color:var(--t3);font-size:11px;opacity:.8;margin-bottom:8px">${esc(_aggMsg(err))}</p><button class="btn btn-ghost btn-sm" onclick="openCharacter(${id})">🔄 Réessayer</button>`
+      :(d&&d.about?`<div class="chm-about">${esc(d.about)}</div>`:'');
+    body.innerHTML=`<div class="chm-wrap">
+      <img class="chm-img" src="${esc((d&&d.image)||c.img)}" onerror="this.src='${esc(c.img)}'">
+      <div class="chm-info">
+        <div style="font-size:18px;font-weight:800">${esc(c.name)}</div>
+        ${d&&d.native?`<div style="font-size:12.5px;color:var(--t3);margin-top:2px">${esc(d.native)}</div>`:''}
+        <div class="chr-meta" style="justify-content:flex-start;margin-top:10px"><span class="chr-role${c.role==='main'?' main':''}">${c.role==='main'?'Principal':c.role==='supporting'?'Secondaire':'—'}</span>${fav!=null?`<span class="chr-fav">♥ ${fav.toLocaleString('fr-FR')} favoris</span>`:''}${jp?`<span class="chr-fav">🎙 ${esc(jp.name)}</span>`:''}</div>
+        ${about}
+        <div style="margin-top:16px"><button class="btn btn-ghost btn-sm" onclick="window.open('https://myanimelist.net/character/${id}','_blank','noopener')" style="color:#7b9cf0;border-color:rgba(123,156,240,.35)">↗ Voir sur MyAnimeList</button></div>
+      </div>
+    </div>`;
+  };
+  draw(null,'loading');
+  getCharDetail(id).then(d=>{ if(body.dataset.id===String(id)){ draw(d,'ok'); const f=_charsCache[cur.type+'-'+cur.id]?.find(x=>x.id===id); if(f&&d.favorites!=null) f.favorites=d.favorites; } })
+    .catch(e=>{ if(body.dataset.id===String(id)) draw(null,'error',e); });
 }
 
 // ─── PAGE AUTEUR (page MyAnimeList de l'auteur lue par le relais /api/malperson) ───
