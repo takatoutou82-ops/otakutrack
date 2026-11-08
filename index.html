@@ -436,8 +436,8 @@ body::after{
 .chr-role.main{background:rgba(255,68,56,.14);color:var(--acc2)}
 .chr-fav{font-size:11px;color:var(--t3)}
 .chr-va{font-size:11px;color:var(--t3);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chm-wrap{display:flex;gap:20px;flex-wrap:wrap}
-.chm-img{width:230px;max-width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--bg4);flex-shrink:0}
+.chm-wrap{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
+.chm-img{width:200px;max-width:100%;height:auto;max-height:340px;object-fit:contain;border-radius:12px;background:var(--bg4);flex-shrink:0;align-self:flex-start}
 .chm-info{flex:1;min-width:230px}
 .chm-about{font-size:13px;line-height:1.65;color:var(--t2);white-space:pre-line;margin-top:12px}
 .tier-item-cat{outline:2px solid var(--acc3);outline-offset:-2px}
@@ -9957,7 +9957,7 @@ async function loadCharFavorites(key){
 // ── Fiche d'un personnage (description lue sur sa page MyAnimeList par le relais /api/malcharacter) ──
 const _chDetail={}, _chInflight={};
 function readCharCache(id){
-  try{ const c=JSON.parse(localStorage.getItem('ch1:'+id)||'null'); if(c&&c.t&&Date.now()-c.t<7*24*3600*1000&&c.d) return c.d; }catch(e){}
+  try{ const c=JSON.parse(localStorage.getItem('ch2:'+id)||'null'); if(c&&c.t&&Date.now()-c.t<7*24*3600*1000&&c.d) return c.d; }catch(e){}
   return null;
 }
 function getCharDetail(id){
@@ -9967,7 +9967,7 @@ function getCharDetail(id){
   const p=proxyJson('malcharacter','id='+id,12000).then(j=>{
     if(!j||!j.name) throw new Error('réponse vide');
     _chDetail[id]=j;
-    try{ localStorage.setItem('ch1:'+id,JSON.stringify({t:Date.now(),d:j})); }catch(e){}
+    try{ localStorage.setItem('ch2:'+id,JSON.stringify({t:Date.now(),d:j})); }catch(e){}
     return j;
   });
   _chInflight[id]=p;
