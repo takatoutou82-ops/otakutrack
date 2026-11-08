@@ -28,7 +28,22 @@ function parseScores(text, label) {
     throw new Error(`${label}: contenu reçu (${text.length} caractères, « ${String(title).trim()} ») mais ${rows.length} ligne(s) de répartition lue(s)`);
   }
   const scores = rows.map((r, k) => ({ score: 10 - k, votes: r.votes, percentage: r.percentage }));
-  return { scores, total: scores.reduce((a, s) => a + s.votes, 0) };
+  return { scores, total: scores.reduce((a, s) => a + s.votes, 0), summary: parseSummary(text) };
+}
+
+// « Summary Stats » : Reading/Watching, Completed, On-Hold, Dropped, Plan to Read/Watch, Total
+function parseSummary(text) {
+  const flat = String(text).replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/[*_`]/g, '').replace(/\s+/g, ' ');
+  const num = re => { const m = flat.match(re); return m ? parseInt(m[1].replace(/[^\d]/g, ''), 10) : null; };
+  const sm = {
+    current: num(/\b(?:Reading|Watching):\s*([\d,]+)/i),
+    completed: num(/\bCompleted:\s*([\d,]+)/i),
+    on_hold: num(/\bOn-Hold:\s*([\d,]+)/i),
+    dropped: num(/\bDropped:\s*([\d,]+)/i),
+    planned: num(/\bPlan to (?:Read|Watch):\s*([\d,]+)/i),
+    total: num(/\bTotal:\s*([\d,]+)/i)
+  };
+  return (sm.completed == null || sm.total == null) ? null : sm;
 }
 
 async function get(url, headers, ms, label) {
