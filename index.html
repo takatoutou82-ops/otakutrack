@@ -413,6 +413,11 @@ body::after{
 .auth-badge{padding:2px 8px;border-radius:99px;background:var(--bg4);color:var(--t2);font-size:11px;font-weight:600}
 .auth-badge.role{background:rgba(123,156,240,.14);color:#9db4f5}
 .auth-score{font-size:14px;font-weight:700;color:var(--acc2);flex-shrink:0;min-width:56px;text-align:right}
+.mag-stats{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 6px}
+.mag-stat{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px 14px;min-width:140px}
+.mag-stat b{display:block;font-size:17px;margin-bottom:2px}
+.mag-stat span{font-size:11.5px;color:var(--t3)}
+.mag-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:22px 0 10px}
 .wm-row{display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px}
 .wm-item{display:flex;flex-direction:column;gap:2px}
 .wm-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.7px;font-weight:700}
@@ -2047,6 +2052,14 @@ body::after{
   </div>
 </div>
 
+<!-- PAGE: MAGAZINE -->
+<div class="pg" id="pg-magazine">
+  <div class="wrap" style="padding-top:20px;padding-bottom:60px">
+    <button class="back-btn" onclick="goBack()">← Retour</button>
+    <div id="magazine-layout" style="margin-top:14px"></div>
+  </div>
+</div>
+
 <!-- PAGE: AUTEUR -->
 <div class="pg" id="pg-author">
   <div class="wrap" style="padding-top:20px;padding-bottom:60px">
@@ -2091,8 +2104,16 @@ body::after{
     <!-- Filtres avancés -->
     <div class="suivi-adv-filters" id="suivi-adv-filters" style="display:none">
       <div class="saf-row" style="align-items:flex-start">
-        <span class="saf-label" style="padding-top:4px">Genres & Thèmes</span>
+        <span class="saf-label" style="padding-top:4px">Démographie</span>
+        <div id="suivi-demo-pills" style="display:flex;flex-wrap:wrap;gap:5px;flex:1"></div>
+      </div>
+      <div class="saf-row" style="align-items:flex-start">
+        <span class="saf-label" style="padding-top:4px">Genres</span>
         <div id="suivi-genre-pills" style="display:flex;flex-wrap:wrap;gap:5px;flex:1"></div>
+      </div>
+      <div class="saf-row" style="align-items:flex-start">
+        <span class="saf-label" style="padding-top:4px">Thèmes</span>
+        <div id="suivi-theme-pills" style="display:flex;flex-wrap:wrap;gap:5px;flex:1"></div>
       </div>
       <div class="saf-row" style="align-items:flex-start">
         <span class="saf-label" style="padding-top:4px">Tags</span>
@@ -2762,6 +2783,40 @@ function malDateStr(d){
 // (qui a été écrit pour le format Jikan). Ça évite de toucher au reste du code.
 const MAL_DEMO_IDS=new Set([15,25,27,42,43]); // Kids, Shoujo, Shounen, Seinen, Josei
 const MAL_THEME_IDS=new Set([50,51,52,53,54,81,55,39,56,57,58,35,59,13,60,61,62,63,64,65,66,17,18,67,38,19,6,68,69,20,70,71,40,3,72,73,74,21,23,75,29,11,31,76,77,78,32,79,80,48,82,83]);
+// Listes COMPLÈTES de MyAnimeList (genres, thèmes, démographies) — servent à la fiche et aux filtres du Suivi
+const MAL_DEMO_LIST=['Josei','Kids','Seinen','Shoujo','Shounen'];
+const MAL_GENRE_LIST=['Action','Adventure','Avant Garde','Award Winning','Boys Love','Comedy','Drama','Ecchi','Erotica','Fantasy','Girls Love','Gourmet','Hentai','Horror','Mystery','Romance','Sci-Fi','Slice of Life','Sports','Supernatural','Suspense'];
+const MAL_THEME_LIST=['Adult Cast','Anthropomorphic','CGDCT','Childcare','Combat Sports','Crossdressing','Delinquents','Detective','Educational','Gag Humor','Gore','Harem','High Stakes Game','Historical','Idols (Female)','Idols (Male)','Isekai','Iyashikei','Love Polygon','Love Status Quo','Magical Sex Shift','Mahou Shoujo','Martial Arts','Mecha','Medical','Military','Music','Mythology','Organized Crime','Otaku Culture','Parody','Performing Arts','Pets','Psychological','Racing','Reincarnation','Reverse Harem','Samurai','School','Showbiz','Space','Strategy Game','Super Power','Survival','Team Sports','Time Travel','Urban Fantasy','Vampire','Video Game','Villainess','Visual Arts','Workplace'];
+const _GENRE_KIND=(()=>{
+  const m=new Map();
+  MAL_GENRE_LIST.forEach(n=>m.set(n.toLowerCase(),'genre'));
+  MAL_THEME_LIST.concat(['Romantic Subtext']).forEach(n=>m.set(n.toLowerCase(),'theme'));
+  MAL_DEMO_LIST.forEach(n=>m.set(n.toLowerCase(),'demo'));
+  return m;
+})();
+// L'API MyAnimeList renvoie tout dans une seule liste « genres » (sans type) : on classe par nom (ou par id en secours)
+function genreKind(name,id){
+  const k=_GENRE_KIND.get(String(name||'').toLowerCase());
+  if(k) return k;
+  if(id){ if(MAL_DEMO_IDS.has(id)) return 'demo'; if(MAL_THEME_IDS.has(id)) return 'theme'; }
+  return 'genre';
+}
+// Sépare TOUJOURS les trois catégories, d'où que viennent les données (API officielle, Jikan, cache ancien…)
+function splitGenres(w){
+  const all=[...(w.genres||[]),...(w.themes||[]),...(w.demographics||[]),...(w.explicit_genres||[])];
+  const seen=new Set(), out={genres:[],themes:[],demos:[]};
+  all.forEach(g=>{
+    const n=g&&g.name; if(!n||seen.has(n)) return; seen.add(n);
+    const k=genreKind(n,g.id||g.mal_id);
+    out[k==='demo'?'demos':k==='theme'?'themes':'genres'].push({name:n});
+  });
+  return out;
+}
+function trkKinds(t){
+  const out={demo:new Set(),genre:new Set(),theme:new Set()};
+  [...(t._genres||[]),...(t._themes||[]),...(t._demographics||[])].forEach(n=>out[genreKind(n)].add(n));
+  return out;
+}
 function malToWorkShape(mal, type){
   const w={};
   w.mal_id=mal.id;
@@ -2789,7 +2844,7 @@ function malToWorkShape(mal, type){
   if(type==='manga'){
     w.volumes=mal.num_volumes||null;
     w.chapters=mal.num_chapters||null;
-    w.serialization=(mal.serialization||[]).map(x=>x.node?.name).filter(Boolean);
+    w.serialization=(mal.serialization||[]).map(x=>({id:x.node?.id||0,name:x.node?.name})).filter(x=>x.name);
     w.authors=(mal.authors||[]).map(a=>({mal_id:a.node?.id||null, role:a.role||'', name:[a.node?.last_name,a.node?.first_name].filter(Boolean).join(', ')}));
     w.published={string: mal.start_date? `${malDateStr(mal.start_date)} to ${mal.end_date?malDateStr(mal.end_date):'?'}`:'—'};
   }else{
@@ -3143,6 +3198,7 @@ window.addEventListener('popstate', e=>{
     return;
   }
   if(state?.page==='author' && state.id){ openAuthor(state.id, state.name||'', false); return; }
+  if(state?.page==='magazine' && state.id){ openMagazine(state.id, state.name||'', false); return; }
   // Gérer le hash pour les fiches (ex: #work-manga-1234)
   const hash=location.hash.replace('#','');
   if(hash.startsWith('work-')){
@@ -3151,6 +3207,7 @@ window.addEventListener('popstate', e=>{
     return;
   }
   if(/^author-\d+$/.test(hash)){ openAuthor(parseInt(hash.slice(7)),'',false); return; }
+  if(/^magazine-\d+$/.test(hash)){ openMagazine(parseInt(hash.slice(9)),'',false); return; }
   const page=state?.page || hash || 'home';
   const validPages=['home','manga','anime','profile','lists','suivi','stats','collection','listdetail','tierlists','tierlistdetail','calendar'];
   nav(validPages.includes(page)?page:'home', false);
@@ -3167,6 +3224,7 @@ function initRouting(){
     if(parts.length===3){ history.replaceState({page:'work',malId:parseInt(parts[2]),type:parts[1]},'',location.hash); openWork(parseInt(parts[2]),parts[1]); return; }
   }
   if(/^author-\d+$/.test(hash)){ const aid=parseInt(hash.slice(7)); history.replaceState({page:'author',id:aid,name:''},'',location.hash); openAuthor(aid,'',false); return; }
+  if(/^magazine-\d+$/.test(hash)){ const mid=parseInt(hash.slice(9)); history.replaceState({page:'magazine',id:mid,name:''},'',location.hash); openMagazine(mid,'',false); return; }
   if(hash.startsWith('listdetail-')){
     const id=hash.replace('listdetail-','');
     if(S.lists.find(l=>l.id===id)){ S.currentListId=id; history.replaceState({page:'listdetail',listId:id},'',location.hash); renderListDetail(); nav('listdetail',false); return; }
@@ -3883,16 +3941,17 @@ async function openWork(malId, type='manga', navOrigin=null){
     S.currentWork._coverFull=w.images?.jpg?.large_image_url||w.images?.jpg?.image_url||'';
     // Sauvegarder les genres dans le tracking si l'œuvre est suivie
     if(S.tracking[malId]){
-      const genreNames=(w.genres||[]).map(g=>g.name);
-      if(genreNames.length) S.tracking[malId]._genres=genreNames;
-      const themeNames=(w.themes||[]).map(g=>g.name);
-      if(themeNames.length) S.tracking[malId]._themes=themeNames;
+      const _sg=splitGenres(w);
+      const genreNames=_sg.genres.map(g=>g.name);
+      S.tracking[malId]._genres=genreNames;
+      const themeNames=_sg.themes.map(g=>g.name);
+      S.tracking[malId]._themes=themeNames;
       // Statut de publication (Finished/Publishing/On Hiatus)
       const pubStatus=w.status||'';
       if(pubStatus) S.tracking[malId]._pubStatus=pubStatus;
       // Démographies (Shounen, Seinen, etc.)
-      const demoNames=(w.demographics||[]).map(d=>d.name);
-      if(demoNames.length) S.tracking[malId]._demographics=demoNames;
+      const demoNames=_sg.demos.map(d=>d.name);
+      S.tracking[malId]._demographics=demoNames;
       // Sauvegarder le score communauté pour le tri
       const communityScore=w.score||0;
       if(communityScore) S.tracking[malId]._communityScore=communityScore;
@@ -3987,8 +4046,12 @@ function renderWorkPage(w){
 
   // Genres
   const gRow=(label,arr)=>(arr&&arr.length)?`<div class="genre-group"><span class="genre-group-label">${label}</span>${arr.map(g=>`<span class="gtag">${esc(g.name)}</span>`).join('')}</div>`:'';
-  const genres=gRow('Genres',w.genres)+gRow('Thèmes',w.themes)+gRow('Démographie',w.demographics);
-  const magazines=(w.serialization&&w.serialization.length)?w.serialization:(w.serializations||[]).map(x=>x.name).filter(Boolean);
+  const _sg=splitGenres(w);
+  const genres=gRow('Démographie',_sg.demos)+gRow('Genres',_sg.genres)+gRow('Thèmes',_sg.themes);
+  const magazines=((w.serialization&&w.serialization.length)?w.serialization:(w.serializations||[]).map(x=>({id:x.mal_id||0,name:x.name})))
+    .map(m=>typeof m==='string'?{id:0,name:m}:m).filter(m=>m&&m.name);
+  // Nom du magazine cliquable, sans aucun changement d'apparence (seul le curseur change au survol)
+  const magazinesHtml=magazines.map(m=>m.id?`<span data-mid="${m.id}" data-mname="${esc(m.name)}" onclick="openMagazineFromEl(this)" style="cursor:pointer">${esc(m.name)}</span>`:esc(m.name)).join(', ');
 
   // Meta
   const metaHtml = type==='manga' ? `
@@ -3998,7 +4061,7 @@ function renderWorkPage(w){
       const fixName = n => { const p=n.split(', '); return p.length===2?p[1]+' '+p[0]:n; };
       return authors.map(a=>a.mal_id?`<span data-aid="${a.mal_id}" data-aname="${esc(a.name)}" onclick="openAuthorFromEl(this)" style="cursor:pointer">${esc(fixName(a.name))}</span>`:esc(fixName(a.name))).join(', ');
     })()}</span></div>
-    <div class="wm-item"><span class="wm-label">Magazine</span><span class="wm-value">${magazines.length?esc(magazines.join(', ')):'—'}</span></div>
+    <div class="wm-item"><span class="wm-label">Magazine</span><span class="wm-value">${magazines.length?magazinesHtml:'—'}</span></div>
     <div class="wm-item"><span class="wm-label">Volumes</span><span class="wm-value">${w.volumes||'?'}</span></div>
     <div class="wm-item"><span class="wm-label">Chapitres</span><span class="wm-value">${w.chapters||'?'}</span></div>
     <div class="wm-item"><span class="wm-label">Publication</span><span class="wm-value">${({'Finished':'Terminée','Publishing':'En cours','On Hiatus':'En pause','Discontinued':'Arrêtée'}[w.status]||w.status||'—')}</span></div>
@@ -4201,10 +4264,23 @@ async function loadSimilar(w){
 }
 
 // ─── SAUVEGARDE MANUELLE COMPLÈTE (export/import) ───
-// ─── SAUVEGARDE AUTOMATIQUE HEBDOMADAIRE ───
-// Chrome/Edge sur ordinateur : on choisit un dossier une fois ; chaque semaine (à l'ouverture du site),
-// le fichier « otakutrack-sauvegarde.json » est RÉÉCRIT dans ce dossier (l'ancien est remplacé, rien ne s'accumule).
-const AUTOBK_FILE='otakutrack-sauvegarde.json', AUTOBK_DAYS=7;
+// ─── SAUVEGARDE AUTOMATIQUE (5 fichiers datés qui tournent) ───
+// Chrome/Edge sur ordinateur : on choisit un dossier une fois ; à chaque ouverture du site un NOUVEAU fichier
+// « otakutrack-sauvegarde-AAAA-MM-JJ_HH-MM.json » est créé dans ce dossier. On en garde 5 : quand un sixième
+// arrive, le plus ancien est supprimé. Garde-fous : rien n'est sauvegardé si les données semblent vides ou
+// anormalement réduites (pour ne jamais faire tourner les bonnes sauvegardes avec une mauvaise).
+const AUTOBK_PREFIX='otakutrack-sauvegarde', AUTOBK_KEEP=5, AUTOBK_MIN_GAP=10*60*1000;
+const AUTOBK_RE=/^otakutrack-sauvegarde(-\d{4}-\d{2}-\d{2}_\d{2}-\d{2})?\.json$/;
+function autobkStamp(d=new Date()){ const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`; }
+function backupDataSize(){ return Object.keys(S.tracking||{}).length; }
+function backupLooksEmpty(){ return backupDataSize()===0 && !(S.lists||[]).length && !Object.keys(S.collection||{}).length && !(S.suiviCategories||[]).length; }
+async function autobkFiles(h){
+  const out=[];
+  for await (const [name,handle] of h.entries()){
+    if(handle.kind==='file' && AUTOBK_RE.test(name)){ const f=await handle.getFile(); out.push({name,time:f.lastModified,size:f.size}); }
+  }
+  return out.sort((a,b)=>b.time-a.time);
+}
 function buildBackupObject(){
   return {
     _meta:{app:'OtakuTrack', exportedAt:new Date().toISOString(), version:1},
@@ -4223,10 +4299,20 @@ async function autobkRender(){
   if(!autobkSupported()){ box.innerHTML='<b style="font-size:13px">🔁 Sauvegarde automatique</b><p style="font-size:11.5px;color:var(--t3);margin-top:6px;line-height:1.5">Disponible uniquement sur Chrome ou Edge sur ordinateur (le navigateur du téléphone ne permet pas d\'écrire dans un dossier choisi).</p>'; return; }
   const h=await mcKvGet('bkdir'); const last=autobkLast();
   const when=last?new Date(last).toLocaleString('fr-FR',{dateStyle:'long',timeStyle:'short'}):'jamais';
+  let listHtml='';
+  if(h){
+    try{
+      if((await h.queryPermission({mode:'readwrite'}))==='granted'){
+        const files=await autobkFiles(h);
+        listHtml=files.length?`<div style="margin-top:10px;font-size:12px"><b>Sauvegardes dans le dossier (${files.length}/${AUTOBK_KEEP})</b>${files.map((f,i)=>`<div style="color:var(--t2);margin-top:3px">${i===0?'🟢':'⚪'} ${new Date(f.time).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'})}${i===0?' <span style="color:var(--t3)">· la plus récente</span>':''} <span style="color:var(--t3)">· ${esc(f.name)} · ${Math.round(f.size/1024)} Ko</span></div>`).join('')}</div>`:'';
+      } else listHtml='<div style="margin-top:8px;font-size:11.5px;color:var(--t3)">Clique sur « Sauvegarder maintenant » pour autoriser l\'accès et voir la liste des sauvegardes.</div>';
+    }catch(e){}
+  }
   box.innerHTML=`<b style="font-size:13px">🔁 Sauvegarde automatique (à chaque ouverture du site)</b>
     <div style="font-size:12px;color:var(--t2);margin:8px 0">${h?`Dossier : <b>${esc(h.name)}</b> · dernière sauvegarde : <b>${when}</b>`:'Aucun dossier choisi.'}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="autobkChoose()">📁 ${h?'Changer de dossier':'Choisir le dossier'}</button>${h?`<button class="btn btn-ghost btn-sm" onclick="autobkRun(true)">Sauvegarder maintenant</button><button class="btn btn-ghost btn-sm" onclick="autobkOff()">Désactiver</button>`:''}</div>
-    <p style="font-size:11.5px;color:var(--t3);margin-top:8px;line-height:1.5">Le fichier <code>${AUTOBK_FILE}</code> est <b>remplacé</b> à chaque sauvegarde (il n'y a toujours qu'un seul fichier). Elle se fait à chaque fois que tu ouvres le site — le navigateur ne peut pas sauvegarder site fermé. Au besoin, il te demandera de confirmer l'accès au dossier (un clic).</p>`;
+    ${listHtml}
+    <p style="font-size:11.5px;color:var(--t3);margin-top:8px;line-height:1.5">À chaque ouverture du site, un nouveau fichier daté est créé (au plus un toutes les 10 minutes). On garde les <b>${AUTOBK_KEEP} dernières</b> : la plus ancienne est supprimée quand une nouvelle arrive. Si les données du site semblent vides ou anormalement réduites, rien n'est sauvegardé ni supprimé, pour protéger tes bonnes sauvegardes. Le navigateur ne peut pas sauvegarder site fermé ; au besoin il te demandera de confirmer l'accès au dossier (un clic).</p>`;
 }
 async function autobkChoose(){
   try{
@@ -4237,20 +4323,34 @@ async function autobkChoose(){
   autobkRender();
 }
 async function autobkOff(){ await mcKvSet('bkdir',null); try{ localStorage.removeItem('ot_autobk_last'); }catch(e){} autobkBanner(false); autobkRender(); toast('Sauvegarde automatique désactivée'); }
+let _autobkWarned=false;
 async function autobkRun(manual){
   try{
     const h=await mcKvGet('bkdir'); if(!h) return false;
+    // ── Garde-fous (sauvegarde automatique seulement) ──
+    if(!manual){
+      if(backupLooksEmpty()) return false; // données vides : on ne touche à rien
+      let lastCount=0; try{ lastCount=parseInt(localStorage.getItem('ot_autobk_count')||'0')||0; }catch(e){}
+      if(lastCount>=10 && backupDataSize()<lastCount*0.5){
+        if(!_autobkWarned){ _autobkWarned=true; toast('Sauvegarde automatique suspendue : tes données semblent incomplètes (tes anciennes sauvegardes sont intactes).','err'); }
+        return false;
+      }
+      if(Date.now()-autobkLast()<AUTOBK_MIN_GAP) return false; // évite d'enchaîner les sauvegardes à chaque rechargement
+    } else if(backupLooksEmpty() && !confirm('Tes données semblent vides. Créer quand même une sauvegarde ?')) return false;
     let perm=await h.queryPermission({mode:'readwrite'});
     if(perm!=='granted'){
       if(!manual){ autobkBanner(true); return false; }   // il faut un clic de l'utilisateur
       perm=await h.requestPermission({mode:'readwrite'});
       if(perm!=='granted'){ toast('Accès au dossier refusé','err'); return false; }
     }
-    const fh=await h.getFileHandle(AUTOBK_FILE,{create:true});
+    const fh=await h.getFileHandle(`${AUTOBK_PREFIX}-${autobkStamp()}.json`,{create:true});
     const w=await fh.createWritable();
     await w.write(JSON.stringify(buildBackupObject()));
-    await w.close();   // remplace le contenu précédent du même fichier
-    try{ localStorage.setItem('ot_autobk_last',String(Date.now())); }catch(e){}
+    await w.close();
+    // On ne garde que les 5 plus récentes : les plus anciennes sont supprimées
+    const files=await autobkFiles(h);
+    for(const f of files.slice(AUTOBK_KEEP)){ try{ await h.removeEntry(f.name); }catch(e){} }
+    try{ localStorage.setItem('ot_autobk_last',String(Date.now())); localStorage.setItem('ot_autobk_count',String(backupDataSize())); }catch(e){}
     autobkBanner(false); autobkRender();
     if(manual) toast('Sauvegarde enregistrée ✓','ok');
     return true;
@@ -4438,8 +4538,13 @@ function quickTrack(malId, type, title, cover){
     fetchWorkMain(type, malId).then(w=>{
       if(!w || !S.tracking[malId]) return;
       let changed=false;
-      const genreNames=(w.genres||[]).map(g=>g.name);
-      if(genreNames.length){ S.tracking[malId]._genres=genreNames; changed=true; }
+      const _sg=splitGenres(w);
+      if(_sg.genres.length||_sg.themes.length||_sg.demos.length){
+        S.tracking[malId]._genres=_sg.genres.map(g=>g.name);
+        S.tracking[malId]._themes=_sg.themes.map(g=>g.name);
+        S.tracking[malId]._demographics=_sg.demos.map(g=>g.name);
+        changed=true;
+      }
       if(w.status){ S.tracking[malId]._pubStatus=w.status; changed=true; }
       if(w.score){ S.tracking[malId]._communityScore=w.score; changed=true; }
       const authorNames=(w.authors||[]).map(a=>a.name).filter(Boolean);
@@ -6893,8 +6998,14 @@ async function fetchMissingScores(){
 
 // ─── SUIVI ───
 // Genres sélectionnés (multi) — inclusion et exclusion (3 états : neutre → inclure → exclure → neutre)
-let _safGenres=new Set();
-let _safGenresExcl=new Set();
+// Trois groupes séparés : Démographie / Genres / Thèmes (clic : inclure → exclure → neutre).
+// Démographie : « l'une ou l'autre » ; Genres et Thèmes : « tous ceux choisis ».
+const SAF_GROUPS={
+  demo:{inc:new Set(),exc:new Set(),wrap:'suivi-demo-pills',list:MAL_DEMO_LIST},
+  genre:{inc:new Set(),exc:new Set(),wrap:'suivi-genre-pills',list:MAL_GENRE_LIST},
+  theme:{inc:new Set(),exc:new Set(),wrap:'suivi-theme-pills',list:MAL_THEME_LIST}
+};
+const _safGenres=SAF_GROUPS.genre.inc, _safGenresExcl=SAF_GROUPS.genre.exc;
 // Mémorise, pour chaque onglet du Suivi ("manga_watchlist", "anime_done", ...), l'ordre exact
 // des œuvres affichées — sert à la navigation précédent/suivant sur la fiche d'une œuvre.
 let _suiviListOrder={};
@@ -6909,43 +7020,49 @@ function setDropSubFilter(type,val,btn){
   renderSuivi();
 }
 
-function populateSuiviGenreFilter(){
-  const wrap=document.getElementById('suivi-genre-pills');
-  if(!wrap) return;
-  const genres=new Set();
-  Object.values(S.tracking).forEach(t=>{
-    (t._genres||[]).forEach(g=>genres.add(g));
-    (t._themes||[]).forEach(g=>genres.add(g));
-  });
-  const sorted=[...genres].sort();
-  if(wrap.children.length === sorted.length+1) return; // already populated
-  wrap.innerHTML='<button class="saf-pill'+(_safGenres.size===0&&_safGenresExcl.size===0?' on':'')+'" data-g="" onclick="toggleSAFGenreMulti(\'\',this)">Tous</button>'
-    +sorted.map(g=>`<button class="saf-pill${_safGenres.has(g)?' on':_safGenresExcl.has(g)?' excl':''}" data-g="${g}" onclick="toggleSAFGenreMulti('${g}',this)">${g}</button>`).join('');
+function _safGroupHtml(gk){
+  const g=SAF_GROUPS[gk];
+  return '<button class="saf-pill'+(g.inc.size===0&&g.exc.size===0?' on':'')+'" data-v="" onclick="toggleSAFGroup(\''+gk+'\',\'\')">Tous</button>'
+    +g.list.map(n=>`<button class="saf-pill${g.inc.has(n)?' on':g.exc.has(n)?' excl':''}" data-v="${esc(n)}" onclick="toggleSAFGroup('${gk}',this.dataset.v)">${esc(n)}</button>`).join('');
 }
-
-function toggleSAFGenreMulti(val, btn){
-  if(!val){
-    _safGenres.clear();
-    _safGenresExcl.clear();
-    document.querySelectorAll('#suivi-genre-pills .saf-pill').forEach(b=>{b.classList.toggle('on',b.dataset.g==='');b.classList.remove('excl');});
-  } else {
-    // Cycle : neutre → inclure → exclure → neutre
-    if(_safGenres.has(val)){
-      _safGenres.delete(val);
-      _safGenresExcl.add(val);
-    } else if(_safGenresExcl.has(val)){
-      _safGenresExcl.delete(val);
-    } else {
-      _safGenres.add(val);
-    }
-    const allBtn=document.querySelector('#suivi-genre-pills [data-g=""]');
-    if(allBtn) allBtn.classList.toggle('on',_safGenres.size===0&&_safGenresExcl.size===0);
-    document.querySelectorAll('#suivi-genre-pills [data-g="'+val+'"]').forEach(b=>{
-      b.classList.toggle('on',_safGenres.has(val));
-      b.classList.toggle('excl',_safGenresExcl.has(val));
-    });
-  }
+function populateSuiviGenreFilter(){
+  Object.keys(SAF_GROUPS).forEach(gk=>{
+    const wrap=document.getElementById(SAF_GROUPS[gk].wrap);
+    if(wrap && wrap.children.length!==SAF_GROUPS[gk].list.length+1) wrap.innerHTML=_safGroupHtml(gk);
+  });
+}
+function _safGroupRepaint(gk){
+  const g=SAF_GROUPS[gk], wrap=document.getElementById(g.wrap); if(!wrap) return;
+  wrap.querySelectorAll('.saf-pill').forEach(b=>{
+    const v=b.dataset.v;
+    if(v===''){ b.classList.toggle('on',g.inc.size===0&&g.exc.size===0); b.classList.remove('excl'); }
+    else { b.classList.toggle('on',g.inc.has(v)); b.classList.toggle('excl',g.exc.has(v)); }
+  });
+}
+function toggleSAFGroup(gk,val){
+  const g=SAF_GROUPS[gk];
+  if(!val){ g.inc.clear(); g.exc.clear(); }
+  else if(g.inc.has(val)){ g.inc.delete(val); g.exc.add(val); }
+  else if(g.exc.has(val)){ g.exc.delete(val); }
+  else g.inc.add(val);
+  _safGroupRepaint(gk);
   renderSuivi();
+}
+function resetSAFGroups(){
+  Object.keys(SAF_GROUPS).forEach(gk=>{ SAF_GROUPS[gk].inc.clear(); SAF_GROUPS[gk].exc.clear(); _safGroupRepaint(gk); });
+  populateSuiviGenreFilter();
+}
+function safGroupsMatch(t){
+  const k=trkKinds(t);
+  for(const gk of ['demo','genre','theme']){
+    const g=SAF_GROUPS[gk], have=k[gk];
+    if(g.inc.size){
+      const ok=gk==='demo' ? [...g.inc].some(x=>have.has(x)) : [...g.inc].every(x=>have.has(x));
+      if(!ok) return false;
+    }
+    if(g.exc.size && [...g.exc].some(x=>have.has(x))) return false;
+  }
+  return true;
 }
 
 
@@ -7093,8 +7210,7 @@ function renderSuivi(){
     const items=all.filter(t=>
       t.type===type &&
       (!query||t.title.toLowerCase().includes(query)||(t._authors||[]).some(a=>a.toLowerCase().includes(query))||(t._studios||[]).some(s=>s.toLowerCase().includes(query))) &&
-      (_safGenres.size===0||[..._safGenres].every(g=>(t._genres||[]).concat(t._themes||[]).includes(g))) &&
-      (_safGenresExcl.size===0||[..._safGenresExcl].every(g=>!(t._genres||[]).concat(t._themes||[]).includes(g))) &&
+      safGroupsMatch(t) &&
       (_safNoTag?(!(t._tags||[]).length):(
         (_safTags.size===0||[..._safTags].every(g=>effTags(t).includes(g))) &&
         (_safTagsExcl.size===0||[..._safTagsExcl].every(g=>!effTags(t).includes(g)))
@@ -10003,6 +10119,122 @@ function openCharacter(id){
     .catch(e=>{ if(body.dataset.id===String(id)) draw(null,'error',e); });
 }
 
+// ─── PAGE MAGAZINE (page du magazine sur MyAnimeList lue par le relais /api/malmagazine) ───
+let _magToken=0, _magSort='pop', _magStatus='all';
+const _magCache={};
+function openMagazineFromEl(el){ openMagazine(parseInt(el.dataset.mid)||0, el.dataset.mname||''); }
+async function openMagazine(id,name,push=true){
+  const token=++_magToken;
+  nav('magazine',false);
+  window.scrollTo(0,0);
+  if(push) history.pushState({page:'magazine',id,name},'','#magazine-'+id);
+  const box=document.getElementById('magazine-layout');
+  box.innerHTML='<div class="loading"><div class="spin"></div> Chargement du magazine…</div>';
+  try{
+    if(!id) throw new Error('identifiant du magazine inconnu — rouvre la fiche de l\'œuvre');
+    let M=_magCache[id];
+    if(!M){
+      const j=await proxyJson('malmagazine',`id=${id}&page=1`,14000);
+      M=_magCache[id]={id,name:j.name||name,total:j.total,lastPage:j.lastPage||1,works:j.works||[],page:1,error:''};
+    }
+    if(token!==_magToken) return;
+    renderMagazine(M);
+    loadMoreMagazine(M,token);
+  }catch(e){
+    if(token!==_magToken) return;
+    console.error('openMagazine a échoué:',e);
+    box.innerHTML='<p style="color:var(--t3);margin-bottom:6px">Impossible de charger ce magazine pour le moment.</p>'
+      +'<p style="color:var(--t3);font-size:11px;opacity:.8;margin-bottom:12px">'+esc(_aggMsg(e))+'</p>'
+      +'<button class="btn btn-ghost btn-sm" onclick="openMagazine('+(id||0)+',\''+String(name||'').replace(/'/g,"\\'")+'\',false)">🔄 Réessayer</button>'
+      +(id?' <a class="btn btn-ghost btn-sm" href="https://myanimelist.net/manga/magazine/'+id+'" target="_blank" rel="noopener">Voir sur MyAnimeList ↗</a>':'');
+  }
+}
+// Les pages suivantes se chargent une par une en arrière-plan ; la liste se complète et se retrie en direct
+async function loadMoreMagazine(M,token){
+  M.run=token; M.error='';
+  while(M.run===token && M.page<Math.min(M.lastPage,40)){
+    const next=M.page+1;
+    try{
+      const j=await proxyJson('malmagazine',`id=${M.id}&page=${next}`,14000);
+      if(M.run!==token) return;
+      if(next===M.page+1){
+        const have=new Set(M.works.map(w=>w.id));
+        (j.works||[]).forEach(w=>{ if(!have.has(w.id)) M.works.push(w); });
+        M.page=next;
+        if(j.lastPage>M.lastPage) M.lastPage=j.lastPage;
+      }
+    }catch(e){ M.error=_aggMsg(e); break; }
+    if(token===_magToken) renderMagazineList(M);
+  }
+  if(token===_magToken) renderMagazineList(M);
+}
+function renderMagazine(M){
+  const box=document.getElementById('magazine-layout');
+  box.innerHTML=`<h1 class="work-title" style="margin-bottom:4px">${esc(M.name||'Magazine')}</h1>
+    <div style="margin:6px 0 0"><a class="btn btn-ghost btn-sm" href="https://myanimelist.net/manga/magazine/${M.id}" target="_blank" rel="noopener" style="color:#7b9cf0;border-color:rgba(123,156,240,.35)">↗ MyAnimeList</a></div>
+    <div class="mag-stats" id="mag-stats"></div>
+    <div id="mag-note" style="font-size:11px;color:var(--t3);margin-bottom:4px"></div>
+    <div class="mag-toolbar">
+      <select class="inp" style="width:auto;margin:0" onchange="_magSort=this.value;renderMagazineList(_magCache[${M.id}])">
+        <option value="pop">Popularité (ordre MyAnimeList)</option>
+        <option value="score-desc">Mieux notés</option>
+        <option value="score-asc">Moins bien notés</option>
+        <option value="new">Plus récents</option>
+        <option value="old">Plus anciens</option>
+        <option value="az">A → Z</option>
+      </select>
+      <button class="saf-pill" data-ms="all" onclick="_magStatus='all';renderMagazineList(_magCache[${M.id}])">Tous</button>
+      <button class="saf-pill" data-ms="Publishing" onclick="_magStatus='Publishing';renderMagazineList(_magCache[${M.id}])">En cours</button>
+      <button class="saf-pill" data-ms="Finished" onclick="_magStatus='Finished';renderMagazineList(_magCache[${M.id}])">Terminés</button>
+      <span id="mag-progress" style="font-size:12px;color:var(--t3)"></span>
+    </div>
+    <div id="mag-works"></div>`;
+  renderMagazineList(M);
+}
+function renderMagazineList(M){
+  const list=document.getElementById('mag-works'); if(!list||!M) return;
+  const all=M.works.map((w,i)=>({...w,_i:i}));
+  // ── Infos déduites des œuvres chargées (MyAnimeList ne donne pas de date de création) ──
+  const years=all.filter(w=>w.year);
+  const oldest=years.reduce((a,w)=>!a||w.year<a.year?w:a,null), newest=years.reduce((a,w)=>!a||w.year>a.year?w:a,null);
+  const running=all.filter(w=>w.status==='Publishing').length;
+  const done=M.page>=M.lastPage;
+  const stats=document.getElementById('mag-stats');
+  if(stats) stats.innerHTML=[
+    [(M.total!=null?M.total:all.length).toLocaleString('fr-FR'),'œuvres sur MyAnimeList'],
+    oldest?[String(oldest.year),'plus ancienne œuvre listée'] : null,
+    newest?[String(newest.year),'œuvre la plus récente'] : null,
+    [running?'Oui':'Non',running?`toujours publié · ${running} série${running>1?'s':''} en cours`:'aucune série en cours'+(done?'':' (chargement…)')]
+  ].filter(Boolean).map(([v,l])=>`<div class="mag-stat"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
+  const note=document.getElementById('mag-note');
+  if(note) note.textContent='La date de création n\'est pas donnée par MyAnimeList : « plus ancienne œuvre listée » en est une approximation.';
+  document.querySelectorAll('.mag-toolbar .saf-pill').forEach(b=>b.classList.toggle('on',b.dataset.ms===_magStatus));
+  const prog=document.getElementById('mag-progress');
+  if(prog) prog.textContent=M.error?('Chargement interrompu : '+M.error):(done?`${all.length} œuvres chargées`:`Chargement… ${all.length}${M.total?' / '+M.total:''} œuvres (page ${M.page}/${M.lastPage})`);
+  // ── Filtre + tri ──
+  const rows=all.filter(w=>_magStatus==='all'||w.status===_magStatus);
+  const num=(a,b,dir)=>{ const x=a==null?null:a, y=b==null?null:b; if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1; return dir*(x-y); };
+  const sorters={
+    pop:(a,b)=>a._i-b._i,
+    'score-desc':(a,b)=>num(a.score,b.score,-1)||(a._i-b._i),
+    'score-asc':(a,b)=>num(a.score,b.score,1)||(a._i-b._i),
+    new:(a,b)=>num(a.year,b.year,-1)||(a._i-b._i),
+    old:(a,b)=>num(a.year,b.year,1)||(a._i-b._i),
+    az:(a,b)=>a.title.localeCompare(b.title,'fr',{sensitivity:'base'})
+  };
+  rows.sort(sorters[_magSort]||sorters.pop);
+  const stFr={Finished:'Terminé',Publishing:'En cours','On Hiatus':'En pause',Discontinued:'Arrêté','Not yet published':'À paraître'};
+  list.innerHTML=rows.map(w=>`
+    <div class="auth-row" onclick="openWork(${w.id},'manga')">
+      <img src="${esc(w.img)}" loading="lazy" onerror="this.style.visibility='hidden'">
+      <div class="auth-info">
+        <div class="auth-title">${esc(w.title)}</div>
+        <div class="auth-meta">${w.type?`<span class="auth-badge">${esc(w.type)}</span>`:''}${w.year?`<span>${w.year}</span>`:''}${w.status?`<span class="auth-badge role">${esc(stFr[w.status]||w.status)}</span>`:''}${(w.volumes||w.chapters)?`<span>${[w.volumes?w.volumes+' tome'+(w.volumes>1?'s':''):'',w.chapters?w.chapters+' chap.':''].filter(Boolean).join(' · ')}</span>`:''}${w.members?`<span>👥 ${w.members.toLocaleString('fr-FR')}</span>`:''}</div>
+      </div>
+      <div class="auth-score">${w.score?'★ '+w.score:'—'}</div>
+    </div>`).join('')||'<p style="color:var(--t3)">Aucune œuvre.</p>';
+}
+
 // ─── PAGE AUTEUR (page MyAnimeList de l'auteur lue par le relais /api/malperson) ───
 let _authorToken=0;
 const _authorCache={};
@@ -10401,7 +10633,7 @@ function resetSAF(){
   document.getElementById('saf-serietomes-min').value = '';
   document.getElementById('saf-serietomes-max').value = '';
   document.getElementById('saf-serietomes-row').style.display = 'none';
-  _safGenres.clear(); _safGenresExcl.clear(); document.querySelectorAll('#suivi-genre-pills .saf-pill').forEach(b=>{b.classList.toggle('on',b.dataset.g==='');b.classList.remove('excl');}); populateSuiviGenreFilter();
+  resetSAFGroups();
   _safTags.clear(); _safTagsExcl.clear(); _safNoTag=false; document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>{b.classList.toggle('on',b.dataset.tg==='');b.classList.remove('excl');});
   document.querySelectorAll('#suivi-adv-filters [data-demo]').forEach(b=>b.classList.toggle('on',b.dataset.demo===''));
   document.querySelectorAll('#saf-status-pills [data-st]').forEach(b=>b.classList.toggle('on',b.dataset.st===''));
