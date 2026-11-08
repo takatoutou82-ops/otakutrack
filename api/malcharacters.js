@@ -27,7 +27,17 @@ function parseCharacters(html, label) {
     // MyAnimeList écrit « Famille, Prénom » : on garde l'ordre et on retire juste la virgule (ex. « Monkey D. Luffy »)
     const name = decode(nameM[1]).replace(/,\s*/g, ' ').replace(/\s+/g, ' ').trim();
     const role = ((seg.match(/<small>\s*(Main|Supporting)\s*<\/small>/i) || [])[1] || '').toLowerCase();
-    const imgM = seg.match(/(?:data-src|src)="(https:\/\/cdn\.myanimelist\.net\/[^"]+)"/i);
+    // Image du personnage : on regarde chaque <img> (data-src d'abord, car src peut être un pixel vide)
+    // et on garde la première qui pointe vers /images/characters/ (pas les photos des doubleurs).
+    let img = '';
+    const tags = seg.match(/<img[^>]*>/gi) || [];
+    for (const tag of tags) {
+      const u = (tag.match(/data-src="([^"]+)"/i) || tag.match(/\ssrc="([^"]+)"/i) || [])[1] || '';
+      if (/\/images\/characters\//i.test(u)) { img = u; break; }
+    }
+    if (!img) { const md = seg.match(/https:\/\/cdn\.myanimelist\.net\/[^\s"')]*\/images\/characters\/[^\s"')]+/i); if (md) img = md[0]; }
+    // URL sans redimensionnement ni signature : https://cdn.myanimelist.net/images/characters/9/310307.jpg
+    img = img.replace(/\/r\/\d+x\d+\//, '/').replace(/\?.*$/, '');
     const favM = seg.match(/([\d,]+)\s*(?:favorites?|Favorites?)/i);
     const va = [];
     const vre = /href="https:\/\/myanimelist\.net\/people\/(\d+)\/[^"]*"[^>]*>\s*([^<]+?)\s*<\/a>[\s\S]{0,300}?<small>\s*([^<]*?)\s*<\/small>/gi;
@@ -40,7 +50,7 @@ function parseCharacters(html, label) {
     }
     characters.push({
       id: st.id, name, role,
-      img: imgM ? imgM[1].replace(/\/r\/\d+x\d+\//, '/') : '',
+      img,
       favorites: favM ? parseInt(favM[1].replace(/[^\d]/g, ''), 10) : null,
       va
     });

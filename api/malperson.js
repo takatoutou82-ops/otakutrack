@@ -41,7 +41,7 @@ function parsePerson(html, id, label) {
   const i = html.search(/Published Manga/i);
   const works = [], seen = new Map();
   const add = (wid, title, img, role) => {
-    if (!seen.has(wid)) { seen.set(wid, { id: wid, title: decode(title), img: String(img || '').replace(/\/r\/\d+x\d+\//, '/'), pos: [] }); works.push(seen.get(wid)); }
+    if (!seen.has(wid)) { seen.set(wid, { id: wid, title: decode(title), img: String(img || '').replace(/\/r\/\d+x\d+\//, '/').replace(/\?.*$/, ''), pos: [] }); works.push(seen.get(wid)); }
     if (role) seen.get(wid).pos.push(decode(role));
   };
   if (i >= 0) {
