@@ -1501,6 +1501,16 @@ body::after{
 #tuto .tu-chip{border-radius:3px;background:var(--bg3);border:1.5px solid var(--border2)}
 #tuto .tu-dots i.on{background:var(--acc)}
 @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+/* ── Catégories de tags ── */
+.tagcat-block{flex:0 0 100%;margin-top:6px}
+.tagcat-h{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin:2px 0 5px}
+.tagcat-pills{display:flex;flex-wrap:wrap;gap:5px}
+.tagcat-btn{font-size:11px;padding:0 4px;color:var(--t3);cursor:pointer;background:none;border:none}
+.tagcat-btn:hover{color:var(--text)}
+.tagcat-empty{font-size:11.5px;color:var(--t3);font-style:italic}
+.tagcat-chip{font-weight:700}
+.tagcat-chip.open{border-color:var(--acc);color:var(--acc2)}
+.tagcat-chip.has{border-color:var(--acc)}
 </style>
 </head>
 <body>
@@ -1553,6 +1563,24 @@ body::after{
       <button class="btn btn-ghost" onclick="closeM('m-sync')">Annuler</button>
       <button class="btn btn-primary" onclick="importSyncCode()">Fusionner</button>
     </div>
+  </div>
+</div>
+<!-- Catégorie de tags : créer / renommer -->
+<div class="modal-bg" id="m-tagcat">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-title"><span id="tagcat-modal-title">Nouvelle catégorie de tags</span> <span class="modal-close" onclick="closeM('m-tagcat')">✕</span></div>
+    <div class="fg"><label class="fl">Nom</label><input class="fi" id="tagcat-name" maxlength="40" placeholder="Ex : Ambiance, Public, Univers…" onkeydown="if(event.key==='Enter')saveTagCat()"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-tagcat')">Annuler</button>
+      <button class="btn btn-primary" style="flex:1" onclick="saveTagCat()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+<!-- Déplacer un tag dans une catégorie -->
+<div class="modal-bg" id="m-tagmove">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-title"><span id="tagmove-title">Déplacer le tag</span> <span class="modal-close" onclick="closeM('m-tagmove')">✕</span></div>
+    <div id="tagmove-body"></div>
   </div>
 </div>
 <!-- Add to list modal -->
@@ -2117,7 +2145,7 @@ body::after{
       </div>
       <div class="saf-row" style="align-items:flex-start">
         <span class="saf-label" style="padding-top:4px">Tags</span>
-        <div style="flex:1"><div id="suivi-tag-pills" style="display:flex;flex-wrap:wrap;gap:5px"></div><div style="font-size:10.5px;color:var(--t3);margin-top:6px">Clic droit (ou appui long sur téléphone) sur un tag perso pour le supprimer partout.</div></div>
+        <div style="flex:1"><div id="suivi-tag-pills" style="display:flex;flex-wrap:wrap;gap:5px"></div><div style="font-size:10.5px;color:var(--t3);margin-top:6px">Clic droit (ou appui long sur téléphone) sur un tag perso pour le supprimer partout. « ⚙ Organiser » sert à ranger tes tags dans des catégories.</div></div>
       </div>
       <div class="saf-row">
         <span class="saf-label">Ma note</span>
@@ -2694,7 +2722,7 @@ function save(){
       suiviCategories:S.suiviCategories||[],
       tierImg:S.tierImg||null,arcsImgs:S.arcsImgs||{},
       customTierLists:S.customTierLists||[],
-      allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{}
+      allTags:S.allTags||[],tagCats:S.tagCats||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{}
     }));
     localStorage.setItem('ot_last_update',String(Date.now()));
   }catch(e){}
@@ -2722,6 +2750,7 @@ function load(){
     if(d.arcsImgs) S.arcsImgs=d.arcsImgs;
     if(d.customTierLists) S.customTierLists=d.customTierLists;
     if(d.allTags) S.allTags=d.allTags;
+    if(d.tagCats) S.tagCats=d.tagCats;
     if(d.mcMap) S.mcMap=d.mcMap;
     if(d.mcOwned) S.mcOwned=d.mcOwned;
     if(d.mcWish) S.mcWish=d.mcWish;
@@ -4289,7 +4318,7 @@ function buildBackupObject(){
     bannerSize:S.bannerSize||null, bannerPos:S.bannerPos||null,
     physCategories:S.physCategories||[], suiviCategories:S.suiviCategories||[],
     tierImg:S.tierImg||null, arcsImgs:S.arcsImgs||{}, customTierLists:S.customTierLists||[],
-    allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{}
+    allTags:S.allTags||[],tagCats:S.tagCats||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{}
   };
 }
 function autobkSupported(){ return typeof window.showDirectoryPicker==='function'; }
@@ -4381,7 +4410,7 @@ function exportFullBackup(){
     bannerSize:S.bannerSize||null, bannerPos:S.bannerPos||null,
     physCategories:S.physCategories||[], suiviCategories:S.suiviCategories||[],
     tierImg:S.tierImg||null, arcsImgs:S.arcsImgs||{}, customTierLists:S.customTierLists||[],
-    allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{}
+    allTags:S.allTags||[],tagCats:S.tagCats||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{}
   };
   const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
@@ -4443,7 +4472,7 @@ function handleImportBackup(input){
         S.tierImg=data.tierImg||null;
         S.arcsImgs=data.arcsImgs||{};
         S.customTierLists=data.customTierLists||[];
-        S.allTags=data.allTags||[]; S.mcMap=data.mcMap||S.mcMap||{}; S.mcOwned=data.mcOwned||S.mcOwned||{}; S.mcWish=data.mcWish||S.mcWish||{}; S.mcBoxes=data.mcBoxes||S.mcBoxes||{};
+        S.allTags=data.allTags||[]; S.tagCats=data.tagCats||[]; S.mcMap=data.mcMap||S.mcMap||{}; S.mcOwned=data.mcOwned||S.mcOwned||{}; S.mcWish=data.mcWish||S.mcWish||{}; S.mcBoxes=data.mcBoxes||S.mcBoxes||{};
         save();
         toast('Sauvegarde importée avec succès ✓ Rechargement…','ok');
         setTimeout(()=>location.reload(), 1000);
@@ -6328,7 +6357,7 @@ function computeFirebaseDocSize(){
     physCategories:S.physCategories||[],
     suiviCategories:S.suiviCategories||[],
     customTierLists:customTierListsClean,
-    allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{},
+    allTags:S.allTags||[],tagCats:S.tagCats||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{},
     _updatedAt:Date.now()
   };
 
@@ -7066,35 +7095,151 @@ function safGroupsMatch(t){
 }
 
 
-const LEN_TAGS=['one-shot','œuvre courte','œuvre moyenne','œuvre longue','œuvre très longue'];
+// ─── Filtres genre / thème / démographie appliqués aux CATÉGORIES du Suivi ───
+// Une catégorie n'a pas de genres propres : elle reste visible tant qu'AU MOINS UNE de ses œuvres
+// correspond aux filtres genre/thème/démographie actifs (les données viennent du suivi).
+function safGroupsActive(){ return ['demo','genre','theme'].some(gk=>SAF_GROUPS[gk].inc.size||SAF_GROUPS[gk].exc.size); }
+function catMatchesGroups(c){
+  return (c.items||[]).some(it=>{
+    const t=S.tracking[it.mal_id];
+    return !!t && (!it.type||!t.type||t.type===it.type) && safGroupsMatch(t);
+  });
+}
+
+// ─── TAGS DE LONGUEUR (automatiques) ───
+// Taille (selon le nombre de tomes) + état de publication.
+// Un manga EN PAUSE / hiatus n'a PAS de tag de taille (sa longueur n'est pas définitive) :
+// il reçoit à la place « en pause ». Un manga en cours reçoit « en cours » (en plus de sa taille).
+const LEN_SIZE_TAGS=['one-shot','œuvre courte','œuvre moyenne','œuvre longue','œuvre très longue'];
+const LEN_STATE_TAGS=['en cours','en pause'];
+const LEN_TAGS=[...LEN_SIZE_TAGS,...LEN_STATE_TAGS];
+function lenStateTag(t){
+  if(!t||t.type!=='manga') return null;
+  const ps=normPubStatus(t._pubStatus);
+  return ps==='On Hiatus'?'en pause':ps==='Publishing'?'en cours':null;
+}
 function lenTag(t){
   if(!t||t.type!=='manga') return null;
+  if(lenStateTag(t)==='en pause') return null;
   const n=t._totalVolumes; if(!n) return null;
-  return n<=3?LEN_TAGS[0]:n<=10?LEN_TAGS[1]:n<=20?LEN_TAGS[2]:n<=45?LEN_TAGS[3]:LEN_TAGS[4];
+  return n<=3?LEN_SIZE_TAGS[0]:n<=10?LEN_SIZE_TAGS[1]:n<=20?LEN_SIZE_TAGS[2]:n<=45?LEN_SIZE_TAGS[3]:LEN_SIZE_TAGS[4];
 }
-function effTags(t){ const a=t._tags||[]; const l=lenTag(t); return l&&!a.includes(l)?[...a,l]:a; }
+function effTags(t){
+  const out=[...(t._tags||[])];
+  [lenTag(t),lenStateTag(t)].forEach(x=>{ if(x&&!out.includes(x)) out.push(x); });
+  return out;
+}
 function allTagChoices(){ return [...LEN_TAGS,...[...(S.allTags||[])].filter(x=>!LEN_TAGS.includes(x)).sort()]; }
+
+// ─── CATÉGORIES DE TAGS ───
+// S.tagCats = [{id,name,tags:[…]}]. « Sans tag » / « Sans note » ne sont jamais dans une catégorie.
+// La catégorie « Longueur » est intégrée : elle contient tous les tags automatiques (non déplaçables).
+const TAGCAT_LEN='__len__', TAGCAT_OTHER='__other__';
+let _tagManage=false;          // mode « Organiser » du filtre Suivi
+let _tlOpenCats=new Set();     // catégories dépliées dans le panneau Tags de la tier list
+let _tagCatEditId=null, _tagMoveTag=null;
+function tagCatGroups(){
+  const known=new Set(S.allTags||[]), used=new Set();
+  const byName=(x,y)=>x.localeCompare(y,'fr');
+  const cats=(S.tagCats||[]).map(c=>{
+    const tags=(c.tags||[]).filter(x=>known.has(x)&&!LEN_TAGS.includes(x)&&!used.has(x));
+    tags.forEach(x=>used.add(x));
+    return {id:c.id,name:c.name||'Sans nom',tags:tags.sort(byName),user:true};
+  });
+  const loose=[...known].filter(x=>!LEN_TAGS.includes(x)&&!used.has(x)).sort(byName);
+  return {len:{id:TAGCAT_LEN,name:'Longueur',tags:LEN_TAGS.slice(),user:false},cats,loose};
+}
+function tagPillHtml(ctx,g){
+  const inc=ctx==='tl'?_tlTags:_safTags, exc=ctx==='tl'?_tlTagsExcl:_safTagsExcl;
+  const fn=ctx==='tl'?'toggleTLTag':'toggleSAFTagMulti';
+  if(ctx==='suivi'&&_tagManage){
+    if(LEN_TAGS.includes(g)) return `<button class="saf-pill" style="opacity:.45;cursor:default" data-tg="${esc(g)}" title="Tag automatique : non déplaçable">${esc(g)}</button>`;
+    return `<button class="saf-pill" data-tg="${esc(g)}" onclick="openTagMove(this.dataset.tg)" title="Déplacer dans une catégorie">↪ ${esc(g)}</button>`;
+  }
+  return `<button class="saf-pill${inc.has(g)?' on':exc.has(g)?' excl':''}" data-tg="${esc(g)}" onclick="${fn}(this.dataset.tg,this)">${esc(g)}</button>`;
+}
+function repaintTagPanels(){
+  populateSuiviTagFilter();
+  const w=document.getElementById('tl-tag-pills-wrap');
+  if(w&&w.style.display!=='none'&&w.style.display) renderTLTagPills();
+}
+function toggleTagManage(){ _tagManage=!_tagManage; populateSuiviTagFilter(); }
+function openTagCatModal(id){
+  _tagCatEditId=id||null;
+  const c=id?(S.tagCats||[]).find(x=>x.id===id):null;
+  document.getElementById('tagcat-modal-title').textContent=id?'Renommer la catégorie':'Nouvelle catégorie de tags';
+  const i=document.getElementById('tagcat-name'); i.value=c?c.name:'';
+  openM('m-tagcat'); setTimeout(()=>i.focus(),60);
+}
+function saveTagCat(){
+  const name=document.getElementById('tagcat-name').value.trim();
+  if(!name){ toast('Donne un nom à la catégorie','err'); return; }
+  if(!S.tagCats) S.tagCats=[];
+  const low=name.toLowerCase();
+  if(low==='longueur'||S.tagCats.some(c=>c.id!==_tagCatEditId&&(c.name||'').toLowerCase()===low)){ toast('Une catégorie porte déjà ce nom','err'); return; }
+  if(_tagCatEditId){ const c=S.tagCats.find(x=>x.id===_tagCatEditId); if(c) c.name=name; }
+  else{ S.tagCats.push({id:'tc_'+Date.now().toString(36),name,tags:[]}); _tagManage=true; }  // on passe en mode Organiser pour y ranger des tags
+  save(); closeM('m-tagcat'); repaintTagPanels();
+  toast(_tagCatEditId?'Catégorie renommée ✓':'Catégorie créée ✓ Touche un tag (↪) pour le ranger dedans','ok');
+}
+function deleteTagCat(id){
+  const c=(S.tagCats||[]).find(x=>x.id===id); if(!c) return;
+  if(!confirm('Supprimer la catégorie « '+c.name+' » ?\n\nLes tags qu\'elle contient ne sont PAS supprimés : ils repassent « Sans catégorie ».')) return;
+  S.tagCats=S.tagCats.filter(x=>x.id!==id); _tlOpenCats.delete(id);
+  save(); repaintTagPanels(); toast('Catégorie supprimée','ok');
+}
+function openTagMove(tag){
+  if(LEN_TAGS.includes(tag)) return;
+  _tagMoveTag=tag;
+  const cur=(S.tagCats||[]).find(c=>(c.tags||[]).includes(tag));
+  document.getElementById('tagmove-title').textContent='Déplacer « '+tag+' »';
+  const opts=[{id:'',name:'Sans catégorie'},...(S.tagCats||[]).map(c=>({id:c.id,name:c.name}))];
+  document.getElementById('tagmove-body').innerHTML=opts.map(o=>`<button class="btn ${((cur&&cur.id)||'')===o.id?'btn-primary':'btn-ghost'}" style="width:100%;text-align:left;margin-bottom:6px" data-cid="${o.id}" onclick="moveTagTo(this.dataset.cid)">${esc(o.name)}</button>`).join('')
+    +((S.tagCats||[]).length?'':'<p style="font-size:12px;color:var(--t3);margin-top:6px">Aucune catégorie pour l\'instant : crée-en une avec « ＋ Catégorie ».</p>');
+  openM('m-tagmove');
+}
+function moveTagTo(cid){
+  const tag=_tagMoveTag; if(!tag) return;
+  (S.tagCats||[]).forEach(c=>{ c.tags=(c.tags||[]).filter(x=>x!==tag); });
+  if(cid){ const c=(S.tagCats||[]).find(x=>x.id===cid); if(c) c.tags.push(tag); }
+  save(); closeM('m-tagmove'); repaintTagPanels();
+}
+
 let _safTags=new Set();
 let _safTagsExcl=new Set();
 let _safNoTag=false;
+let _safNoNote=false;
 const SAF_NOTAG_VAL='__no_tag__';
+const SAF_NONOTE_VAL='__no_note__';
 function populateSuiviTagFilter(){
   const wrap=document.getElementById('suivi-tag-pills');
   if(!wrap) return;
-  // On liste TOUS les tags jamais créés (S.allTags), pas seulement ceux actuellement utilisés,
-  // pour que la liste reste stable même si aucune œuvre n'a ce tag pour le moment.
-  const sorted=allTagChoices();
-  // +2 : bouton "Tous" + bouton "Sans tag", toujours affichés même sans tag créé
-  if(wrap.children.length === sorted.length+2) return; // déjà peuplé
-  wrap.innerHTML='<button class="saf-pill'+(!_safNoTag&&_safTags.size===0&&_safTagsExcl.size===0?' on':'')+'" data-tg="" onclick="toggleSAFTagMulti(\'\',this)">Tous</button>'
-    +'<button class="saf-pill'+(_safNoTag?' on':'')+'" data-tg="'+SAF_NOTAG_VAL+'" onclick="toggleSAFTagMulti(\''+SAF_NOTAG_VAL+'\',this)">Sans tag</button>'
-    +sorted.map(g=>`<button class="saf-pill${_safTags.has(g)?' on':_safTagsExcl.has(g)?' excl':''}" data-tg="${esc(g)}" onclick="toggleSAFTagMulti('${esc(g).replace(/'/g,"\\'")}',this)">${esc(g)}</button>`).join('');
+  const {len,cats,loose}=tagCatGroups();
+  const anySel=_safNoTag||_safNoNote||_safTags.size>0||_safTagsExcl.size>0;
+  let h='<div style="flex:0 0 100%;display:flex;flex-wrap:wrap;gap:5px;align-items:center">'
+    +`<button class="saf-pill${!anySel?' on':''}" data-tg="" onclick="toggleSAFTagMulti('',this)">Tous</button>`
+    +`<button class="saf-pill${_safNoTag?' on':''}" data-tg="${SAF_NOTAG_VAL}" onclick="toggleSAFTagMulti(this.dataset.tg,this)">Sans tag</button>`
+    +`<button class="saf-pill${_safNoNote?' on':''}" data-tg="${SAF_NONOTE_VAL}" onclick="toggleSAFTagMulti(this.dataset.tg,this)">Sans note</button>`
+    +'<span style="flex:1"></span>'
+    +'<button class="saf-pill" onclick="openTagCatModal()" title="Créer une catégorie de tags">＋ Catégorie</button>'
+    +`<button class="saf-pill${_tagManage?' on':''}" onclick="toggleTagManage()" title="Ranger les tags dans les catégories">⚙ Organiser</button>`
+    +'</div>';
+  const grp=(label,tags,head,empty)=>`<div class="tagcat-block"><div class="tagcat-h"><span>${esc(label)}</span>${head||''}</div><div class="tagcat-pills">${tags.length?tags.map(g=>tagPillHtml('suivi',g)).join(''):(empty||'')}</div></div>`;
+  h+=grp(len.name,len.tags,'<span style="font-weight:500;text-transform:none;letter-spacing:0">· automatique</span>');
+  const shown=cats.filter(c=>c.tags.length||_tagManage);
+  shown.forEach(c=>{
+    const ctl=_tagManage?`<button class="tagcat-btn" onclick="openTagCatModal('${c.id}')" title="Renommer">✏</button><button class="tagcat-btn" style="color:var(--red)" onclick="deleteTagCat('${c.id}')" title="Supprimer la catégorie">🗑</button>`:'';
+    h+=grp(c.name,c.tags,ctl,'<span class="tagcat-empty">Vide — touche un tag (↪) pour le ranger ici</span>');
+  });
+  if(loose.length) h+=grp(shown.length?'Sans catégorie':'Mes tags',loose);
+  wrap.innerHTML=h;
 }
 function deleteTagEverywhere(tag){
   if(LEN_TAGS.includes(tag)){ toast('Les tags de longueur sont automatiques : impossible de les supprimer','err'); return; }
   if(!confirm('Supprimer le tag « '+tag+' » ?\n\nIl sera retiré de toutes les œuvres et catégories où tu l\'as mis, et des filtres. Cette action est définitive.')) return;
   Object.values(S.tracking||{}).forEach(t=>{ if(t._tags) t._tags=t._tags.filter(x=>x!==tag); });
   (S.suiviCategories||[]).forEach(c=>{ if(c.tags) c.tags=c.tags.filter(x=>x!==tag); });
+  (S.tagCats||[]).forEach(c=>{ if(c.tags) c.tags=c.tags.filter(x=>x!==tag); });
   S.allTags=(S.allTags||[]).filter(x=>x!==tag);
   _safTags.delete(tag); _safTagsExcl.delete(tag); _tlTags.delete(tag); _tlTagsExcl.delete(tag);
   save(); populateSuiviTagFilter(); renderSuivi(); toast('Tag « '+tag+' » supprimé','ok');
@@ -7102,41 +7247,29 @@ function deleteTagEverywhere(tag){
 (function(){
   const host=()=>document.getElementById('suivi-tag-pills');
   const pick=e=>{ const b=e.target.closest&&e.target.closest('.saf-pill'); return b&&b.dataset.tg?b:null; };
-  document.addEventListener('contextmenu',e=>{ const h=host(); if(!h||!h.contains(e.target)) return; const b=pick(e); if(!b||b.dataset.tg===SAF_NOTAG_VAL) return; e.preventDefault(); deleteTagEverywhere(b.dataset.tg); });
+  const special=v=>v===SAF_NOTAG_VAL||v===SAF_NONOTE_VAL;
+  document.addEventListener('contextmenu',e=>{ const h=host(); if(!h||!h.contains(e.target)) return; const b=pick(e); if(!b||special(b.dataset.tg)) return; e.preventDefault(); deleteTagEverywhere(b.dataset.tg); });
   let tm=null;
-  document.addEventListener('touchstart',e=>{ const h=host(); if(!h||!h.contains(e.target)) return; const b=pick(e); if(!b||b.dataset.tg===SAF_NOTAG_VAL) return; tm=setTimeout(()=>{ tm=null; deleteTagEverywhere(b.dataset.tg); },700); },{passive:true});
+  document.addEventListener('touchstart',e=>{ const h=host(); if(!h||!h.contains(e.target)) return; const b=pick(e); if(!b||special(b.dataset.tg)) return; tm=setTimeout(()=>{ tm=null; deleteTagEverywhere(b.dataset.tg); },700); },{passive:true});
   ['touchend','touchmove','touchcancel'].forEach(ev=>document.addEventListener(ev,()=>{ if(tm){clearTimeout(tm);tm=null;} },{passive:true}));
 })();
 function toggleSAFTagMulti(val, btn){
   if(!val){
-    _safTags.clear();
-    _safTagsExcl.clear();
-    _safNoTag=false;
-    document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>{b.classList.toggle('on',b.dataset.tg==='');b.classList.remove('excl');});
+    _safTags.clear(); _safTagsExcl.clear(); _safNoTag=false; _safNoNote=false;
   } else if(val===SAF_NOTAG_VAL){
-    // "Sans tag" est exclusif : il n'a pas de sens combiné avec des tags précis
-    _safNoTag=!_safNoTag;
-    _safTags.clear();
-    _safTagsExcl.clear();
-    document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>{b.classList.toggle('on',b.dataset.tg===SAF_NOTAG_VAL?_safNoTag:false);b.classList.remove('excl');});
+    // « Sans tag » est exclusif avec les tags précis (mais se combine avec « Sans note »)
+    _safNoTag=!_safNoTag; _safTags.clear(); _safTagsExcl.clear();
+  } else if(val===SAF_NONOTE_VAL){
+    // « Sans note » : œuvres (et catégories) sans note ; se combine avec les tags
+    _safNoNote=!_safNoNote;
   } else {
     _safNoTag=false;
-    // Cycle : neutre → inclure → exclure → neutre
-    if(_safTags.has(val)){
-      _safTags.delete(val);
-      _safTagsExcl.add(val);
-    } else if(_safTagsExcl.has(val)){
-      _safTagsExcl.delete(val);
-    } else {
-      _safTags.add(val);
-    }
-    document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>{
-      if(b.dataset.tg===''){ b.classList.toggle('on',_safTags.size===0&&_safTagsExcl.size===0&&!_safNoTag); }
-      else if(b.dataset.tg===SAF_NOTAG_VAL){ b.classList.toggle('on',false); }
-      else if(b.dataset.tg===val){ b.classList.toggle('on',_safTags.has(val)); b.classList.toggle('excl',_safTagsExcl.has(val)); }
-    });
+    // Cycle : neutre → inclure → exclure → neutre (plusieurs tags, de plusieurs catégories, possibles)
+    if(_safTags.has(val)){ _safTags.delete(val); _safTagsExcl.add(val); }
+    else if(_safTagsExcl.has(val)){ _safTagsExcl.delete(val); }
+    else _safTags.add(val);
   }
-  renderSuivi();
+  renderSuivi();   // repeint aussi les pastilles (populateSuiviTagFilter)
 }
 
 function renderSuivi(){
@@ -7215,6 +7348,7 @@ function renderSuivi(){
         (_safTags.size===0||[..._safTags].every(g=>effTags(t).includes(g))) &&
         (_safTagsExcl.size===0||[..._safTagsExcl].every(g=>!effTags(t).includes(g)))
       )) &&
+      (!_safNoNote||!(t.rating>0)) &&
       (!_safDemo||(t._demographics||[]).some(d=>d===_safDemo)) &&
       (!_safStatus||(()=>{
         // Correspondance via _pubStatus normalisé (manga: "Finished"/"Publishing"/"On Hiatus",
@@ -7255,6 +7389,8 @@ function renderSuivi(){
           if(_inc.some(g=>LEN_TAGS.includes(g))) cats=[];   // les tags automatiques de longueur ne concernent que les œuvres
           else cats=cats.filter(c=>{ const ct=c.tags||[]; return _safNoTag?!ct.length:(_inc.every(g=>ct.includes(g))&&_exc.every(g=>!ct.includes(g))); });
         }
+        if(_safNoNote) cats=cats.filter(c=>!(c.rating>0));              // « Sans note » s'applique aussi aux catégories
+        if(safGroupsActive()) cats=cats.filter(catMatchesGroups);       // genre / thème : seulement si une œuvre de la catégorie correspond
       }
 
       const catEntries=cats.map(c=>({
@@ -7713,11 +7849,28 @@ function toggleTLTagPanel(){
   if(open) renderTLTagPills();
 }
 function renderTLTagPills(){
-  const wrap=document.getElementById('tl-tag-pills-wrap');
-  const sorted=allTagChoices();
-  if(!sorted.length){ wrap.innerHTML='<span style="font-size:11.5px;color:var(--t3);font-style:italic">Aucun tag créé pour le moment.</span>'; return; }
-  wrap.innerHTML='<button class="saf-pill'+(_tlTags.size===0&&_tlTagsExcl.size===0?' on':'')+'" onclick="clearTLTags()">Tous</button>'
-    +sorted.map(g=>`<button class="saf-pill${_tlTags.has(g)?' on':_tlTagsExcl.has(g)?' excl':''}" onclick="toggleTLTag('${esc(g).replace(/'/g,"\\'")}',this)">${esc(g)}</button>`).join('');
+  const wrap=document.getElementById('tl-tag-pills-wrap'); if(!wrap) return;
+  const {len,cats,loose}=tagCatGroups();
+  const groups=[len,...cats.filter(c=>c.tags.length)];
+  if(loose.length) groups.push({id:TAGCAT_OTHER,name:groups.length>1?'Sans catégorie':'Mes tags',tags:loose});
+  const none=_tlTags.size===0&&_tlTagsExcl.size===0;
+  const cnt=g=>g.tags.filter(t=>_tlTags.has(t)||_tlTagsExcl.has(t)).length;
+  // Ligne 1 : « Tous » + une pastille par catégorie (clic = déplier / replier). On peut en ouvrir plusieurs.
+  let h='<div style="flex:0 0 100%;display:flex;flex-wrap:wrap;gap:5px">'
+    +`<button class="saf-pill${none?' on':''}" onclick="clearTLTags()">Tous</button>`
+    +groups.map(g=>{ const n=cnt(g), open=_tlOpenCats.has(g.id);
+      return `<button class="saf-pill tagcat-chip${open?' open':''}${n?' has':''}" data-cid="${g.id}" onclick="toggleTLTagCat(this.dataset.cid)">${open?'▾':'▸'} ${esc(g.name)}${n?' · '+n:''}</button>`; }).join('')
+    +'</div>';
+  // Lignes suivantes : les tags des catégories dépliées (choix multiple, y compris entre catégories)
+  groups.forEach(g=>{
+    if(!_tlOpenCats.has(g.id)) return;
+    h+=`<div style="flex:0 0 100%;display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border:1px dashed var(--border2);border-radius:8px"><span class="tagcat-h" style="flex:0 0 100%;margin:0 0 2px">${esc(g.name)}</span>${g.tags.map(t=>tagPillHtml('tl',t)).join('')}</div>`;
+  });
+  wrap.innerHTML=h;
+}
+function toggleTLTagCat(id){
+  if(_tlOpenCats.has(id)) _tlOpenCats.delete(id); else _tlOpenCats.add(id);
+  renderTLTagPills();
 }
 function toggleTLTag(tag, btn){
   // Cycle : neutre → inclure → exclure → neutre
@@ -10701,7 +10854,7 @@ function resetSAF(){
   document.getElementById('saf-serietomes-max').value = '';
   document.getElementById('saf-serietomes-row').style.display = 'none';
   resetSAFGroups();
-  _safTags.clear(); _safTagsExcl.clear(); _safNoTag=false; document.querySelectorAll('#suivi-tag-pills .saf-pill').forEach(b=>{b.classList.toggle('on',b.dataset.tg==='');b.classList.remove('excl');});
+  _safTags.clear(); _safTagsExcl.clear(); _safNoTag=false; _safNoNote=false;   // les pastilles sont repeintes par renderSuivi()
   document.querySelectorAll('#suivi-adv-filters [data-demo]').forEach(b=>b.classList.toggle('on',b.dataset.demo===''));
   document.querySelectorAll('#saf-status-pills [data-st]').forEach(b=>b.classList.toggle('on',b.dataset.st===''));
   document.querySelectorAll('#saf-extra-genres [data-g]').forEach(b=>b.classList.toggle('on',b.dataset.g===''));
@@ -11347,6 +11500,7 @@ async function loadFromFirebase(){
     if(remote.arcsImgs) S.arcsImgs=remote.arcsImgs;
     if(remote.customTierLists) S.customTierLists=remote.customTierLists;
     if(remote.allTags) S.allTags=remote.allTags;
+    if(remote.tagCats) S.tagCats=remote.tagCats;
     if(remote.mcMap) S.mcMap=remote.mcMap;
     if(remote.mcOwned) S.mcOwned=remote.mcOwned;
     if(remote.mcWish) S.mcWish=remote.mcWish;
@@ -11360,7 +11514,7 @@ async function loadFromFirebase(){
       suiviCategories:S.suiviCategories||[],
       tierImg:S.tierImg||null,arcsImgs:S.arcsImgs||{},
       customTierLists:S.customTierLists||[],
-      allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{}
+      allTags:S.allTags||[],tagCats:S.tagCats||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{}
     })); }catch(e){}
     renderCustomTops();
     renderTierList();
@@ -11454,7 +11608,7 @@ function fbSave(immediate=true){
         physCategories:S.physCategories||[],
         suiviCategories:S.suiviCategories||[],
         customTierLists:customTierListsClean,
-        allTags:S.allTags||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{},
+        allTags:S.allTags||[],tagCats:S.tagCats||[],mcMap:S.mcMap||{},mcOwned:S.mcOwned||{},mcWish:S.mcWish||{},mcBoxes:S.mcBoxes||{},
         _updatedAt:Date.now()
       });
     }catch(e){ console.error('Firebase save error',e); }
