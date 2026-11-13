@@ -1627,6 +1627,19 @@ body::after{
   </div>
 </div>
 
+<!-- MODAL: MODIFIER UNE LISTE (titre + description) -->
+<div class="modal-bg" id="m-editlist">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">Modifier la liste <span class="modal-close" onclick="closeM('m-editlist')">✕</span></div>
+    <div class="fg"><label class="fl">Titre</label><input class="fi" id="el-title" maxlength="120" onkeydown="if(event.key==='Enter')saveEditList()"></div>
+    <div class="fg"><label class="fl">Description (tu peux la laisser vide)</label><textarea class="fi" id="el-desc" rows="3" placeholder="Aucune description"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeM('m-editlist')">Annuler</button>
+      <button class="btn btn-primary" style="flex:1" onclick="saveEditList()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <input type="file" accept="image/*" id="list-item-img-input" style="display:none" onchange="onListItemImagePicked(this)">
 
 <!-- MODAL: NOUVELLE TIER LIST -->
@@ -4721,7 +4734,7 @@ function renderLists(){
     const isImg = l.type==='image';
     const covers = isImg
       ? (l.imageItems||[]).slice(0,4).map(i=>`<div class="lc-cov">${i.imgUrl?`<img src="${i.imgUrl}" loading="lazy">`:'<div style="width:100%;height:100%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:18px">🖼</div>'}</div>`).join('')
-      : l.items.slice(0,4).map(i=>`<div class="lc-cov">${i.cover?`<img src="${i.cover}" loading="lazy">`:''}</div>`).join('');
+      : l.items.slice(0,4).map(i=>`<div class="lc-cov"><img src="${i.cover||''}" loading="lazy"></div>`).join('');
     const count = isImg ? (l.imageItems||[]).length : l.items.length;
     const typeBadge = isImg ? '<span style="font-size:9px;font-weight:800;background:rgba(251,146,60,.15);color:var(--orange);border:1px solid rgba(251,146,60,.25);border-radius:5px;padding:2px 6px;font-family:Syne,sans-serif;margin-left:6px">🖼 IMAGE</span>' : '';
     return `<div class="list-card" draggable="true" data-list-id="${l.id}"
@@ -4733,8 +4746,8 @@ function renderLists(){
       onclick="openListDetail('${l.id}')">
       <div class="lc-drag-handle" title="Glisser pour réorganiser">⠿</div>
       <div class="lc-covers">${covers}</div>
-      <div class="lc-title">${esc(l.title)}${typeBadge}</div>
-      <div class="lc-meta">${count} élément${count!==1?'s':''}</div>
+      <div class="lc-title">${esc(l.title)}${typeBadge}<span onclick="event.stopPropagation();openEditList('${l.id}')" title="Modifier le titre et la description" style="cursor:pointer;margin-left:8px;font-size:12px;opacity:.75">✏</span></div>
+      <div class="lc-meta">${l.desc?esc(l.desc)+' · ':''}${count} élément${count!==1?'s':''}</div>
       <button onclick="event.stopPropagation();deleteList('${l.id}')" style="position:absolute;top:8px;right:8px;background:rgba(248,113,113,.15);border:none;border-radius:6px;padding:4px 8px;color:#f87171;font-size:11px;cursor:pointer;font-weight:700">🗑 Supprimer</button>
     </div>`;
   }).join('')}</div>`;
@@ -4781,6 +4794,29 @@ function deleteList(id){
   S.lists=S.lists.filter(l=>l.id!==id);
   save(); renderLists();
   toast('Liste supprimée','ok');
+}
+
+// ─── MODIFIER LE TITRE / LA DESCRIPTION D'UNE LISTE ───
+function editListBtn(id){
+  return `<span onclick="openEditList('${id}')" title="Modifier le titre et la description" style="margin-left:8px;font-size:11px;font-weight:700;color:var(--acc);cursor:pointer;border:1px solid var(--border);border-radius:5px;padding:2px 7px;white-space:nowrap">✏ Modifier</span>`;
+}
+let _editListId=null;
+function openEditList(id){
+  const l=S.lists.find(x=>x.id===id); if(!l) return;
+  _editListId=id;
+  document.getElementById('el-title').value=l.title||'';
+  document.getElementById('el-desc').value=l.desc||'';
+  openM('m-editlist');
+  setTimeout(()=>document.getElementById('el-title').focus(),60);
+}
+function saveEditList(){
+  const l=S.lists.find(x=>x.id===_editListId); if(!l) return;
+  l.title=document.getElementById('el-title').value.trim()||'Sans titre';
+  l.desc=document.getElementById('el-desc').value.trim();      // vide = pas de description, aucun souci
+  save(); closeM('m-editlist');
+  renderLists();
+  if(S.currentListId===l.id) renderListDetail();
+  toast('Liste modifiée ✓','ok');
 }
 
 function openListDetail(id){
@@ -4849,7 +4885,7 @@ function renderListDetail(){
 
     document.getElementById('listdetail-body').innerHTML=`
       <h1 style="font-size:22px;font-family:'Syne',sans-serif;font-weight:800;margin-bottom:6px">${esc(list.title)}</h1>
-      <p style="color:var(--t2);font-size:13.5px;margin-bottom:16px">${esc(list.desc||'')} · ${items.length} élément${items.length!==1?'s':''} <span style="color:var(--orange);font-size:11px;font-weight:700;background:rgba(251,146,60,.1);border-radius:5px;padding:2px 8px;margin-left:4px">🖼 IMAGE</span></p>
+      <p style="color:var(--t2);font-size:13.5px;margin-bottom:16px">${list.desc?esc(list.desc)+' · ':''}${items.length} élément${items.length!==1?'s':''} ${editListBtn(list.id)} <span style="color:var(--orange);font-size:11px;font-weight:700;background:rgba(251,146,60,.1);border-radius:5px;padding:2px 8px;margin-left:4px">🖼 IMAGE</span></p>
       <button class="btn btn-primary" style="margin-bottom:20px" onclick="openAddImgItem()">＋ Ajouter une image</button>
       <div id="list-items-wrap">${itemsHtml}</div>
     `;
@@ -4972,7 +5008,7 @@ function renderListDetail(){
 
   document.getElementById('listdetail-body').innerHTML=`
     <h1 style="font-size:22px;font-family:'Syne',sans-serif;font-weight:800;margin-bottom:6px">${esc(list.title)}</h1>
-    <p style="color:var(--t2);font-size:13.5px;margin-bottom:10px">${esc(list.desc||'')} · ${list.items.length} œuvres${isRated?' · <span style="color:var(--acc);font-size:11px;font-weight:700">NOTÉE</span>':''}</p>
+    <p style="color:var(--t2);font-size:13.5px;margin-bottom:10px">${list.desc?esc(list.desc)+' · ':''}${list.items.length} œuvres${isRated?' · <span style="color:var(--acc);font-size:11px;font-weight:700">NOTÉE</span>':''} ${editListBtn(list.id)}</p>
     <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
       <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:7px 12px">
         <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--t3);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
