@@ -7132,7 +7132,7 @@ function effTags(t){
 function allTagChoices(){ return [...LEN_TAGS,...[...(S.allTags||[])].filter(x=>!LEN_TAGS.includes(x)).sort()]; }
 
 // ─── CATÉGORIES DE TAGS ───
-// S.tagCats = [{id,name,tags:[…]}]. « Sans tag » / « Sans note » ne sont jamais dans une catégorie.
+// S.tagCats = [{id,name,tags:[…]}]. « Sans tag » n'est jamais dans une catégorie.
 // La catégorie « Longueur » est intégrée : elle contient tous les tags automatiques (non déplaçables).
 const TAGCAT_LEN='__len__', TAGCAT_OTHER='__other__';
 let _tagManage=false;          // mode « Organiser » du filtre Suivi
@@ -7208,9 +7208,7 @@ function moveTagTo(cid){
 let _safTags=new Set();
 let _safTagsExcl=new Set();
 let _safNoTag=false;
-let _safNoNote=false;
 const SAF_NOTAG_VAL='__no_tag__';
-const SAF_NONOTE_VAL='__no_note__';
 let _suiviOpenCats=new Set();   // catégories dépliées dans le filtre Tags du Suivi
 function toggleSuiviTagCat(id){
   if(_suiviOpenCats.has(id)) _suiviOpenCats.delete(id); else _suiviOpenCats.add(id);
@@ -7224,12 +7222,11 @@ function populateSuiviTagFilter(){
   if(loose.length) groups.push({id:TAGCAT_OTHER,name:groups.length>1?'Sans catégorie':'Mes tags',tags:loose});
   const isOpen=g=>_tagManage||_suiviOpenCats.has(g.id);        // en mode Organiser, tout est déplié
   const cnt=g=>g.tags.filter(t=>_safTags.has(t)||_safTagsExcl.has(t)).length;
-  const anySel=_safNoTag||_safNoNote||_safTags.size>0||_safTagsExcl.size>0;
-  // Ligne 1 : Tous · Sans tag · Sans note MAL · une pastille par catégorie (clic = déplier / replier) · actions
+  const anySel=_safNoTag||_safTags.size>0||_safTagsExcl.size>0;
+  // Ligne 1 : Tous · Sans tag · une pastille par catégorie (clic = déplier / replier) · actions
   let h='<div style="flex:0 0 100%;display:flex;flex-wrap:wrap;gap:5px;align-items:center">'
     +`<button class="saf-pill${!anySel?' on':''}" data-tg="" onclick="toggleSAFTagMulti('',this)">Tous</button>`
     +`<button class="saf-pill${_safNoTag?' on':''}" data-tg="${SAF_NOTAG_VAL}" onclick="toggleSAFTagMulti(this.dataset.tg,this)">Sans tag</button>`
-    +`<button class="saf-pill${_safNoNote?' on':''}" data-tg="${SAF_NONOTE_VAL}" onclick="toggleSAFTagMulti(this.dataset.tg,this)" title="Œuvres dont la fiche affiche « ? » (pas assez de votes sur MyAnimeList)">Sans note MAL</button>`
     +groups.map(g=>{ const n=cnt(g), open=isOpen(g);
       return `<button class="saf-pill tagcat-chip${open?' open':''}${n?' has':''}" data-cid="${g.id}" onclick="toggleSuiviTagCat(this.dataset.cid)">${open?'▾':'▸'} ${esc(g.name)}${n?' · '+n:''}</button>`; }).join('')
     +'<span style="flex:1"></span>'
@@ -7260,7 +7257,7 @@ function deleteTagEverywhere(tag){
 (function(){
   const host=()=>document.getElementById('suivi-tag-pills');
   const pick=e=>{ const b=e.target.closest&&e.target.closest('.saf-pill'); return b&&b.dataset.tg?b:null; };
-  const special=v=>v===SAF_NOTAG_VAL||v===SAF_NONOTE_VAL;
+  const special=v=>v===SAF_NOTAG_VAL;
   document.addEventListener('contextmenu',e=>{ const h=host(); if(!h||!h.contains(e.target)) return; const b=pick(e); if(!b||special(b.dataset.tg)) return; e.preventDefault(); deleteTagEverywhere(b.dataset.tg); });
   let tm=null;
   document.addEventListener('touchstart',e=>{ const h=host(); if(!h||!h.contains(e.target)) return; const b=pick(e); if(!b||special(b.dataset.tg)) return; tm=setTimeout(()=>{ tm=null; deleteTagEverywhere(b.dataset.tg); },700); },{passive:true});
@@ -7268,13 +7265,10 @@ function deleteTagEverywhere(tag){
 })();
 function toggleSAFTagMulti(val, btn){
   if(!val){
-    _safTags.clear(); _safTagsExcl.clear(); _safNoTag=false; _safNoNote=false;
+    _safTags.clear(); _safTagsExcl.clear(); _safNoTag=false;
   } else if(val===SAF_NOTAG_VAL){
-    // « Sans tag » est exclusif avec les tags précis (mais se combine avec « Sans note »)
+    // « Sans tag » est exclusif avec les tags précis
     _safNoTag=!_safNoTag; _safTags.clear(); _safTagsExcl.clear();
-  } else if(val===SAF_NONOTE_VAL){
-    // « Sans note MAL » : œuvres sans note communautaire ; se combine avec les tags
-    _safNoNote=!_safNoNote;
   } else {
     _safNoTag=false;
     // Cycle : neutre → inclure → exclure → neutre (plusieurs tags, de plusieurs catégories, possibles)
@@ -7361,7 +7355,6 @@ function renderSuivi(){
         (_safTags.size===0||[..._safTags].every(g=>effTags(t).includes(g))) &&
         (_safTagsExcl.size===0||[..._safTagsExcl].every(g=>!effTags(t).includes(g)))
       )) &&
-      (!_safNoNote||!t._communityScore) &&   // « Sans note MAL » : pas assez de votes sur MyAnimeList (« ? » sur la fiche)
       (!_safDemo||(t._demographics||[]).some(d=>d===_safDemo)) &&
       (!_safStatus||(()=>{
         // Correspondance via _pubStatus normalisé (manga: "Finished"/"Publishing"/"On Hiatus",
@@ -7402,7 +7395,6 @@ function renderSuivi(){
           if(_inc.some(g=>LEN_TAGS.includes(g))) cats=[];   // les tags automatiques de longueur ne concernent que les œuvres
           else cats=cats.filter(c=>{ const ct=c.tags||[]; return _safNoTag?!ct.length:(_inc.every(g=>ct.includes(g))&&_exc.every(g=>!ct.includes(g))); });
         }
-        if(_safNoNote) cats=[];                                         // les catégories n'ont pas de note MAL
         if(safGroupsActive()) cats=cats.filter(catMatchesGroups);       // genre / thème : seulement si une œuvre de la catégorie correspond
       }
 
@@ -10867,7 +10859,7 @@ function resetSAF(){
   document.getElementById('saf-serietomes-max').value = '';
   document.getElementById('saf-serietomes-row').style.display = 'none';
   resetSAFGroups();
-  _safTags.clear(); _safTagsExcl.clear(); _safNoTag=false; _safNoNote=false;   // les pastilles sont repeintes par renderSuivi()
+  _safTags.clear(); _safTagsExcl.clear(); _safNoTag=false;   // les pastilles sont repeintes par renderSuivi()
   document.querySelectorAll('#suivi-adv-filters [data-demo]').forEach(b=>b.classList.toggle('on',b.dataset.demo===''));
   document.querySelectorAll('#saf-status-pills [data-st]').forEach(b=>b.classList.toggle('on',b.dataset.st===''));
   document.querySelectorAll('#saf-extra-genres [data-g]').forEach(b=>b.classList.toggle('on',b.dataset.g===''));
