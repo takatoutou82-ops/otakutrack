@@ -7211,27 +7211,40 @@ let _safNoTag=false;
 let _safNoNote=false;
 const SAF_NOTAG_VAL='__no_tag__';
 const SAF_NONOTE_VAL='__no_note__';
+let _suiviOpenCats=new Set();   // catégories dépliées dans le filtre Tags du Suivi
+function toggleSuiviTagCat(id){
+  if(_suiviOpenCats.has(id)) _suiviOpenCats.delete(id); else _suiviOpenCats.add(id);
+  populateSuiviTagFilter();
+}
 function populateSuiviTagFilter(){
   const wrap=document.getElementById('suivi-tag-pills');
   if(!wrap) return;
   const {len,cats,loose}=tagCatGroups();
+  const groups=[len,...cats.filter(c=>c.tags.length||_tagManage)];
+  if(loose.length) groups.push({id:TAGCAT_OTHER,name:groups.length>1?'Sans catégorie':'Mes tags',tags:loose});
+  const isOpen=g=>_tagManage||_suiviOpenCats.has(g.id);        // en mode Organiser, tout est déplié
+  const cnt=g=>g.tags.filter(t=>_safTags.has(t)||_safTagsExcl.has(t)).length;
   const anySel=_safNoTag||_safNoNote||_safTags.size>0||_safTagsExcl.size>0;
+  // Ligne 1 : Tous · Sans tag · Sans note MAL · une pastille par catégorie (clic = déplier / replier) · actions
   let h='<div style="flex:0 0 100%;display:flex;flex-wrap:wrap;gap:5px;align-items:center">'
     +`<button class="saf-pill${!anySel?' on':''}" data-tg="" onclick="toggleSAFTagMulti('',this)">Tous</button>`
     +`<button class="saf-pill${_safNoTag?' on':''}" data-tg="${SAF_NOTAG_VAL}" onclick="toggleSAFTagMulti(this.dataset.tg,this)">Sans tag</button>`
-    +`<button class="saf-pill${_safNoNote?' on':''}" data-tg="${SAF_NONOTE_VAL}" onclick="toggleSAFTagMulti(this.dataset.tg,this)">Sans note</button>`
+    +`<button class="saf-pill${_safNoNote?' on':''}" data-tg="${SAF_NONOTE_VAL}" onclick="toggleSAFTagMulti(this.dataset.tg,this)" title="Œuvres dont la fiche affiche « ? » (pas assez de votes sur MyAnimeList)">Sans note MAL</button>`
+    +groups.map(g=>{ const n=cnt(g), open=isOpen(g);
+      return `<button class="saf-pill tagcat-chip${open?' open':''}${n?' has':''}" data-cid="${g.id}" onclick="toggleSuiviTagCat(this.dataset.cid)">${open?'▾':'▸'} ${esc(g.name)}${n?' · '+n:''}</button>`; }).join('')
     +'<span style="flex:1"></span>'
     +'<button class="saf-pill" onclick="openTagCatModal()" title="Créer une catégorie de tags">＋ Catégorie</button>'
     +`<button class="saf-pill${_tagManage?' on':''}" onclick="toggleTagManage()" title="Ranger les tags dans les catégories">⚙ Organiser</button>`
     +'</div>';
-  const grp=(label,tags,head,empty)=>`<div class="tagcat-block"><div class="tagcat-h"><span>${esc(label)}</span>${head||''}</div><div class="tagcat-pills">${tags.length?tags.map(g=>tagPillHtml('suivi',g)).join(''):(empty||'')}</div></div>`;
-  h+=grp(len.name,len.tags,'<span style="font-weight:500;text-transform:none;letter-spacing:0">· automatique</span>');
-  const shown=cats.filter(c=>c.tags.length||_tagManage);
-  shown.forEach(c=>{
-    const ctl=_tagManage?`<button class="tagcat-btn" onclick="openTagCatModal('${c.id}')" title="Renommer">✏</button><button class="tagcat-btn" style="color:var(--red)" onclick="deleteTagCat('${c.id}')" title="Supprimer la catégorie">🗑</button>`:'';
-    h+=grp(c.name,c.tags,ctl,'<span class="tagcat-empty">Vide — touche un tag (↪) pour le ranger ici</span>');
+  // Lignes suivantes : les tags des catégories dépliées (choix multiple, y compris entre catégories)
+  groups.forEach(g=>{
+    if(!isOpen(g)) return;
+    const user=cats.some(c=>c.id===g.id);
+    const ctl=(_tagManage&&user)?`<button class="tagcat-btn" onclick="openTagCatModal('${g.id}')" title="Renommer">✏</button><button class="tagcat-btn" style="color:var(--red)" onclick="deleteTagCat('${g.id}')" title="Supprimer la catégorie">🗑</button>`:'';
+    const note=g.id===TAGCAT_LEN?'<span style="font-weight:500;text-transform:none;letter-spacing:0">· automatique</span>':'';
+    const body=g.tags.length?g.tags.map(t=>tagPillHtml('suivi',t)).join(''):'<span class="tagcat-empty">Vide — touche un tag (↪) pour le ranger ici</span>';
+    h+=`<div style="flex:0 0 100%;display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border:1px dashed var(--border2);border-radius:8px"><span class="tagcat-h" style="flex:0 0 100%;margin:0 0 2px"><span>${esc(g.name)}</span>${note}${ctl}</span>${body}</div>`;
   });
-  if(loose.length) h+=grp(shown.length?'Sans catégorie':'Mes tags',loose);
   wrap.innerHTML=h;
 }
 function deleteTagEverywhere(tag){
@@ -7260,7 +7273,7 @@ function toggleSAFTagMulti(val, btn){
     // « Sans tag » est exclusif avec les tags précis (mais se combine avec « Sans note »)
     _safNoTag=!_safNoTag; _safTags.clear(); _safTagsExcl.clear();
   } else if(val===SAF_NONOTE_VAL){
-    // « Sans note » : œuvres (et catégories) sans note ; se combine avec les tags
+    // « Sans note MAL » : œuvres sans note communautaire ; se combine avec les tags
     _safNoNote=!_safNoNote;
   } else {
     _safNoTag=false;
@@ -7348,7 +7361,7 @@ function renderSuivi(){
         (_safTags.size===0||[..._safTags].every(g=>effTags(t).includes(g))) &&
         (_safTagsExcl.size===0||[..._safTagsExcl].every(g=>!effTags(t).includes(g)))
       )) &&
-      (!_safNoNote||!(t.rating>0)) &&
+      (!_safNoNote||!t._communityScore) &&   // « Sans note MAL » : pas assez de votes sur MyAnimeList (« ? » sur la fiche)
       (!_safDemo||(t._demographics||[]).some(d=>d===_safDemo)) &&
       (!_safStatus||(()=>{
         // Correspondance via _pubStatus normalisé (manga: "Finished"/"Publishing"/"On Hiatus",
@@ -7389,7 +7402,7 @@ function renderSuivi(){
           if(_inc.some(g=>LEN_TAGS.includes(g))) cats=[];   // les tags automatiques de longueur ne concernent que les œuvres
           else cats=cats.filter(c=>{ const ct=c.tags||[]; return _safNoTag?!ct.length:(_inc.every(g=>ct.includes(g))&&_exc.every(g=>!ct.includes(g))); });
         }
-        if(_safNoNote) cats=cats.filter(c=>!(c.rating>0));              // « Sans note » s'applique aussi aux catégories
+        if(_safNoNote) cats=[];                                         // les catégories n'ont pas de note MAL
         if(safGroupsActive()) cats=cats.filter(catMatchesGroups);       // genre / thème : seulement si une œuvre de la catégorie correspond
       }
 
