@@ -1622,10 +1622,12 @@ body::after{
       <label class="fl" style="display:block;margin-bottom:6px">Ou importer un fichier JSON (crée la liste directement)</label>
       <input type="file" id="cl-json-input" accept=".json,application/json" style="display:none" onchange="importListJSON(this.files[0])">
       <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('cl-json-input').click()">📂 Importer un JSON</button>
-      <p style="font-size:11px;color:var(--t3);margin-top:6px">1 liste : {"title":"...", "items":[{"id":123,"title":"...","cover":"...","type":"manga"}, ...]}<br>Plusieurs listes d'un coup : {"lists":[{"title":"...","items":[...]}, {"title":"...","items":[...]}, ...]}</p>
+      <p style="font-size:11px;color:var(--t3);margin-top:6px">1 liste : {"title":"...", "items":[{"id":123,"title":"...","cover":"...","type":"manga"}, ...]}<br>Plusieurs listes d'un coup : {"lists":[{"title":"...","items":[...]}, {"title":"...","items":[...]}, ...]}<br>Sans ID MyAnimeList (image seule) : {"title":"...","cover":"https://…jpg","note":"…","kind":"ESSENTIEL","badge":"9/10"} — « id » est alors facultatif ; kind, badge, note et section sont optionnels.</p>
     </div>
   </div>
 </div>
+
+<input type="file" accept="image/*" id="list-item-img-input" style="display:none" onchange="onListItemImagePicked(this)">
 
 <!-- MODAL: NOUVELLE TIER LIST -->
 <div class="modal-bg" id="m-newctl">
@@ -2469,7 +2471,7 @@ body::after{
 <div class="modal-bg" id="m-list-note">
   <div class="modal" style="max-width:400px">
     <div class="modal-title"><span id="list-note-title">Note</span><span class="modal-close" onclick="closeM('m-list-note')">✕</span></div>
-    <p id="list-note-body" style="color:var(--t2);font-size:13.5px;line-height:1.7"></p>
+    <p id="list-note-body" style="color:var(--t2);font-size:13.5px;line-height:1.7;white-space:pre-line"></p>
   </div>
 </div>
 <!-- ═══════════════════════════════════════════ -->
@@ -4922,13 +4924,14 @@ function renderListDetail(){
       ondragend="listDragEnd(event)"
       ondrop="listDrop(event,${i})"
       style="cursor:grab">
-      <div class="cc-wrap" onclick="openWork(${item.id},'${item.type}')">
-        <img class="cc-img" src="${item.cover}" loading="lazy">
-        ${item.type==='manga'?`<div class="list-type-badge" style="top:5px;right:5px">📖 MANGA</div>`:''}
-        ${myRating?`<div class="cc-rating" style="position:absolute;top:5px;left:5px;z-index:2">★ ${myRating}</div>`:''}
-        ${item.note?`<div class="list-note-badge" title="Voir la note" onclick="event.stopPropagation();openListItemNote('${esc(displayName).replace(/'/g,"\\'")}','${esc(item.note).replace(/'/g,"\\'")}')">💬</div>`:''}
+      <div class="cc-wrap" onclick="${item.custom?(item.note?`openListItemNote('${jsq(displayName)}','${jsq(item.note)}')`:''):`openWork(${item.id},'${item.type}')`}">
+        ${item.cover?`<img class="cc-img" src="${esc(item.cover)}" loading="lazy">`:`<div class="cc-img" style="display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;background:linear-gradient(160deg,var(--bg3),var(--bg2,var(--bg3)));color:var(--t2);font-size:12px;font-weight:700;line-height:1.3">${esc(displayName)}</div>`}
+        ${item.custom?(item.kind?`<div class="list-type-badge" style="top:5px;right:5px">${esc(item.kind)}</div>`:''):(item.type==='manga'?`<div class="list-type-badge" style="top:5px;right:5px">📖 MANGA</div>`:'')}
+        ${myRating?`<div class="cc-rating" style="position:absolute;top:5px;left:5px;z-index:2">★ ${myRating}</div>`:(item.badge?`<div class="cc-rating" style="position:absolute;top:5px;left:5px;z-index:2">★ ${esc(item.badge)}</div>`:'')}
+        ${item.note?`<div class="list-note-badge" title="Voir la note" onclick="event.stopPropagation();openListItemNote('${jsq(displayName)}','${jsq(item.note)}')">💬</div>`:''}
         <div class="cc-overlay">
           <div class="cc-ov-btns">
+            ${item.custom?`<div class="cc-ov-btn" onclick="event.stopPropagation();pickListItemImage('${list.id}',${item.id})" title="Changer l'image" style="font-size:11px">🖼</div>`:''}
             <div class="cc-ov-btn" onclick="event.stopPropagation();removeFromListDetail(${i})" title="Retirer" style="font-size:11px">✕</div>
           </div>
         </div>
@@ -4982,6 +4985,29 @@ function renderListDetail(){
     ${tierHtml}
     <div id="list-items-wrap">${itemsHtml}</div>
   `;
+}
+
+// Échappe un texte pour l'insérer dans une chaîne JS '...' d'un attribut onclick (apostrophes, antislash, retours à la ligne)
+function jsq(s){ return esc(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'); }
+
+// Entrée libre (sans ID MAL) : choisir / remplacer son image (envoyée sur Cloudinary, comme les autres couvertures)
+let _listImgTarget=null;
+function pickListItemImage(listId,itemId){
+  _listImgTarget={listId,itemId};
+  const inp=document.getElementById('list-item-img-input'); if(inp) inp.click();
+}
+async function onListItemImagePicked(input){
+  const f=input.files&&input.files[0]; input.value='';
+  if(!f||!_listImgTarget) return;
+  const {listId,itemId}=_listImgTarget; _listImgTarget=null;
+  const list=S.lists.find(l=>l.id===listId);
+  const it=list&&list.items.find(x=>x.id==itemId);
+  if(!it) return;
+  toast('Envoi de l\'image…','ok');
+  try{
+    it.cover=await uploadToCloudinary(f,'list-covers');
+    save(); renderListDetail(); toast('Image mise à jour ✓','ok');
+  }catch(e){ toast('Échec de l\'envoi de l\'image','err'); }
 }
 
 function rateListItem(listId, itemId, rating){
@@ -5088,7 +5114,7 @@ async function fillListCovers(listId){
     if(S.currentListId===listId) renderListDetail(); else renderLists();
   };
   for(const it of l.items){
-    if(it.cover) continue;
+    if(it.cover||it.custom) continue;
     try{
       const w=await fetchWorkMain(it.type, it.id);
       const url=w?.images?.jpg?.large_image_url||w?.images?.jpg?.image_url||'';
@@ -5107,15 +5133,24 @@ function buildListFromJSON(data){
   const title=(data.title||'Liste importée').toString().trim();
   const rawItems=Array.isArray(data.items)?data.items:Array.isArray(data)?data:null;
   if(!rawItems) return null;
-  const items=rawItems.map(it=>({
-    id: Number(it.id||it.mal_id),
-    title: (it.title||'').toString(),
-    cover: (it.cover||it.image||'').toString(),
-    type: (it.type==='anime'?'anime':'manga'),
-    section: it.section ? it.section.toString() : undefined,
-    note: it.note ? it.note.toString() : undefined,
-    newGroup: it.newGroup === true
-  })).filter(it=>it.id && it.title);
+  const items=rawItems.map((it,i)=>{
+    const realId=Number(it.id||it.mal_id);
+    // Entrée « libre » : pas d'ID MyAnimeList (ou "custom":true). Elle reçoit un id NÉGATIF propre à la liste
+    // (jamais envoyé à MyAnimeList) et s'appuie sur "cover" (URL d'image), "note", "kind" (étiquette) et "badge" (ex. "9/10").
+    const custom=it.custom===true||!realId;
+    return {
+      id: custom ? -(i+1) : realId,
+      title: (it.title||'').toString(),
+      cover: (it.cover||it.image||'').toString(),
+      type: (it.type==='anime'?'anime':'manga'),
+      section: it.section ? it.section.toString() : undefined,
+      note: it.note ? it.note.toString() : undefined,
+      newGroup: it.newGroup === true,
+      custom: custom ? true : undefined,
+      kind: it.kind ? it.kind.toString() : undefined,
+      badge: (it.badge!==undefined&&it.badge!==null&&it.badge!=='') ? it.badge.toString() : undefined
+    };
+  }).filter(it=>it.id && it.title);
   if(!items.length) return null;
   const type=['normal','rated','image'].includes(data.type)?data.type:'normal';
   const listId='l'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
